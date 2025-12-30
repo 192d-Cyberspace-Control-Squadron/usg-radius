@@ -1,0 +1,22 @@
+[package]
+name = "radius-proto"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "RADIUS protocol implementation (RFC 2865, 2866, 2869, 5997)"
+
+[dependencies]
+md5.workspace = true
+rand.workspace = true
+thiserror.workspace = true
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+
+[dev-dependencies]
+hex.workspace = true
+
+[features]
+default = []
+serde = ["dep:serde", "dep:serde_json"]

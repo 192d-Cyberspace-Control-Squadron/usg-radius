@@ -20,3 +20,6 @@ target/
 
 /target
 .DS_STORE
+
+# Configuration files (may contain secrets)
+config.json

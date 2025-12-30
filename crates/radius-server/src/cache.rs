@@ -1,0 +1,323 @@
+//! Request deduplication cache
+//!
+//! Implements RFC 2865 duplicate request detection by caching recent requests.
+//! Helps prevent replay attacks and ensures proper handling of retransmissions.
+
+use dashmap::DashMap;
+use std::net::IpAddr;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+
+/// Request fingerprint for deduplication
+///
+/// A unique identifier for a RADIUS request based on:
+/// - Source IP address
+/// - Request Identifier (1 byte)
+/// - Request Authenticator (16 bytes)
+///
+/// Per RFC 2865 Section 2: "The Identifier field aids in matching requests and replies."
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub struct RequestFingerprint {
+    /// Source IP address of the request
+    pub source_ip: IpAddr,
+    /// Request identifier (0-255)
+    pub identifier: u8,
+    /// First 8 bytes of the request authenticator (for efficient storage)
+    pub auth_prefix: [u8; 8],
+}
+
+impl RequestFingerprint {
+    /// Create a new request fingerprint
+    pub fn new(source_ip: IpAddr, identifier: u8, authenticator: &[u8; 16]) -> Self {
+        let mut auth_prefix = [0u8; 8];
+        auth_prefix.copy_from_slice(&authenticator[..8]);
+
+        RequestFingerprint {
+            source_ip,
+            identifier,
+            auth_prefix,
+        }
+    }
+}
+
+/// Cached request entry with timestamp
+#[derive(Debug, Clone)]
+struct CacheEntry {
+    /// When this entry was created
+    inserted_at: Instant,
+    /// Full authenticator for verification (optional, for stricter checking)
+    _authenticator: [u8; 16],
+}
+
+/// Request cache for duplicate detection
+///
+/// Thread-safe cache that stores recent requests and automatically expires old entries.
+pub struct RequestCache {
+    /// Cache storage (thread-safe concurrent hash map)
+    cache: Arc<DashMap<RequestFingerprint, CacheEntry>>,
+    /// Maximum age of cache entries before expiry
+    ttl: Duration,
+    /// Maximum number of entries to keep in cache
+    max_entries: usize,
+}
+
+impl RequestCache {
+    /// Create a new request cache
+    ///
+    /// # Arguments
+    /// * `ttl` - Time-to-live for cache entries (typically 30-60 seconds)
+    /// * `max_entries` - Maximum number of entries to cache (prevents memory exhaustion)
+    pub fn new(ttl: Duration, max_entries: usize) -> Self {
+        RequestCache {
+            cache: Arc::new(DashMap::new()),
+            ttl,
+            max_entries,
+        }
+    }
+
+    /// Check if a request is a duplicate
+    ///
+    /// Returns `true` if this request was seen recently, `false` otherwise.
+    /// Also adds the request to the cache if it's new.
+    pub fn is_duplicate(&self, fingerprint: RequestFingerprint, authenticator: [u8; 16]) -> bool {
+        // Clean expired entries before checking
+        self.cleanup_expired();
+
+        // Check if request already exists
+        if self.cache.contains_key(&fingerprint) {
+            return true;
+        }
+
+        // Enforce max entries limit (simple: clean expired first, then check)
+        if self.cache.len() >= self.max_entries {
+            // Clean again to make room
+            self.cleanup_expired();
+
+            // If still at limit, remove an arbitrary entry
+            if self.cache.len() >= self.max_entries {
+                // Remove any entry to make room
+                if let Some(entry) = self.cache.iter().next() {
+                    let key_to_remove = entry.key().clone();
+                    drop(entry); // Release the lock
+                    self.cache.remove(&key_to_remove);
+                }
+            }
+        }
+
+        // Add to cache
+        self.cache.insert(
+            fingerprint,
+            CacheEntry {
+                inserted_at: Instant::now(),
+                _authenticator: authenticator,
+            },
+        );
+
+        false
+    }
+
+    /// Remove expired entries from the cache
+    fn cleanup_expired(&self) {
+        let now = Instant::now();
+
+        // Collect expired keys
+        let expired_keys: Vec<RequestFingerprint> = self
+            .cache
+            .iter()
+            .filter(|entry| now.duration_since(entry.value().inserted_at) > self.ttl)
+            .map(|entry| entry.key().clone())
+            .collect();
+
+        // Remove expired entries
+        for key in expired_keys {
+            self.cache.remove(&key);
+        }
+    }
+
+    /// Get the number of entries in the cache
+    pub fn len(&self) -> usize {
+        self.cache.len()
+    }
+
+    /// Check if the cache is empty
+    pub fn is_empty(&self) -> bool {
+        self.cache.is_empty()
+    }
+
+    /// Clear all entries from the cache
+    pub fn clear(&self) {
+        self.cache.clear();
+    }
+
+    /// Get cache statistics
+    pub fn stats(&self) -> CacheStats {
+        self.cleanup_expired();
+        CacheStats {
+            entries: self.cache.len(),
+            max_entries: self.max_entries,
+            ttl_seconds: self.ttl.as_secs(),
+        }
+    }
+}
+
+/// Cache statistics
+#[derive(Debug, Clone)]
+pub struct CacheStats {
+    /// Current number of entries
+    pub entries: usize,
+    /// Maximum number of entries
+    pub max_entries: usize,
+    /// TTL in seconds
+    pub ttl_seconds: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::thread;
+
+    #[test]
+    fn test_request_fingerprint_creation() {
+        let ip = "192.168.1.1".parse().unwrap();
+        let auth = [1u8; 16];
+        let fingerprint = RequestFingerprint::new(ip, 42, &auth);
+
+        assert_eq!(fingerprint.source_ip, ip);
+        assert_eq!(fingerprint.identifier, 42);
+        assert_eq!(fingerprint.auth_prefix, [1u8; 8]);
+    }
+
+    #[test]
+    fn test_request_fingerprint_equality() {
+        let ip = "192.168.1.1".parse().unwrap();
+        let auth = [1u8; 16];
+
+        let fp1 = RequestFingerprint::new(ip, 42, &auth);
+        let fp2 = RequestFingerprint::new(ip, 42, &auth);
+
+        assert_eq!(fp1, fp2);
+    }
+
+    #[test]
+    fn test_request_fingerprint_different_id() {
+        let ip = "192.168.1.1".parse().unwrap();
+        let auth = [1u8; 16];
+
+        let fp1 = RequestFingerprint::new(ip, 42, &auth);
+        let fp2 = RequestFingerprint::new(ip, 43, &auth);
+
+        assert_ne!(fp1, fp2);
+    }
+
+    #[test]
+    fn test_cache_duplicate_detection() {
+        let cache = RequestCache::new(Duration::from_secs(60), 1000);
+
+        let ip = "192.168.1.1".parse().unwrap();
+        let auth = [1u8; 16];
+        let fingerprint = RequestFingerprint::new(ip, 42, &auth);
+
+        // First request should not be a duplicate
+        assert!(!cache.is_duplicate(fingerprint.clone(), auth));
+
+        // Second request with same fingerprint should be a duplicate
+        assert!(cache.is_duplicate(fingerprint.clone(), auth));
+    }
+
+    #[test]
+    fn test_cache_different_requests() {
+        let cache = RequestCache::new(Duration::from_secs(60), 1000);
+
+        let ip = "192.168.1.1".parse().unwrap();
+        let auth1 = [1u8; 16];
+        let auth2 = [2u8; 16];
+
+        let fp1 = RequestFingerprint::new(ip, 42, &auth1);
+        let fp2 = RequestFingerprint::new(ip, 42, &auth2);
+
+        // Different authenticators should not be duplicates
+        assert!(!cache.is_duplicate(fp1, auth1));
+        assert!(!cache.is_duplicate(fp2, auth2));
+    }
+
+    #[test]
+    fn test_cache_expiry() {
+        let cache = RequestCache::new(Duration::from_millis(100), 1000);
+
+        let ip = "192.168.1.1".parse().unwrap();
+        let auth = [1u8; 16];
+        let fingerprint = RequestFingerprint::new(ip, 42, &auth);
+
+        // Add request to cache
+        assert!(!cache.is_duplicate(fingerprint.clone(), auth));
+
+        // Should still be in cache immediately
+        assert!(cache.is_duplicate(fingerprint.clone(), auth));
+
+        // Wait for expiry
+        thread::sleep(Duration::from_millis(150));
+
+        // Should be expired and removed
+        assert!(!cache.is_duplicate(fingerprint.clone(), auth));
+    }
+
+    #[test]
+    fn test_cache_max_entries() {
+        let cache = RequestCache::new(Duration::from_secs(60), 3);
+
+        let ip = "192.168.1.1".parse().unwrap();
+
+        // Add 3 requests (at max)
+        for i in 0..3u8 {
+            let auth = [i; 16];
+            let fp = RequestFingerprint::new(ip, i, &auth);
+            assert!(!cache.is_duplicate(fp, auth));
+        }
+
+        // Cache should be at max
+        assert_eq!(cache.len(), 3);
+
+        // Add one more - should still respect max (by removing one)
+        let auth = [99u8; 16];
+        let fp = RequestFingerprint::new(ip, 99, &auth);
+        cache.is_duplicate(fp, auth);
+
+        // Cache should not exceed max entries
+        assert!(cache.len() <= 3);
+    }
+
+    #[test]
+    fn test_cache_stats() {
+        let cache = RequestCache::new(Duration::from_secs(60), 1000);
+
+        let stats = cache.stats();
+        assert_eq!(stats.entries, 0);
+        assert_eq!(stats.max_entries, 1000);
+        assert_eq!(stats.ttl_seconds, 60);
+
+        // Add a request
+        let ip = "192.168.1.1".parse().unwrap();
+        let auth = [1u8; 16];
+        let fp = RequestFingerprint::new(ip, 42, &auth);
+        cache.is_duplicate(fp, auth);
+
+        let stats = cache.stats();
+        assert_eq!(stats.entries, 1);
+    }
+
+    #[test]
+    fn test_cache_clear() {
+        let cache = RequestCache::new(Duration::from_secs(60), 1000);
+
+        let ip = "192.168.1.1".parse().unwrap();
+        let auth = [1u8; 16];
+        let fp = RequestFingerprint::new(ip, 42, &auth);
+
+        cache.is_duplicate(fp, auth);
+        assert_eq!(cache.len(), 1);
+
+        cache.clear();
+        assert_eq!(cache.len(), 0);
+        assert!(cache.is_empty());
+    }
+}
