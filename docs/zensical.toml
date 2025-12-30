@@ -59,3 +59,42 @@ permalink = true
 
 [project.markdown_extensions.pymdownx.tabbed]
 alternate_style = true
+
+[[project.nav]]
+Home = "index.md"
+
+[[project.nav]]
+"Quick Reference" = "quick-reference.md"
+
+[[project.nav]]
+"Getting Started" = [
+    { Installation = "getting-started/installation.md" },
+]
+
+[[project.nav]]
+"Protocol" = [
+    { "Overview" = "protocol/overview.md" },
+    { "Attributes" = "protocol/attributes.md" },
+]
+
+[[project.nav]]
+"Configuration" = [
+    { "Server" = "configuration/server.md" },
+    { "Users" = "configuration/users.md" },
+    { "Clients" = "configuration/clients.md" },
+]
+
+[[project.nav]]
+"API Reference" = [
+    { "Overview" = "api/overview.md" },
+]
+
+[[project.nav]]
+"Security" = [
+    { "Overview" = "security/overview.md" },
+]
+
+[[project.nav]]
+"Examples" = [
+    { "Basic Authentication" = "examples/basic-auth.md" },
+]
