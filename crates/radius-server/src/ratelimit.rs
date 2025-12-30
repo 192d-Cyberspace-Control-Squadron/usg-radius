@@ -229,9 +229,9 @@ mod tests {
     fn test_bucket_consume() {
         let mut bucket = Bucket::new(10.0, 1.0);
         assert!(bucket.try_consume());
-        assert_eq!(bucket.tokens(), 9.0);
+        assert!((bucket.tokens() - 9.0).abs() < 0.1); // Allow for time-based refill
         assert!(bucket.try_consume());
-        assert_eq!(bucket.tokens(), 8.0);
+        assert!((bucket.tokens() - 8.0).abs() < 0.1); // Allow for time-based refill
     }
 
     #[test]

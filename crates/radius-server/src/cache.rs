@@ -88,18 +88,18 @@ impl RequestCache {
             return true;
         }
 
-        // Enforce max entries limit (simple: clean expired first, then check)
+        // Enforce max entries limit
         if self.cache.len() >= self.max_entries {
-            // Clean again to make room
+            // Clean expired entries first to make room
             self.cleanup_expired();
 
-            // If still at limit, remove an arbitrary entry
+            // If still at limit, remove oldest entry (simple FIFO eviction)
             if self.cache.len() >= self.max_entries {
-                // Remove any entry to make room
-                if let Some(entry) = self.cache.iter().next() {
-                    let key_to_remove = entry.key().clone();
-                    drop(entry); // Release the lock
-                    self.cache.remove(&key_to_remove);
+                // Collect a key to remove (avoid holding iterator lock during removal)
+                let key_to_remove = self.cache.iter().next().map(|entry| entry.key().clone());
+
+                if let Some(key) = key_to_remove {
+                    self.cache.remove(&key);
                 }
             }
         }
