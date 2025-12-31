@@ -290,6 +290,18 @@ impl Config {
                     name: Some("VPN Gateway".to_string()),
                     enabled: true,
                 },
+                Client {
+                    address: "2001:db8::/32".to_string(),
+                    secret: "client_secret_3".to_string(),
+                    name: Some("IPv6 Network".to_string()),
+                    enabled: true,
+                },
+                Client {
+                    address: "::1".to_string(),
+                    secret: "client_secret_4".to_string(),
+                    name: Some("IPv6 Localhost".to_string()),
+                    enabled: true,
+                },
             ],
             users: vec![
                 User {
@@ -479,5 +491,92 @@ mod tests {
 
         // Should fail validation due to invalid address
         assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_client_parse_network_ipv6_single() {
+        let client = Client {
+            address: "::1".to_string(),
+            secret: "secret".to_string(),
+            name: Some("Test".to_string()),
+            enabled: true,
+        };
+
+        let network = client.parse_network().unwrap();
+        assert!(network.contains("::1".parse().unwrap()));
+        assert!(!network.contains("::2".parse().unwrap()));
+    }
+
+    #[test]
+    fn test_client_parse_network_ipv6_cidr() {
+        let client = Client {
+            address: "2001:db8::/32".to_string(),
+            secret: "secret".to_string(),
+            name: Some("Test".to_string()),
+            enabled: true,
+        };
+
+        let network = client.parse_network().unwrap();
+        assert!(network.contains("2001:db8::1".parse().unwrap()));
+        assert!(network.contains("2001:db8:ffff:ffff:ffff:ffff:ffff:ffff".parse().unwrap()));
+        assert!(!network.contains("2001:db9::1".parse().unwrap()));
+    }
+
+    #[test]
+    fn test_client_matches_ipv6() {
+        let client = Client {
+            address: "fe80::/10".to_string(),
+            secret: "secret".to_string(),
+            name: Some("Test".to_string()),
+            enabled: true,
+        };
+
+        assert!(client.matches("fe80::1".parse().unwrap()).unwrap());
+        assert!(client.matches("fe80::dead:beef".parse().unwrap()).unwrap());
+        assert!(!client.matches("2001:db8::1".parse().unwrap()).unwrap());
+    }
+
+    #[test]
+    fn test_config_find_client_ipv6() {
+        let mut config = Config::default();
+        config.clients = vec![
+            Client {
+                address: "2001:db8::/32".to_string(),
+                secret: "secret1".to_string(),
+                name: Some("IPv6 Network".to_string()),
+                enabled: true,
+            },
+            Client {
+                address: "::1".to_string(),
+                secret: "secret2".to_string(),
+                name: Some("IPv6 Localhost".to_string()),
+                enabled: true,
+            },
+        ];
+
+        // Should find matching IPv6 client
+        let client = config.find_client("2001:db8::50".parse().unwrap());
+        assert!(client.is_some());
+        assert_eq!(client.unwrap().secret, "secret1");
+
+        // Should find exact IPv6 match
+        let client = config.find_client("::1".parse().unwrap());
+        assert!(client.is_some());
+        assert_eq!(client.unwrap().secret, "secret2");
+
+        // Should not find non-matching IPv6
+        let client = config.find_client("2001:db9::1".parse().unwrap());
+        assert!(client.is_none());
+    }
+
+    #[test]
+    fn test_config_socket_addr_ipv6() {
+        let mut config = Config::default();
+        config.listen_address = "::1".to_string();
+        config.listen_port = 1812;
+
+        let addr = config.socket_addr().unwrap();
+        assert_eq!(addr.port(), 1812);
+        assert!(addr.is_ipv6());
     }
 }

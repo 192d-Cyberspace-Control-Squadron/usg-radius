@@ -343,31 +343,117 @@ impl AuthHandler for MFAAuthHandler {
 
 ## Operational Security
 
-### Logging
+### Logging & Audit Trail
 
-Log all authentication attempts:
+USG RADIUS provides comprehensive logging and JSON audit trail capabilities.
+
+#### Structured Logging
+
+All authentication attempts are logged using the `tracing` framework:
 
 ```rust
-// Log successful authentication
-log::info!(
-    "ACCEPT: user={} from={} nas={}",
-    username, client_ip, nas_ip
+// Structured logging with fields
+info!(
+    username = %username,
+    client_ip = %source_ip,
+    request_id = request.identifier,
+    "Authentication successful"
 );
 
-// Log failed authentication
-log::warn!(
-    "REJECT: user={} from={} reason={}",
-    username, client_ip, reason
+warn!(
+    username = %username,
+    client_ip = %source_ip,
+    request_id = request.identifier,
+    "Authentication failed"
 );
 ```
 
+**Log Levels:**
+
+- `trace`: Extremely detailed debugging
+- `debug`: Detailed debugging information
+- `info`: Normal operational messages
+- `warn`: Warning messages (failed auth, rate limits)
+- `error`: Error messages
+
+**Configuration:**
+
+```json
+{
+  "log_level": "info"
+}
+```
+
+Or use environment variable:
+
+```bash
+RUST_LOG=debug usg_radius
+```
+
+#### JSON Audit Trail
+
+For compliance and forensic analysis, enable JSON audit logging:
+
+```json
+{
+  "audit_log_path": "/var/log/radius/audit.log"
+}
+```
+
+**Audit Events Logged:**
+
+- `auth_attempt` - Every authentication request
+- `auth_success` - Successful authentication
+- `auth_failure` - Failed authentication
+- `rate_limit_exceeded` - Rate limit violations
+- `unauthorized_client` - Requests from unauthorized IPs
+- `duplicate_request` - Replay attack attempts
+
+**Audit Entry Format:**
+
+```json
+{
+  "timestamp": 1735596000,
+  "timestamp_iso": "2025-12-30T12:00:00Z",
+  "event_type": "auth_success",
+  "username": "admin",
+  "client_ip": "192.168.1.50",
+  "client_name": "Internal Network",
+  "request_id": 42,
+  "server_version": "0.1.0"
+}
+```
+
 **What to log:**
+
 - ✅ Username (success and failure)
 - ✅ Source IP
-- ✅ Timestamp
-- ✅ NAS identifier
-- ✅ Result (accept/reject)
+- ✅ Client name (from config)
+- ✅ Timestamp (Unix + ISO 8601)
+- ✅ Event type
+- ✅ Request ID
+- ✅ Server version
 - ❌ Passwords (never log passwords)
+
+**Log Rotation:**
+
+Use system tools like `logrotate` for audit log rotation:
+
+```bash
+# /etc/logrotate.d/radius
+/var/log/radius/audit.log {
+    daily
+    rotate 90
+    compress
+    delaycompress
+    notifempty
+    create 0640 radius radius
+    sharedscripts
+    postrotate
+        systemctl reload radius
+    endscript
+}
+```
 
 ### Monitoring
 
@@ -467,12 +553,17 @@ Before deploying to production:
 - [ ] No secrets in version control
 - [ ] Strong password policy
 - [ ] Account lockout implemented
-- [ ] Comprehensive logging enabled
+- [ ] Comprehensive logging enabled (`log_level: "info"`)
+- [ ] JSON audit trail enabled (`audit_log_path` configured)
+- [ ] Strict RFC compliance enabled (`strict_rfc_compliance: true`)
+- [ ] Rate limiting configured appropriately
+- [ ] Request deduplication cache enabled
 - [ ] Monitoring and alerting configured
 - [ ] Incident response plan documented
 - [ ] Regular security audits scheduled
 - [ ] Secret rotation procedure defined
 - [ ] Backup and recovery tested
+- [ ] Log rotation configured (logrotate)
 
 ## References
 

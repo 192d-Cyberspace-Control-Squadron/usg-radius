@@ -28,7 +28,8 @@
 //!     let mut handler = SimpleAuthHandler::new();
 //!     handler.add_user("alice", "password");
 //!
-//!     // Create server
+//!     // Create server (supports both IPv4 and IPv6)
+//!     // Use "0.0.0.0:1812" for IPv4 or "[::]:1812" for IPv6
 //!     let config = ServerConfig::new(
 //!         "0.0.0.0:1812".parse()?,
 //!         b"secret",

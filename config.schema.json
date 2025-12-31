@@ -1,0 +1,239 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/anthropics/usg-radius/config.schema.json",
+  "title": "USG RADIUS Server Configuration",
+  "description": "Configuration schema for the USG RADIUS authentication server",
+  "type": "object",
+  "required": ["listen_address", "listen_port", "secret"],
+  "properties": {
+    "listen_address": {
+      "type": "string",
+      "description": "IP address the server binds to. Use 0.0.0.0 for all IPv4 interfaces, :: for all IPv6 interfaces, or specific IP for single interface",
+      "default": "0.0.0.0",
+      "examples": ["0.0.0.0", "127.0.0.1", "192.168.1.10", "::", "::1", "fe80::1"],
+      "oneOf": [
+        {
+          "format": "ipv4"
+        },
+        {
+          "format": "ipv6"
+        }
+      ]
+    },
+    "listen_port": {
+      "type": "integer",
+      "description": "UDP port the server listens on. Standard RADIUS authentication port is 1812",
+      "default": 1812,
+      "minimum": 1,
+      "maximum": 65535,
+      "examples": [1812, 1813, 1645]
+    },
+    "secret": {
+      "type": "string",
+      "description": "Default shared secret for client authentication. IMPORTANT: Use strong, random secrets (16+ characters) in production",
+      "minLength": 1,
+      "default": "testing123",
+      "examples": ["MyVerySecureSecret2024!"]
+    },
+    "clients": {
+      "type": "array",
+      "description": "List of authorized RADIUS clients (NAS devices, VPN gateways, etc.)",
+      "default": [],
+      "items": {
+        "type": "object",
+        "required": ["address", "secret"],
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "Client IP address or network in CIDR notation. Supports both IPv4 (e.g., 192.168.1.0/24) and IPv6 (e.g., 2001:db8::/32)",
+            "examples": [
+              "192.168.1.0/24",
+              "10.0.0.1",
+              "172.16.0.0/16",
+              "2001:db8::/32",
+              "::1",
+              "fe80::/10"
+            ]
+          },
+          "secret": {
+            "type": "string",
+            "description": "Shared secret for this client. Should be unique per client and 16+ characters",
+            "minLength": 1,
+            "examples": ["ClientSpecificSecret123!"]
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable name/description for this client",
+            "examples": ["Internal Network", "VPN Gateway", "Wireless Access Points"]
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether this client is enabled. Disabled clients are rejected",
+            "default": true
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "users": {
+      "type": "array",
+      "description": "List of users for authentication. Note: Production systems should use external auth backends (LDAP, AD, database)",
+      "default": [],
+      "items": {
+        "type": "object",
+        "required": ["username", "password"],
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "Username for authentication",
+            "minLength": 1,
+            "examples": ["admin", "john.doe"]
+          },
+          "password": {
+            "type": "string",
+            "description": "User password. Should follow strong password policies",
+            "minLength": 1,
+            "examples": ["SecurePassword123!"]
+          },
+          "attributes": {
+            "type": "object",
+            "description": "Additional RADIUS attributes to return on successful authentication",
+            "default": {},
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "verbose": {
+      "type": "boolean",
+      "description": "Enable verbose logging (deprecated: use log_level instead). WARNING: May log sensitive information",
+      "default": false,
+      "deprecated": true
+    },
+    "log_level": {
+      "type": "string",
+      "description": "Structured logging level. Can be overridden with RUST_LOG environment variable",
+      "default": "info",
+      "enum": ["trace", "debug", "info", "warn", "error"],
+      "examples": ["info", "debug"]
+    },
+    "audit_log_path": {
+      "type": ["string", "null"],
+      "description": "Path to JSON audit log file for compliance and forensics. Leave null to disable audit logging",
+      "default": null,
+      "examples": ["/var/log/radius/audit.log", "/var/log/usg-radius/audit.json"]
+    },
+    "strict_rfc_compliance": {
+      "type": "boolean",
+      "description": "Enable strict RFC 2865 compliance validation. When true, enforces required attributes, validates enumerated values, and rejects malformed packets. Set to false only if you have legacy non-compliant clients",
+      "default": true
+    },
+    "request_cache_ttl": {
+      "type": "integer",
+      "description": "Request deduplication cache time-to-live in seconds. Prevents replay attacks",
+      "default": 60,
+      "minimum": 1,
+      "maximum": 3600,
+      "examples": [60, 120, 300]
+    },
+    "request_cache_max_entries": {
+      "type": "integer",
+      "description": "Maximum number of cached requests for deduplication",
+      "default": 10000,
+      "minimum": 100,
+      "maximum": 1000000,
+      "examples": [10000, 50000, 100000]
+    },
+    "rate_limit_per_client_rps": {
+      "type": "integer",
+      "description": "Maximum requests per second per client IP. Set to 0 for unlimited",
+      "default": 100,
+      "minimum": 0,
+      "maximum": 10000,
+      "examples": [100, 200, 0]
+    },
+    "rate_limit_per_client_burst": {
+      "type": "integer",
+      "description": "Burst capacity for per-client rate limiting. Should be >= rate_limit_per_client_rps",
+      "default": 200,
+      "minimum": 0,
+      "maximum": 20000,
+      "examples": [200, 400, 1000]
+    },
+    "rate_limit_global_rps": {
+      "type": "integer",
+      "description": "Maximum requests per second globally (all clients). Set to 0 for unlimited",
+      "default": 1000,
+      "minimum": 0,
+      "maximum": 100000,
+      "examples": [1000, 5000, 10000]
+    },
+    "rate_limit_global_burst": {
+      "type": "integer",
+      "description": "Burst capacity for global rate limiting. Should be >= rate_limit_global_rps",
+      "default": 2000,
+      "minimum": 0,
+      "maximum": 200000,
+      "examples": [2000, 10000, 20000]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "listen_address": "0.0.0.0",
+      "listen_port": 1812,
+      "secret": "testing123",
+      "clients": [
+        {
+          "address": "192.168.1.0/24",
+          "secret": "internal_network_secret",
+          "name": "Internal Network",
+          "enabled": true
+        },
+        {
+          "address": "10.0.0.1",
+          "secret": "vpn_gateway_secret",
+          "name": "VPN Gateway",
+          "enabled": true
+        },
+        {
+          "address": "2001:db8::/32",
+          "secret": "ipv6_network_secret",
+          "name": "IPv6 Network",
+          "enabled": true
+        },
+        {
+          "address": "::1",
+          "secret": "localhost_ipv6_secret",
+          "name": "IPv6 Localhost",
+          "enabled": true
+        }
+      ],
+      "users": [
+        {
+          "username": "admin",
+          "password": "admin123",
+          "attributes": {}
+        },
+        {
+          "username": "user1",
+          "password": "password1",
+          "attributes": {}
+        }
+      ],
+      "verbose": false,
+      "log_level": "info",
+      "audit_log_path": "/var/log/radius/audit.log",
+      "strict_rfc_compliance": true,
+      "request_cache_ttl": 60,
+      "request_cache_max_entries": 10000,
+      "rate_limit_per_client_rps": 100,
+      "rate_limit_per_client_burst": 200,
+      "rate_limit_global_rps": 1000,
+      "rate_limit_global_burst": 2000
+    }
+  ]
+}

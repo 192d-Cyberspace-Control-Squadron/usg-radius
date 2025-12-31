@@ -23,7 +23,16 @@ usg_radius /path/to/custom-config.json
   "secret": "testing123",
   "clients": [],
   "users": [],
-  "verbose": false
+  "verbose": false,
+  "log_level": "info",
+  "audit_log_path": "/var/log/radius/audit.log",
+  "strict_rfc_compliance": true,
+  "request_cache_ttl": 60,
+  "request_cache_max_entries": 10000,
+  "rate_limit_per_client_rps": 100,
+  "rate_limit_per_client_burst": 200,
+  "rate_limit_global_rps": 1000,
+  "rate_limit_global_burst": 2000
 }
 ```
 
@@ -123,6 +132,183 @@ When enabled, logs include:
 !!! warning
     Verbose mode may log sensitive information. Use only for debugging.
 
+### log_level
+
+Structured logging level (replaces verbose flag).
+
+- **Type**: String
+- **Default**: `"info"`
+- **Valid values**: `"trace"`, `"debug"`, `"info"`, `"warn"`, `"error"`
+
+**Example:**
+
+```json
+{
+  "log_level": "debug"
+}
+```
+
+**Environment Override:**
+
+```bash
+RUST_LOG=debug usg_radius
+```
+
+### audit_log_path
+
+Path to JSON audit log file for compliance and forensics.
+
+- **Type**: String (optional)
+- **Default**: `null` (disabled)
+- **Format**: JSON lines
+
+**Example:**
+
+```json
+{
+  "audit_log_path": "/var/log/radius/audit.log"
+}
+```
+
+When enabled, logs all security events in JSON format:
+
+- Authentication attempts, successes, failures
+- Rate limit violations
+- Unauthorized client attempts
+- Duplicate request detection
+
+!!! tip
+    Use `logrotate` to manage audit log rotation and retention.
+
+### strict_rfc_compliance
+
+Enable strict RFC 2865 compliance validation.
+
+- **Type**: Boolean
+- **Default**: `true` (recommended)
+
+**Example:**
+
+```json
+{
+  "strict_rfc_compliance": true
+}
+```
+
+When enabled:
+
+- ✅ Enforces required attributes (User-Name, User-Password/CHAP-Password)
+- ✅ Validates enumerated values (Service-Type 1-13, etc.)
+- ✅ Type-specific validation (string UTF-8, integer/IPv4 lengths)
+- ✅ Rejects malformed packets
+
+When disabled (lenient mode):
+
+- ⚠️ Only enforces critical requirements
+- ⚠️ Allows invalid enumerated values for compatibility
+- ⚠️ Use only if you have non-compliant RADIUS clients
+
+!!! danger "Security Recommendation"
+    Keep strict mode enabled unless you have legacy clients that don't comply with RFC 2865.
+
+### request_cache_ttl
+
+Request deduplication cache time-to-live in seconds.
+
+- **Type**: Integer
+- **Default**: `60`
+- **Valid range**: 1-3600
+
+**Example:**
+
+```json
+{
+  "request_cache_ttl": 60
+}
+```
+
+Prevents replay attacks by caching request authenticators.
+
+### request_cache_max_entries
+
+Maximum number of cached requests for deduplication.
+
+- **Type**: Integer
+- **Default**: `10000`
+- **Valid range**: 100-1000000
+
+**Example:**
+
+```json
+{
+  "request_cache_max_entries": 10000
+}
+```
+
+### rate_limit_per_client_rps
+
+Maximum requests per second per client IP.
+
+- **Type**: Integer
+- **Default**: `100`
+- **Valid range**: 0 (unlimited) - 10000
+
+**Example:**
+
+```json
+{
+  "rate_limit_per_client_rps": 100
+}
+```
+
+### rate_limit_per_client_burst
+
+Burst capacity for per-client rate limiting.
+
+- **Type**: Integer
+- **Default**: `200`
+- **Valid range**: 0-20000
+
+**Example:**
+
+```json
+{
+  "rate_limit_per_client_burst": 200
+}
+```
+
+### rate_limit_global_rps
+
+Maximum requests per second globally (all clients).
+
+- **Type**: Integer
+- **Default**: `1000`
+- **Valid range**: 0 (unlimited) - 100000
+
+**Example:**
+
+```json
+{
+  "rate_limit_global_rps": 1000
+}
+```
+
+### rate_limit_global_burst
+
+Burst capacity for global rate limiting.
+
+- **Type**: Integer
+- **Default**: `2000`
+- **Valid range**: 0-200000
+
+**Example:**
+
+```json
+{
+  "rate_limit_global_burst": 2000
+}
+```
+
 ## Complete Configuration Example
 
 ### Basic Configuration
@@ -171,26 +357,39 @@ When enabled, logs include:
     {
       "address": "192.168.100.0/24",
       "secret": "WirelessAPSecret!2024",
-      "name": "Wireless Access Points"
+      "name": "Wireless Access Points",
+      "enabled": true
     },
     {
       "address": "10.20.30.40",
       "secret": "VPNGatewaySecret!2024",
-      "name": "Primary VPN Gateway"
+      "name": "Primary VPN Gateway",
+      "enabled": true
     },
     {
       "address": "10.20.30.41",
       "secret": "VPNGatewaySecret!2024",
-      "name": "Backup VPN Gateway"
+      "name": "Backup VPN Gateway",
+      "enabled": true
     },
     {
       "address": "172.16.0.0/16",
       "secret": "InternalNASSecret!2024",
-      "name": "Internal Network Access Servers"
+      "name": "Internal Network Access Servers",
+      "enabled": true
     }
   ],
   "users": [],
-  "verbose": false
+  "verbose": false,
+  "log_level": "info",
+  "audit_log_path": "/var/log/radius/audit.log",
+  "strict_rfc_compliance": true,
+  "request_cache_ttl": 60,
+  "request_cache_max_entries": 10000,
+  "rate_limit_per_client_rps": 100,
+  "rate_limit_per_client_burst": 200,
+  "rate_limit_global_rps": 1000,
+  "rate_limit_global_burst": 2000
 }
 ```
 

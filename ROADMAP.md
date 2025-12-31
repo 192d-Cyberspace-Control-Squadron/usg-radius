@@ -400,7 +400,8 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 - [ ] `radius-dict` - Dictionary file parser
 
 ### Additional Features
-- [ ] IPv6 support
+
+- [x] IPv6 support (dual-stack IPv4/IPv6 for all network operations)
 - [ ] RADIUS/JSON REST API
 - [ ] WebSocket transport
 - [ ] gRPC management API
