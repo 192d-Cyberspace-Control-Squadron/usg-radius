@@ -2953,6 +2953,7 @@ dependencies = [
 name = "usg-radius-workspace"
 version = "0.1.0"
 dependencies = [
+ "bcrypt",
  "criterion",
  "radius-proto",
  "radius-server",

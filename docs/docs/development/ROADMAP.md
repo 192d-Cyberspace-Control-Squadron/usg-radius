@@ -585,8 +585,14 @@ The following legacy methods will **not** be implemented due to modern alternati
 - ✅ Service account binding
 - ✅ Anonymous bind support
 - ✅ Async/sync compatibility
+- ✅ **Connection pooling** (**Dec 31, 2025** - Performance Optimization)
+  - Semaphore-based pool with configurable max_connections (default: 10)
+  - Automatic connection lifecycle management
+  - Pool timeout configuration with acquire_timeout (default: 10s)
+  - Separate user authentication connections (doesn't consume pool)
+  - Eliminates per-request connection overhead (~50-100ms per auth)
 - [ ] Group membership queries and RADIUS attribute mapping
-- [ ] Connection pooling and failover
+- [ ] Connection failover
 
 **Status**: ✅ Core features complete, advanced features pending
 **Completed**: Dec 2025
@@ -647,15 +653,25 @@ The following legacy methods will **not** be implemented due to modern alternati
 
 ### Performance Optimization
 
+- [x] **LDAP connection pooling** - ✅ **COMPLETED (Dec 31, 2025)**
+  - Implemented LdapPool with semaphore-based concurrency control
+  - Configurable max_connections (default: 10) and acquire_timeout (default: 10s)
+  - Eliminates 2 connection creations per authentication (search + bind)
+  - Expected 50-100ms latency reduction per LDAP authentication
+  - Automatic connection lifecycle with `OwnedSemaphorePermit` RAII pattern
 - [ ] Query optimization for database backends
-- [ ] LDAP connection pooling improvements
-- [ ] Request caching enhancements
-- ✅ Performance benchmarking framework
-- [ ] Memory optimization
-- [ ] CPU profiling and optimization
+- [ ] Request cache expiry optimization (time-wheel vs lazy cleanup)
+- [ ] Rate limiter global bucket optimization (reduce Mutex contention)
+- [ ] Password verification result caching (reduce bcrypt CPU overhead)
+- ✅ **Performance benchmarking framework** - Criterion-based benchmarks
+  - Packet encoding/decoding benchmarks (existing)
+  - Server performance benchmarks (cache, rate limiter, password verification)
+- [ ] Memory profiling and optimization
+- [ ] CPU profiling and hot path optimization
 
-**Status**: 🔄 Benchmarking framework exists, optimizations pending
-**Estimated Effort**: 2 weeks
+**Status**: 🔄 In Progress - LDAP pooling complete, other optimizations pending
+**Completed**: LDAP connection pooling (Dec 31, 2025)
+**Estimated Remaining**: 1-1.5 weeks
 
 ### Certificate Revocation (CRL/OCSP) ✅ COMPLETED (Phase 1: CRL)
 

@@ -95,9 +95,14 @@ tls = ["radius-proto/tls", "radius-server/tls"]
 
 [dev-dependencies]
 criterion.workspace = true
+bcrypt.workspace = true
 
 [[bench]]
 name = "packet_benchmarks"
+harness = false
+
+[[bench]]
+name = "server_benchmarks"
 harness = false
 
 [profile.release]

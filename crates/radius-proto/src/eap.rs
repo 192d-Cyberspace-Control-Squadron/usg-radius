@@ -1506,6 +1506,34 @@ pub mod eap_tls {
                 .map(|certs| certs.iter().map(|c| c.as_ref().to_vec()).collect())
         }
 
+        /// Get mutable access to the underlying TLS connection
+        ///
+        /// This is used by EAP-TEAP to encrypt/decrypt Phase 2 application data.
+        ///
+        /// # Returns
+        /// * `Ok(&mut ServerConnection)` - Mutable reference to TLS connection
+        /// * `Err(EapError)` - Connection not initialized
+        ///
+        /// # Example
+        ///
+        /// ```no_run
+        /// # use radius_proto::eap::eap_tls::EapTlsServer;
+        /// # use std::sync::Arc;
+        /// # use std::io::Write;
+        /// # let config = Arc::new(rustls::ServerConfig::builder().with_no_client_auth().with_single_cert(vec![], rustls::pki_types::PrivateKeyDer::Pkcs8(vec![].into())).unwrap());
+        /// # let mut server = EapTlsServer::new(config);
+        /// # server.initialize_connection().unwrap();
+        /// // After handshake is complete, write application data
+        /// let conn = server.get_connection_mut()?;
+        /// conn.writer().write_all(b"application data")?;
+        /// # Ok::<(), Box<dyn std::error::Error>>(())
+        /// ```
+        pub fn get_connection_mut(&mut self) -> Result<&mut rustls::ServerConnection, EapError> {
+            self.connection
+                .as_mut()
+                .ok_or(EapError::TlsError("TLS connection not initialized".to_string()))
+        }
+
         /// Verify client certificate identity matches EAP identity
         ///
         /// For mutual TLS, this checks that the certificate's Subject CN

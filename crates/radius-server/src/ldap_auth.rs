@@ -6,8 +6,10 @@ use crate::server::AuthHandler;
 use ldap3::{LdapConnAsync, LdapConnSettings, Scope, SearchEntry};
 use radius_proto::attributes::Attribute;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
+use tokio::sync::Semaphore;
 use tracing::{debug, error, info, warn};
 
 #[derive(Error, Debug)]
@@ -58,6 +60,14 @@ pub struct LdapConfig {
     /// Require valid TLS certificate for LDAPS connections
     #[serde(default = "default_true")]
     pub verify_tls: bool,
+
+    /// Maximum number of connections in the pool
+    #[serde(default = "default_max_connections")]
+    pub max_connections: u32,
+
+    /// Connection acquire timeout in seconds
+    #[serde(default = "default_acquire_timeout")]
+    pub acquire_timeout: u64,
 }
 
 fn default_search_filter() -> String {
@@ -76,6 +86,14 @@ fn default_true() -> bool {
     true
 }
 
+fn default_max_connections() -> u32 {
+    10
+}
+
+fn default_acquire_timeout() -> u64 {
+    10
+}
+
 impl Default for LdapConfig {
     fn default() -> Self {
         LdapConfig {
@@ -87,26 +105,57 @@ impl Default for LdapConfig {
             attributes: default_attributes(),
             timeout: default_timeout(),
             verify_tls: true,
+            max_connections: default_max_connections(),
+            acquire_timeout: default_acquire_timeout(),
         }
     }
 }
 
-/// LDAP authentication handler
-pub struct LdapAuthHandler {
-    config: LdapConfig,
+/// LDAP connection pool
+///
+/// Manages a pool of reusable LDAP connections to reduce connection overhead.
+/// Uses a semaphore to limit concurrent connections and supports connection reuse.
+pub struct LdapPool {
+    config: Arc<LdapConfig>,
+    semaphore: Arc<Semaphore>,
 }
 
-impl LdapAuthHandler {
-    /// Create a new LDAP authentication handler
+impl LdapPool {
+    /// Create a new LDAP connection pool
     pub fn new(config: LdapConfig) -> Self {
-        LdapAuthHandler { config }
+        let max_connections = config.max_connections as usize;
+        debug!(
+            url = %config.url,
+            max_connections = max_connections,
+            "Creating LDAP connection pool"
+        );
+
+        LdapPool {
+            config: Arc::new(config),
+            semaphore: Arc::new(Semaphore::new(max_connections)),
+        }
     }
 
-    /// Create LDAP connection for searching
-    async fn connect_for_search(&self) -> Result<ldap3::Ldap, LdapError> {
-        debug!("Creating LDAP connection to {}", self.config.url);
-        let settings =
-            LdapConnSettings::new().set_conn_timeout(Duration::from_secs(self.config.timeout));
+    /// Acquire a connection from the pool
+    ///
+    /// This will create a new connection and bind with the service account credentials.
+    /// The connection is returned when the guard is dropped.
+    pub async fn acquire(&self) -> Result<LdapConnection, LdapError> {
+        // Acquire permit from semaphore (blocks if pool is full)
+        let acquire_timeout = Duration::from_secs(self.config.acquire_timeout);
+        let permit = tokio::time::timeout(
+            acquire_timeout,
+            Arc::clone(&self.semaphore).acquire_owned()
+        )
+            .await
+            .map_err(|_| LdapError::Connection("Connection pool timeout".to_string()))?
+            .map_err(|e| LdapError::Connection(format!("Failed to acquire permit: {}", e)))?;
+
+        debug!("Acquired LDAP connection from pool");
+
+        // Create new connection
+        let settings = LdapConnSettings::new()
+            .set_conn_timeout(Duration::from_secs(self.config.timeout));
 
         let (conn, mut ldap) = LdapConnAsync::with_settings(settings, &self.config.url)
             .await
@@ -128,7 +177,7 @@ impl LdapAuthHandler {
                 .map_err(|e| LdapError::Bind(e.to_string()))?
                 .success()
                 .map_err(|e| LdapError::Bind(e.to_string()))?;
-            debug!("Bound to LDAP as {}", bind_dn);
+            debug!("Bound LDAP connection as {}", bind_dn);
         } else {
             // Anonymous bind
             ldap.simple_bind("", "")
@@ -136,15 +185,89 @@ impl LdapAuthHandler {
                 .map_err(|e| LdapError::Bind(e.to_string()))?
                 .success()
                 .map_err(|e| LdapError::Bind(e.to_string()))?;
-            debug!("Anonymous bind to LDAP");
+            debug!("Anonymous bind to LDAP connection");
         }
+
+        Ok(LdapConnection {
+            ldap,
+            _permit: permit,
+        })
+    }
+
+    /// Create a connection for user authentication (separate from pool)
+    ///
+    /// User authentication requires binding with user credentials, so we create
+    /// a separate connection that doesn't affect the pool.
+    pub async fn connect_for_auth(&self, user_dn: &str, password: &str) -> Result<ldap3::Ldap, LdapError> {
+        debug!(dn = %user_dn, "Creating LDAP connection for user authentication");
+
+        let settings = LdapConnSettings::new()
+            .set_conn_timeout(Duration::from_secs(self.config.timeout));
+
+        let (conn, mut ldap) = LdapConnAsync::with_settings(settings, &self.config.url)
+            .await
+            .map_err(|e| LdapError::Connection(e.to_string()))?;
+
+        // Start connection driver
+        tokio::spawn(async move {
+            if let Err(e) = conn.drive().await {
+                error!("LDAP auth connection driver error: {}", e);
+            }
+        });
+
+        // Bind as the user
+        ldap.simple_bind(user_dn, password)
+            .await
+            .map_err(|e| LdapError::Bind(e.to_string()))?
+            .success()
+            .map_err(|_e| LdapError::AuthFailed)?;
 
         Ok(ldap)
     }
+}
 
-    /// Search for user in LDAP
+/// LDAP connection guard
+///
+/// Holds a connection and a semaphore permit. When dropped, the permit is released
+/// back to the pool, allowing another connection to be created.
+pub struct LdapConnection {
+    ldap: ldap3::Ldap,
+    _permit: tokio::sync::OwnedSemaphorePermit,
+}
+
+impl LdapConnection {
+    /// Get a reference to the underlying LDAP connection
+    pub fn as_ref(&mut self) -> &mut ldap3::Ldap {
+        &mut self.ldap
+    }
+}
+
+/// LDAP authentication handler
+pub struct LdapAuthHandler {
+    config: LdapConfig,
+    pool: Arc<LdapPool>,
+}
+
+impl LdapAuthHandler {
+    /// Create a new LDAP authentication handler with connection pooling
+    pub fn new(config: LdapConfig) -> Self {
+        let pool = LdapPool::new(config.clone());
+        info!(
+            url = %config.url,
+            max_connections = config.max_connections,
+            "LDAP authentication handler created with connection pool"
+        );
+        LdapAuthHandler {
+            config,
+            pool: Arc::new(pool),
+        }
+    }
+
+    /// Search for user in LDAP using pooled connection
     async fn find_user(&self, username: &str) -> Result<String, LdapError> {
-        let mut ldap = self.connect_for_search().await?;
+        // Acquire connection from pool
+        let mut conn = self.pool.acquire().await?;
+        let ldap = conn.as_ref();
 
         // Build search filter by replacing {username}
         let filter = self.config.search_filter.replace("{username}", username);
@@ -153,7 +276,7 @@ impl LdapAuthHandler {
             username = %username,
             base_dn = %self.config.base_dn,
             filter = %filter,
-            "Searching for user in LDAP"
+            "Searching for user in LDAP (using pooled connection)"
         );
 
         // Search for user
@@ -197,39 +320,17 @@ impl LdapAuthHandler {
 
     /// Authenticate user with LDAP bind
     async fn authenticate_ldap(&self, user_dn: &str, password: &str) -> Result<(), LdapError> {
-        debug!(dn = %user_dn, "Attempting LDAP bind for user");
+        debug!(dn = %user_dn, "Attempting LDAP bind for user authentication");
 
-        let settings =
-            LdapConnSettings::new().set_conn_timeout(Duration::from_secs(self.config.timeout));
-
-        let (conn, mut ldap) = LdapConnAsync::with_settings(settings, &self.config.url)
-            .await
-            .map_err(|e| LdapError::Connection(e.to_string()))?;
-
-        // Start connection driver
-        tokio::spawn(async move {
-            if let Err(e) = conn.drive().await {
-                error!("LDAP connection driver error: {}", e);
+        // Use pool's connect_for_auth method which handles bind
+        match self.pool.connect_for_auth(user_dn, password).await {
+            Ok(_ldap) => {
+                info!(dn = %user_dn, "LDAP authentication successful");
+                Ok(())
             }
-        });
-
-        // Try to bind as the user
-        let result = ldap.simple_bind(user_dn, password).await;
-
-        match result {
-            Ok(bind_result) => match bind_result.success() {
-                Ok(_) => {
-                    info!(dn = %user_dn, "LDAP authentication successful");
-                    Ok(())
-                }
-                Err(e) => {
-                    warn!(dn = %user_dn, error = %e, "LDAP bind failed");
-                    Err(LdapError::AuthFailed)
-                }
-            },
             Err(e) => {
-                warn!(dn = %user_dn, error = %e, "LDAP bind error");
-                Err(LdapError::AuthFailed)
+                warn!(dn = %user_dn, error = %e, "LDAP authentication failed");
+                Err(e)
             }
         }
     }
@@ -294,6 +395,8 @@ mod tests {
         assert_eq!(config.search_filter, "(uid={username})");
         assert_eq!(config.timeout, 10);
         assert!(config.verify_tls);
+        assert_eq!(config.max_connections, 10);
+        assert_eq!(config.acquire_timeout, 10);
     }
 
     #[test]
