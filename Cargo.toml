@@ -46,6 +46,7 @@ clap = { version = "4.5", features = ["derive", "cargo"] }
 # Development
 hex = "0.4"
 tempfile = "3.0"
+criterion = "0.5"
 
 # Internal crates
 radius-proto = { path = "crates/radius-proto" }
@@ -62,6 +63,13 @@ radius-proto.workspace = true
 radius-server.workspace = true
 tokio.workspace = true
 tempfile.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+
+[[bench]]
+name = "packet_benchmarks"
+harness = false
 
 [profile.release]
 opt-level = 3

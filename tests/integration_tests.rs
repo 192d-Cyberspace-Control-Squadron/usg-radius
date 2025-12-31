@@ -7,8 +7,8 @@
 //! - Configuration validation
 //! - Audit logging
 
-use radius_proto::{Attribute, AttributeType, Code, Packet};
 use radius_proto::auth::{encrypt_user_password, generate_request_authenticator};
+use radius_proto::{Attribute, AttributeType, Code, Packet};
 use radius_server::{Config, RadiusServer, ServerConfig, SimpleAuthHandler};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -16,12 +16,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 
 /// Test helper to create a RADIUS Access-Request packet
-fn create_access_request(
-    username: &str,
-    password: &str,
-    secret: &[u8],
-    identifier: u8,
-) -> Packet {
+fn create_access_request(username: &str, password: &str, secret: &[u8], identifier: u8) -> Packet {
     let req_auth = generate_request_authenticator();
     let mut packet = Packet::new(Code::AccessRequest, identifier, req_auth);
 
@@ -76,7 +71,9 @@ async fn test_successful_authentication() {
     // Create server
     let server_config = ServerConfig::from_config(config.clone(), Arc::new(handler))
         .expect("Failed to create server config");
-    let server = RadiusServer::new(server_config).await.expect("Failed to create server");
+    let server = RadiusServer::new(server_config)
+        .await
+        .expect("Failed to create server");
 
     // Get the actual port assigned
     let server_addr = server.local_addr().expect("Failed to get server address");
@@ -90,12 +87,7 @@ async fn test_successful_authentication() {
     sleep(Duration::from_millis(500)).await;
 
     // Create and send Access-Request
-    let packet = create_access_request(
-        "testuser",
-        "testpass",
-        b"testing123",
-        1,
-    );
+    let packet = create_access_request("testuser", "testpass", b"testing123", 1);
 
     let response = send_radius_request(&packet, server_addr)
         .await
@@ -118,7 +110,9 @@ async fn test_failed_authentication_wrong_password() {
 
     let server_config = ServerConfig::from_config(config, Arc::new(handler))
         .expect("Failed to create server config");
-    let server = RadiusServer::new(server_config).await.expect("Failed to create server");
+    let server = RadiusServer::new(server_config)
+        .await
+        .expect("Failed to create server");
     let server_addr = server.local_addr().expect("Failed to get server address");
 
     tokio::spawn(async move {
@@ -128,12 +122,7 @@ async fn test_failed_authentication_wrong_password() {
     sleep(Duration::from_millis(500)).await;
 
     // Send request with wrong password
-    let packet = create_access_request(
-        "testuser",
-        "wrongpass",
-        b"testing123",
-        2,
-    );
+    let packet = create_access_request("testuser", "wrongpass", b"testing123", 2);
 
     let response = send_radius_request(&packet, server_addr)
         .await
@@ -156,7 +145,9 @@ async fn test_failed_authentication_unknown_user() {
 
     let server_config = ServerConfig::from_config(config, Arc::new(handler))
         .expect("Failed to create server config");
-    let server = RadiusServer::new(server_config).await.expect("Failed to create server");
+    let server = RadiusServer::new(server_config)
+        .await
+        .expect("Failed to create server");
     let server_addr = server.local_addr().expect("Failed to get server address");
 
     tokio::spawn(async move {
@@ -166,12 +157,7 @@ async fn test_failed_authentication_unknown_user() {
     sleep(Duration::from_millis(500)).await;
 
     // Send request for unknown user
-    let packet = create_access_request(
-        "unknownuser",
-        "password",
-        b"testing123",
-        3,
-    );
+    let packet = create_access_request("unknownuser", "password", b"testing123", 3);
 
     let response = send_radius_request(&packet, server_addr)
         .await
@@ -196,7 +182,9 @@ async fn test_multiple_sequential_authentications() {
 
     let server_config = ServerConfig::from_config(config, Arc::new(handler))
         .expect("Failed to create server config");
-    let server = RadiusServer::new(server_config).await.expect("Failed to create server");
+    let server = RadiusServer::new(server_config)
+        .await
+        .expect("Failed to create server");
     let server_addr = server.local_addr().expect("Failed to get server address");
 
     tokio::spawn(async move {
@@ -206,19 +194,22 @@ async fn test_multiple_sequential_authentications() {
     sleep(Duration::from_millis(500)).await;
 
     // Test multiple users sequentially
-    for (i, (username, password)) in [("user1", "pass1"), ("user2", "pass2"), ("user3", "pass3")].iter().enumerate() {
-        let packet = create_access_request(
-            username,
-            password,
-            b"testing123",
-            (i + 1) as u8,
-        );
+    for (i, (username, password)) in [("user1", "pass1"), ("user2", "pass2"), ("user3", "pass3")]
+        .iter()
+        .enumerate()
+    {
+        let packet = create_access_request(username, password, b"testing123", (i + 1) as u8);
 
         let response = send_radius_request(&packet, server_addr)
             .await
             .expect("Failed to send request");
 
-        assert_eq!(response.code, Code::AccessAccept, "Failed for user {}", username);
+        assert_eq!(
+            response.code,
+            Code::AccessAccept,
+            "Failed for user {}",
+            username
+        );
         assert_eq!(response.identifier, (i + 1) as u8);
     }
 }
@@ -226,25 +217,28 @@ async fn test_multiple_sequential_authentications() {
 #[test]
 fn test_env_var_expansion() {
     use std::env;
-    use tempfile::NamedTempFile;
     use std::io::Write;
+    use tempfile::NamedTempFile;
 
     // Set test environment variable
     env::set_var("TEST_RADIUS_SECRET", "env_secret_value");
 
     // Create temporary config file with env var
     let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
-    write!(temp_file, r#"{{
+    write!(
+        temp_file,
+        r#"{{
         "listen_address": "::",
         "listen_port": 1812,
         "secret": "${{TEST_RADIUS_SECRET}}",
         "clients": [],
         "users": []
-    }}"#).expect("Failed to write to temp file");
+    }}"#
+    )
+    .expect("Failed to write to temp file");
 
     // Load config
-    let config = Config::from_file(temp_file.path())
-        .expect("Failed to load config with env var");
+    let config = Config::from_file(temp_file.path()).expect("Failed to load config with env var");
 
     // Verify env var was expanded
     assert_eq!(config.secret, "env_secret_value");
@@ -255,20 +249,258 @@ fn test_env_var_expansion() {
 
 #[test]
 fn test_env_var_not_found() {
-    use tempfile::NamedTempFile;
     use std::io::Write;
+    use tempfile::NamedTempFile;
 
     // Create config with non-existent env var
     let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
-    write!(temp_file, r#"{{
+    write!(
+        temp_file,
+        r#"{{
         "listen_address": "::",
         "listen_port": 1812,
         "secret": "${{NONEXISTENT_VAR_12345}}",
         "clients": [],
         "users": []
-    }}"#).expect("Failed to write to temp file");
+    }}"#
+    )
+    .expect("Failed to write to temp file");
 
     // Should fail to load
     let result = Config::from_file(temp_file.path());
     assert!(result.is_err(), "Should fail with missing env var");
+}
+
+#[tokio::test]
+async fn test_rate_limiting() {
+    let mut config = Config::default();
+    config.listen_address = "127.0.0.1".to_string();
+    config.listen_port = 0;
+    config.secret = "testing123".to_string();
+
+    // Set very low rate limits for testing
+    config.rate_limit_per_client_rps = Some(2);
+    config.rate_limit_per_client_burst = Some(3);
+
+    let mut handler = SimpleAuthHandler::new();
+    handler.add_user("testuser", "testpass");
+
+    let server_config = ServerConfig::from_config(config, Arc::new(handler))
+        .expect("Failed to create server config");
+    let server = RadiusServer::new(server_config)
+        .await
+        .expect("Failed to create server");
+    let server_addr = server.local_addr().expect("Failed to get server address");
+
+    tokio::spawn(async move {
+        server.run().await.ok();
+    });
+
+    sleep(Duration::from_millis(500)).await;
+
+    // Send requests rapidly to trigger rate limit
+    // First 3 should succeed (burst), then rate limit kicks in
+    let mut success_count = 0;
+    let mut rate_limited = false;
+
+    for i in 0..10 {
+        let packet = create_access_request("testuser", "testpass", b"testing123", i);
+
+        // Try to send request with short timeout
+        let result = tokio::time::timeout(
+            Duration::from_millis(100),
+            send_radius_request(&packet, server_addr),
+        )
+        .await;
+
+        match result {
+            Ok(Ok(_response)) => {
+                success_count += 1;
+            }
+            Ok(Err(_)) | Err(_) => {
+                rate_limited = true;
+            }
+        }
+    }
+
+    // Should have some successful requests and some rate limited
+    assert!(success_count > 0, "Should have some successful requests");
+    assert!(rate_limited, "Should have triggered rate limiting");
+    assert!(
+        success_count < 10,
+        "Not all requests should succeed due to rate limiting"
+    );
+}
+
+#[tokio::test]
+async fn test_client_ip_validation() {
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    // Create config with specific client IP restrictions
+    let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
+    write!(
+        temp_file,
+        r#"{{
+        "listen_address": "127.0.0.1",
+        "listen_port": 1812,
+        "secret": "testing123",
+        "clients": [
+            {{
+                "name": "Test Client",
+                "address": "127.0.0.1",
+                "secret": "testing123"
+            }}
+        ],
+        "users": [
+            {{
+                "username": "testuser",
+                "password": "testpass"
+            }}
+        ]
+    }}"#
+    )
+    .expect("Failed to write to temp file");
+
+    let mut config = Config::from_file(temp_file.path()).expect("Failed to load config");
+
+    // Override to use OS-assigned port for testing
+    config.listen_port = 0;
+
+    let mut handler = SimpleAuthHandler::new();
+    handler.add_user("testuser", "testpass");
+
+    let server_config = ServerConfig::from_config(config, Arc::new(handler))
+        .expect("Failed to create server config");
+    let server = RadiusServer::new(server_config)
+        .await
+        .expect("Failed to create server");
+    let server_addr = server.local_addr().expect("Failed to get server address");
+
+    tokio::spawn(async move {
+        server.run().await.ok();
+    });
+
+    sleep(Duration::from_millis(500)).await;
+
+    // Send request from authorized IP (127.0.0.1)
+    let packet = create_access_request("testuser", "testpass", b"testing123", 1);
+
+    let response = send_radius_request(&packet, server_addr)
+        .await
+        .expect("Failed to send request");
+
+    // Should succeed because 127.0.0.1 is authorized
+    assert_eq!(response.code, Code::AccessAccept);
+}
+
+#[tokio::test]
+async fn test_ipv6_support() {
+    use tokio::net::UdpSocket as AsyncUdpSocket;
+
+    // Check if IPv6 is available on this system
+    let ipv6_test = AsyncUdpSocket::bind("[::1]:0").await;
+    if ipv6_test.is_err() {
+        // IPv6 not available, skip test
+        println!("IPv6 not available on this system, skipping test");
+        return;
+    }
+    drop(ipv6_test);
+
+    let mut config = Config::default();
+    config.listen_address = "::1".to_string(); // IPv6 loopback
+    config.listen_port = 0;
+    config.secret = "testing123".to_string();
+
+    let mut handler = SimpleAuthHandler::new();
+    handler.add_user("testuser", "testpass");
+
+    let server_config = ServerConfig::from_config(config, Arc::new(handler))
+        .expect("Failed to create server config");
+    let server = RadiusServer::new(server_config).await;
+
+    // If server creation fails (IPv6 not supported), skip test
+    if server.is_err() {
+        println!("IPv6 server creation failed, skipping test");
+        return;
+    }
+
+    let server = server.unwrap();
+    let server_addr = server.local_addr().expect("Failed to get server address");
+
+    tokio::spawn(async move {
+        server.run().await.ok();
+    });
+
+    sleep(Duration::from_millis(500)).await;
+
+    // Send request over IPv6
+    let packet = create_access_request("testuser", "testpass", b"testing123", 1);
+
+    // Try to send request over IPv6
+    let result = send_radius_request(&packet, server_addr).await;
+
+    // If we get a routing error, IPv6 isn't fully configured, skip test
+    if let Err(ref e) = result {
+        if e.to_string().contains("No route to host") || e.to_string().contains("HostUnreachable") {
+            println!("IPv6 routing not configured, skipping test");
+            return;
+        }
+    }
+
+    let response = result.expect("Failed to send request over IPv6");
+    assert_eq!(response.code, Code::AccessAccept);
+    assert_eq!(response.identifier, 1);
+}
+
+#[tokio::test]
+async fn test_duplicate_request_detection() {
+    let mut config = Config::default();
+    config.listen_address = "127.0.0.1".to_string();
+    config.listen_port = 0;
+    config.secret = "testing123".to_string();
+    config.request_cache_ttl = Some(10); // 10 second TTL
+
+    let mut handler = SimpleAuthHandler::new();
+    handler.add_user("testuser", "testpass");
+
+    let server_config = ServerConfig::from_config(config, Arc::new(handler))
+        .expect("Failed to create server config");
+    let server = RadiusServer::new(server_config)
+        .await
+        .expect("Failed to create server");
+    let server_addr = server.local_addr().expect("Failed to get server address");
+
+    tokio::spawn(async move {
+        server.run().await.ok();
+    });
+
+    sleep(Duration::from_millis(500)).await;
+
+    // Send same request twice
+    let packet = create_access_request(
+        "testuser",
+        "testpass",
+        b"testing123",
+        42, // Use specific ID
+    );
+
+    // First request should succeed
+    let response1 = send_radius_request(&packet, server_addr)
+        .await
+        .expect("First request failed");
+    assert_eq!(response1.code, Code::AccessAccept);
+
+    // Immediate duplicate should be silently dropped (no response)
+    let result = tokio::time::timeout(
+        Duration::from_millis(100),
+        send_radius_request(&packet, server_addr),
+    )
+    .await;
+
+    // Should timeout because duplicate requests are silently dropped
+    assert!(
+        result.is_err(),
+        "Duplicate request should timeout (be silently dropped)"
+    );
 }
