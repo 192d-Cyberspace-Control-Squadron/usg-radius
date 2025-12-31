@@ -125,6 +125,47 @@ pub trait AuthHandler: Send + Sync {
         }
     }
 
+    /// Multi-round authentication with full request packet access
+    ///
+    /// This method provides access to the full RADIUS request packet, enabling
+    /// authentication methods like EAP that need access to protocol-specific attributes.
+    ///
+    /// The default implementation extracts username, password, and state, then calls
+    /// authenticate_with_challenge() for backward compatibility.
+    ///
+    /// # Arguments
+    /// * `request` - The full RADIUS Access-Request packet
+    /// * `secret` - The shared secret for this client
+    ///
+    /// # Returns
+    /// AuthResult indicating Accept, Reject, or Challenge
+    fn authenticate_request(
+        &self,
+        request: &Packet,
+        secret: &[u8],
+    ) -> AuthResult {
+        // Extract username
+        let username = request
+            .find_attribute(AttributeType::UserName as u8)
+            .and_then(|attr| attr.as_string().ok())
+            .unwrap_or_default();
+
+        // Extract password (if PAP)
+        let password = request
+            .find_attribute(AttributeType::UserPassword as u8)
+            .and_then(|attr| {
+                decrypt_user_password(&attr.value, secret, &request.authenticator).ok()
+            });
+
+        // Extract state
+        let state = request
+            .find_attribute(AttributeType::State as u8)
+            .map(|attr| attr.value.as_slice());
+
+        // Delegate to authenticate_with_challenge for backward compatibility
+        self.authenticate_with_challenge(&username, password.as_deref(), state)
+    }
+
     /// Get additional attributes to include in Access-Accept response
     fn get_accept_attributes(&self, _username: &str) -> Vec<Attribute> {
         vec![]
@@ -614,11 +655,6 @@ impl RadiusServer {
             )
             .await;
 
-        // Extract State attribute (for multi-round authentication)
-        let state = request
-            .find_attribute(AttributeType::State as u8)
-            .map(|attr| attr.value.as_slice());
-
         // Determine authentication method and get result
         let auth_result = if let Some(chap_password_attr) =
             request.find_attribute(AttributeType::ChapPassword as u8)
@@ -654,33 +690,15 @@ impl RadiusServer {
             } else {
                 AuthResult::Reject
             }
-        } else if let Some(user_password_attr) =
-            request.find_attribute(AttributeType::UserPassword as u8)
-        {
-            // PAP authentication - may return Accept, Reject, or Challenge
-            debug!(
-                username = %username,
-                "Using PAP authentication"
-            );
-
-            let password =
-                decrypt_user_password(&user_password_attr.value, secret, &request.authenticator)
-                    .map_err(|_| ServerError::AuthFailed)?;
-
-            // Use multi-round authentication
-            config
-                .auth_handler
-                .authenticate_with_challenge(&username, Some(&password), state)
         } else {
-            // No password provided - check if handler wants to challenge
+            // Use new authenticate_request method which has access to full packet
+            // This enables EAP and other protocol-specific authentication
             debug!(
                 username = %username,
-                "No password attribute found - checking if challenge is needed"
+                "Using authenticate_request for flexible authentication"
             );
 
-            config
-                .auth_handler
-                .authenticate_with_challenge(&username, None, state)
+            config.auth_handler.authenticate_request(request, secret)
         };
 
         // Handle authentication result

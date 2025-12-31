@@ -1639,6 +1639,7 @@ dependencies = [
  "ipnetwork",
  "ldap3",
  "radius-proto",
+ "rustls",
  "serde",
  "serde_json",
  "sqlx",
@@ -2660,6 +2661,8 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

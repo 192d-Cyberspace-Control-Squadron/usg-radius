@@ -47,6 +47,7 @@ pub mod accounting;
 pub mod audit;
 pub mod cache;
 pub mod config;
+pub mod eap_auth;
 pub mod ldap_auth;
 pub mod postgres_auth;
 pub mod ratelimit;
@@ -56,6 +57,7 @@ pub use accounting::{AccountingHandler, AccountingResult, Session, SimpleAccount
 pub use audit::{AuditEntry, AuditEventType, AuditLogger};
 pub use cache::{RequestCache, RequestFingerprint};
 pub use config::{Client, Config, ConfigError, User};
+pub use eap_auth::EapAuthHandler;
 pub use ldap_auth::{LdapAuthHandler, LdapConfig, LdapError};
 pub use postgres_auth::{PostgresAuthHandler, PostgresConfig, PostgresError};
 pub use ratelimit::{RateLimitConfig, RateLimiter};

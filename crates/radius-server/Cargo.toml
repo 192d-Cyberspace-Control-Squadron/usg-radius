@@ -26,7 +26,12 @@ clap.workspace = true
 ldap3.workspace = true
 sqlx.workspace = true
 bcrypt.workspace = true
+rustls = { workspace = true, optional = true }
 
 [dev-dependencies]
 hex.workspace = true
 tempfile.workspace = true
+
+[features]
+default = []
+tls = ["radius-proto/tls", "dep:rustls"]

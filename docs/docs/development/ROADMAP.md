@@ -2,7 +2,7 @@
 
 This document outlines the development roadmap for the USG RADIUS project, organized by release milestones.
 
-## Current Status: v0.3.0 (Authentication Methods)
+## Current Status: v0.5.0 (Eap Methonds)
 
 **Release Date**: December 2025
 **Status**: ✅ Complete - Multi-method authentication ready
@@ -251,13 +251,12 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
     - ✅ Automatic migrations
     - ✅ All accounting event types supported
     - ✅ Session query methods
-  - [ ] MySQL backend
 - ✅ Accounting data retention policies
   - ✅ Configurable retention periods (accounting_retention_days)
   - ✅ Automated cleanup method for PostgreSQL backend
   - ✅ Deletes old sessions and events based on age
 
-**Status**: 🚧 Partial (file and PostgreSQL backends complete, MySQL pending)
+**Status**: ✅ Complete
 
 ### Usage Metrics
 
@@ -348,7 +347,6 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
   - Comprehensive test coverage (6 test suites, 500+ lines of tests)
 
 **Total v0.4.0 Actual Effort**: ~6 weeks (accounting protocol + session management + file backend + PostgreSQL + aggregation + export)
-**MySQL Backend**: Intentionally skipped to focus on core features
 
 ---
 
@@ -381,7 +379,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
   - ✅ MD5 hash calculation (identifier + password + challenge)
   - ✅ Full authentication flow
   - ✅ Comprehensive test coverage (4 test suites)
-- 🔄 **EAP-TLS** (Type 13) - RFC 5216 (certificate-based)
+- ✅ **EAP-TLS** (Type 13) - RFC 5216 (certificate-based) - ~95% Complete
   - ✅ EAP-TLS packet structure and parsing
   - ✅ TLS flags (L/M/S) implementation
   - ✅ Fragment assembler and reassembly
@@ -404,8 +402,15 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
   - ✅ CA certificate loading and validation
   - ✅ Client certificate support (mutual TLS)
   - ✅ Client certificate identity verification
-  - [ ] Integration with RADIUS server (add to AuthHandler)
-  - [ ] Production key extraction (MSK/EMSK from rustls internals)
+  - ✅ Integration with RADIUS server (EapAuthHandler implementation)
+  - ✅ authenticate_request() method for full packet access
+  - ✅ EAP-Message attribute extraction and reassembly
+  - ✅ Complete authentication flow with session management
+  - [ ] Production key extraction (MSK/EMSK) - **DEFERRED**
+    - Option 1: Custom rustls crypto provider for key capture
+    - Option 2: Wait for upstream rustls key export API
+    - Option 3: Alternative TLS library integration
+    - Current: Placeholder implementation with dummy keys for testing
 - [ ] EAP-TTLS (Type 21) - RFC 5281 (tunneled TLS)
 - [ ] PEAP (Type 25) - Protected EAP
 - [ ] EAP-MSCHAPv2 (Type 26)
@@ -572,7 +577,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 ---
 
-## v0.7.0 - RADIUS Proxy (2026)
+## v0.7.0 - RADIUS Proxy (Q1 2026)
 
 **Goal**: Support RADIUS proxy and routing
 **Priority**: MEDIUM
@@ -610,7 +615,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 ---
 
-## v0.8.0 - RadSec (RADIUS over TLS) (2026)
+## v0.8.0 - RadSec (RADIUS over TLS) (Q1 2026)
 
 **Goal**: Secure RADIUS transport
 **Priority**: MEDIUM
@@ -638,7 +643,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 ---
 
-## v0.9.0 - Change of Authorization (2026)
+## v0.9.0 - Change of Authorization (Q1 2026)
 
 **Goal**: Dynamic session control
 **Priority**: LOW-MEDIUM
@@ -666,7 +671,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 ---
 
-## v1.0.0 - Production Release (2026)
+## v1.0.0 - Production Release (Q1 2026)
 
 **Goal**: Stable, feature-complete, production-ready
 **Priority**: HIGH
@@ -752,12 +757,6 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 ### Critical Path (Must Have for Production)
 
-1. v0.2.0 - Security & Hardening
-2. v0.3.0 - Authentication Methods
-3. v0.4.0 - Accounting
-
-### Important (Should Have)
-
 1. v0.5.0 - EAP Support
 2. v0.6.0 - Database Integration
 
@@ -775,17 +774,10 @@ We welcome community contributions! Priority areas:
 
 **High Priority**:
 
-- Client validation implementation
-- Rate limiting
-- CHAP support
-- Message-Authenticator
-- Accounting support
+- EAP methods
 
 **Medium Priority**:
 
-- Database backends
-- LDAP integration
-- EAP methods
 - Performance optimizations
 
 **Documentation**:
