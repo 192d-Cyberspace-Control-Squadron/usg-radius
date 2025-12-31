@@ -24,7 +24,7 @@ services:
       LDAP_TLS_VERIFY_CLIENT: "demand"
       LDAP_REPLICATION: "false"
       KEEP_EXISTING_CONFIG: "false"
-      LDAP_REMOVE_CONFIG_AFTER_SETUP: "true"
+      LDAP_REMOVE_CONFIG_AFTER_SETUP: "false"
       LDAP_SSL_HELPER_PREFIX: "ldap"
     ports:
       - "1389:389"
