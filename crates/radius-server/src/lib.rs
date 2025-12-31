@@ -10,6 +10,11 @@
 //! - JSON configuration
 //! - User and client management
 //! - Logging and monitoring
+//! - Strict RFC 2865 compliance validation (default)
+//! - JSON audit logging
+//! - Rate limiting and DoS protection
+//! - Request deduplication (replay attack prevention)
+//! - Per-client IP validation and secrets
 //!
 //! # Example
 //!

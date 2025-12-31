@@ -4,7 +4,7 @@ use crate::config::Config;
 use crate::ratelimit::{RateLimitConfig, RateLimiter};
 use radius_proto::attributes::{Attribute, AttributeType};
 use radius_proto::auth::{calculate_response_authenticator, decrypt_user_password};
-use radius_proto::{Code, Packet, PacketError};
+use radius_proto::{validate_packet, Code, Packet, PacketError, ValidationMode};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -18,6 +18,8 @@ pub enum ServerError {
     Io(#[from] std::io::Error),
     #[error("Packet error: {0}")]
     Packet(#[from] PacketError),
+    #[error("Validation error: {0}")]
+    Validation(String),
     #[error("Authentication failed")]
     AuthFailed,
     #[error("Invalid client")]
@@ -267,6 +269,28 @@ impl RadiusServer {
 
         // Decode the packet
         let request = Packet::decode(&data)?;
+
+        // Validate the packet
+        let validation_mode = if config
+            .config
+            .as_ref()
+            .map(|c| c.strict_rfc_compliance)
+            .unwrap_or(false)
+        {
+            ValidationMode::Strict
+        } else {
+            ValidationMode::Lenient
+        };
+
+        if let Err(e) = validate_packet(&request, validation_mode) {
+            warn!(
+                client_ip = %addr.ip(),
+                request_id = request.identifier,
+                error = %e,
+                "Rejected malformed packet"
+            );
+            return Err(ServerError::Validation(e.to_string()));
+        }
 
         // Check for duplicate request (replay attack prevention)
         let fingerprint = RequestFingerprint::new(addr.ip(), request.identifier, &request.authenticator);

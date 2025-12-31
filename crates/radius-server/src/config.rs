@@ -111,6 +111,12 @@ pub struct Config {
     #[serde(default)]
     pub audit_log_path: Option<String>,
 
+    /// Strict RFC 2865 compliance mode (default: true)
+    /// When enabled, enforces strict validation of attribute values and types.
+    /// Set to false for lenient mode if compatibility with non-compliant clients is needed.
+    #[serde(default = "default_strict_rfc_compliance")]
+    pub strict_rfc_compliance: bool,
+
     /// Request cache TTL in seconds (default: 60)
     #[serde(default)]
     pub request_cache_ttl: Option<u64>,
@@ -148,6 +154,10 @@ fn default_secret() -> String {
     "testing123".to_string()
 }
 
+fn default_strict_rfc_compliance() -> bool {
+    true
+}
+
 impl Default for Config {
     fn default() -> Self {
         Config {
@@ -159,6 +169,7 @@ impl Default for Config {
             verbose: false,
             log_level: None,
             audit_log_path: None,
+            strict_rfc_compliance: true,
             request_cache_ttl: None,
             request_cache_max_entries: None,
             rate_limit_per_client_rps: None,
@@ -295,6 +306,7 @@ impl Config {
             verbose: false,
             log_level: Some("info".to_string()),
             audit_log_path: Some("/var/log/radius/audit.log".to_string()),
+            strict_rfc_compliance: true,
             request_cache_ttl: Some(60),
             request_cache_max_entries: Some(10000),
             rate_limit_per_client_rps: Some(100),

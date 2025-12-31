@@ -39,6 +39,7 @@
 pub mod attributes;
 pub mod auth;
 pub mod packet;
+pub mod validation;
 
 pub use attributes::{Attribute, AttributeType};
 pub use auth::{
@@ -46,3 +47,4 @@ pub use auth::{
     generate_request_authenticator, verify_response_authenticator,
 };
 pub use packet::{Code, Packet, PacketError};
+pub use validation::{validate_packet, ValidationError, ValidationMode};
