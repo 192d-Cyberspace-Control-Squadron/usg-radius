@@ -103,7 +103,10 @@ impl PostgresAuthHandler {
     /// This will establish a connection pool to the database.
     /// Returns an error if the database cannot be reached.
     pub async fn new(config: PostgresConfig) -> Result<Self, PostgresError> {
-        debug!("Creating PostgreSQL connection pool to {}", mask_url(&config.url));
+        debug!(
+            "Creating PostgreSQL connection pool to {}",
+            mask_url(&config.url)
+        );
 
         let pool = PgPoolOptions::new()
             .max_connections(config.max_connections)
@@ -257,11 +260,17 @@ impl AuthHandler for PostgresAuthHandler {
         })
     }
 
+    // CHAP authentication is not supported for PostgreSQL by default
+    // PostgreSQL typically stores hashed passwords (bcrypt, etc.) which cannot be used for CHAP
+    // CHAP requires access to plaintext passwords to compute the expected response
+    // If you need CHAP support, you must store plaintext passwords (not recommended)
+    // and implement get_user_password() to return them
+    // The default implementation in AuthHandler will return false for CHAP
+
     fn get_accept_attributes(&self, username: &str) -> Vec<Attribute> {
         tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                self.get_user_attributes(username).await
-            })
+            tokio::runtime::Handle::current()
+                .block_on(async { self.get_user_attributes(username).await })
         })
     }
 

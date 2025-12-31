@@ -4,7 +4,10 @@ use crate::config::Config;
 use crate::ratelimit::{RateLimitConfig, RateLimiter};
 use radius_proto::attributes::{Attribute, AttributeType};
 use radius_proto::auth::{calculate_response_authenticator, decrypt_user_password};
-use radius_proto::{validate_packet, Code, Packet, PacketError, ValidationMode};
+use radius_proto::{
+    validate_packet, verify_chap_response, ChapChallenge, ChapResponse, Code, Packet, PacketError,
+    ValidationMode,
+};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -34,10 +37,37 @@ pub enum ServerError {
 ///
 /// Implement this trait to provide custom authentication logic.
 pub trait AuthHandler: Send + Sync {
-    /// Authenticate a user with username and password
+    /// Authenticate a user with username and password (PAP)
     ///
     /// Returns true if authentication succeeds, false otherwise.
     fn authenticate(&self, username: &str, password: &str) -> bool;
+
+    /// Authenticate a user with CHAP challenge-response
+    ///
+    /// Returns true if authentication succeeds, false otherwise.
+    /// Default implementation retrieves password and verifies CHAP response.
+    fn authenticate_chap(
+        &self,
+        username: &str,
+        chap_response: &ChapResponse,
+        challenge: &ChapChallenge,
+    ) -> bool {
+        // Default implementation: get password and verify CHAP
+        if let Some(password) = self.get_user_password(username) {
+            verify_chap_response(chap_response, &password, challenge)
+        } else {
+            false
+        }
+    }
+
+    /// Get user's plaintext password (for CHAP verification)
+    ///
+    /// Returns None if user doesn't exist or password retrieval is not supported.
+    /// This is needed for CHAP authentication since the server must compute
+    /// the expected response using the plaintext password.
+    fn get_user_password(&self, _username: &str) -> Option<String> {
+        None // Default: not supported
+    }
 
     /// Get additional attributes to include in Access-Accept response
     fn get_accept_attributes(&self, _username: &str) -> Vec<Attribute> {
@@ -46,11 +76,7 @@ pub trait AuthHandler: Send + Sync {
 
     /// Get additional attributes to include in Access-Reject response
     fn get_reject_attributes(&self, _username: &str) -> Vec<Attribute> {
-        vec![Attribute::string(
-            AttributeType::ReplyMessage as u8,
-            "Authentication failed",
-        )
-        .unwrap()]
+        vec![Attribute::string(AttributeType::ReplyMessage as u8, "Authentication failed").unwrap()]
     }
 }
 
@@ -77,6 +103,10 @@ impl AuthHandler for SimpleAuthHandler {
             .get(username)
             .map(|p| p == password)
             .unwrap_or(false)
+    }
+
+    fn get_user_password(&self, username: &str) -> Option<String> {
+        self.users.get(username).cloned()
     }
 }
 
@@ -125,7 +155,10 @@ impl ServerConfig {
     }
 
     /// Create server config from a full Config object
-    pub fn from_config(config: Config, auth_handler: Arc<dyn AuthHandler>) -> Result<Self, ServerError> {
+    pub fn from_config(
+        config: Config,
+        auth_handler: Arc<dyn AuthHandler>,
+    ) -> Result<Self, ServerError> {
         let bind_addr = config.socket_addr().map_err(|e| {
             ServerError::Io(std::io::Error::new(std::io::ErrorKind::InvalidInput, e))
         })?;
@@ -246,11 +279,14 @@ impl RadiusServer {
             );
 
             // Audit log rate limit event
-            config.audit_logger.log(
-                AuditEntry::new(AuditEventType::RateLimitExceeded)
-                    .with_client_ip(addr.ip())
-                    .with_request_id(request_id)
-            ).await;
+            config
+                .audit_logger
+                .log(
+                    AuditEntry::new(AuditEventType::RateLimitExceeded)
+                        .with_client_ip(addr.ip())
+                        .with_request_id(request_id),
+                )
+                .await;
 
             return Err(ServerError::RateLimited);
         }
@@ -265,11 +301,14 @@ impl RadiusServer {
             );
 
             // Audit log unauthorized client event
-            config.audit_logger.log(
-                AuditEntry::new(AuditEventType::UnauthorizedClient)
-                    .with_client_ip(addr.ip())
-                    .with_request_id(request_id)
-            ).await;
+            config
+                .audit_logger
+                .log(
+                    AuditEntry::new(AuditEventType::UnauthorizedClient)
+                        .with_client_ip(addr.ip())
+                        .with_request_id(request_id),
+                )
+                .await;
 
             return Err(ServerError::InvalidClient);
         }
@@ -300,8 +339,12 @@ impl RadiusServer {
         }
 
         // Check for duplicate request (replay attack prevention)
-        let fingerprint = RequestFingerprint::new(addr.ip(), request.identifier, &request.authenticator);
-        if config.request_cache.is_duplicate(fingerprint, request.authenticator) {
+        let fingerprint =
+            RequestFingerprint::new(addr.ip(), request.identifier, &request.authenticator);
+        if config
+            .request_cache
+            .is_duplicate(fingerprint, request.authenticator)
+        {
             warn!(
                 client_ip = %addr.ip(),
                 request_id = request.identifier,
@@ -309,11 +352,14 @@ impl RadiusServer {
             );
 
             // Audit log duplicate request event
-            config.audit_logger.log(
-                AuditEntry::new(AuditEventType::DuplicateRequest)
-                    .with_client_ip(addr.ip())
-                    .with_request_id(request.identifier)
-            ).await;
+            config
+                .audit_logger
+                .log(
+                    AuditEntry::new(AuditEventType::DuplicateRequest)
+                        .with_client_ip(addr.ip())
+                        .with_request_id(request.identifier),
+                )
+                .await;
 
             return Err(ServerError::DuplicateRequest);
         }
@@ -327,7 +373,9 @@ impl RadiusServer {
 
         // Handle based on packet type
         let response = match request.code {
-            Code::AccessRequest => Self::handle_access_request(&request, &config, addr.ip()).await?,
+            Code::AccessRequest => {
+                Self::handle_access_request(&request, &config, addr.ip()).await?
+            }
             Code::StatusServer => Self::handle_status_server(&request, &config, addr.ip())?,
             _ => {
                 warn!(packet_type = ?request.code, "Unsupported packet type");
@@ -372,29 +420,74 @@ impl RadiusServer {
         );
 
         // Audit log authentication attempt
-        let client_name = config.config.as_ref()
+        let client_name = config
+            .config
+            .as_ref()
             .and_then(|c| c.find_client(source_ip))
             .and_then(|client| client.name.clone());
 
-        config.audit_logger.log(
-            AuditEntry::new(AuditEventType::AuthAttempt)
-                .with_username(&username)
-                .with_client_ip(source_ip)
-                .with_request_id(request.identifier)
-                .with_client_name(client_name.unwrap_or_else(|| "unknown".to_string()))
-        ).await;
+        config
+            .audit_logger
+            .log(
+                AuditEntry::new(AuditEventType::AuthAttempt)
+                    .with_username(&username)
+                    .with_client_ip(source_ip)
+                    .with_request_id(request.identifier)
+                    .with_client_name(client_name.unwrap_or_else(|| "unknown".to_string())),
+            )
+            .await;
 
-        // Extract and decrypt password using client-specific secret
-        let password = request
-            .find_attribute(AttributeType::UserPassword as u8)
-            .map(|attr| {
-                decrypt_user_password(&attr.value, secret, &request.authenticator)
-            })
-            .ok_or(ServerError::AuthFailed)?
-            .map_err(|_| ServerError::AuthFailed)?;
+        // Determine authentication method (CHAP or PAP)
+        let authenticated = if let Some(chap_password_attr) =
+            request.find_attribute(AttributeType::ChapPassword as u8)
+        {
+            // CHAP authentication
+            debug!(
+                username = %username,
+                "Using CHAP authentication"
+            );
 
-        // Authenticate
-        let authenticated = config.auth_handler.authenticate(&username, &password);
+            // Parse CHAP-Password attribute (17 bytes: 1 byte ident + 16 bytes response)
+            let chap_response =
+                ChapResponse::from_bytes(&chap_password_attr.value).map_err(|e| {
+                    warn!(username = %username, error = %e, "Invalid CHAP-Password attribute");
+                    ServerError::AuthFailed
+                })?;
+
+            // Get CHAP challenge (from CHAP-Challenge attribute or Request Authenticator)
+            let challenge = if let Some(chap_challenge_attr) =
+                request.find_attribute(AttributeType::ChapChallenge as u8)
+            {
+                ChapChallenge::new(chap_challenge_attr.value.clone())
+            } else {
+                ChapChallenge::from_authenticator(&request.authenticator)
+            };
+
+            // Verify CHAP response using the auth handler
+            config
+                .auth_handler
+                .authenticate_chap(&username, &chap_response, &challenge)
+        } else if let Some(user_password_attr) =
+            request.find_attribute(AttributeType::UserPassword as u8)
+        {
+            // PAP authentication
+            debug!(
+                username = %username,
+                "Using PAP authentication"
+            );
+
+            let password =
+                decrypt_user_password(&user_password_attr.value, secret, &request.authenticator)
+                    .map_err(|_| ServerError::AuthFailed)?;
+
+            config.auth_handler.authenticate(&username, &password)
+        } else {
+            warn!(
+                username = %username,
+                "No User-Password or CHAP-Password attribute found"
+            );
+            return Err(ServerError::AuthFailed);
+        };
 
         if authenticated {
             info!(
@@ -405,17 +498,22 @@ impl RadiusServer {
             );
 
             // Audit log authentication success
-            let client_name = config.config.as_ref()
+            let client_name = config
+                .config
+                .as_ref()
                 .and_then(|c| c.find_client(source_ip))
                 .and_then(|client| client.name.clone());
 
-            config.audit_logger.log(
-                AuditEntry::new(AuditEventType::AuthSuccess)
-                    .with_username(&username)
-                    .with_client_ip(source_ip)
-                    .with_request_id(request.identifier)
-                    .with_client_name(client_name.unwrap_or_else(|| "unknown".to_string()))
-            ).await;
+            config
+                .audit_logger
+                .log(
+                    AuditEntry::new(AuditEventType::AuthSuccess)
+                        .with_username(&username)
+                        .with_client_ip(source_ip)
+                        .with_request_id(request.identifier)
+                        .with_client_name(client_name.unwrap_or_else(|| "unknown".to_string())),
+                )
+                .await;
 
             // Create Access-Accept response
             let mut response = Packet::new(Code::AccessAccept, request.identifier, [0u8; 16]);
@@ -440,18 +538,23 @@ impl RadiusServer {
             );
 
             // Audit log authentication failure
-            let client_name = config.config.as_ref()
+            let client_name = config
+                .config
+                .as_ref()
                 .and_then(|c| c.find_client(source_ip))
                 .and_then(|client| client.name.clone());
 
-            config.audit_logger.log(
-                AuditEntry::new(AuditEventType::AuthFailure)
-                    .with_username(&username)
-                    .with_client_ip(source_ip)
-                    .with_request_id(request.identifier)
-                    .with_client_name(client_name.unwrap_or_else(|| "unknown".to_string()))
-                    .with_details("Invalid credentials")
-            ).await;
+            config
+                .audit_logger
+                .log(
+                    AuditEntry::new(AuditEventType::AuthFailure)
+                        .with_username(&username)
+                        .with_client_ip(source_ip)
+                        .with_request_id(request.identifier)
+                        .with_client_name(client_name.unwrap_or_else(|| "unknown".to_string()))
+                        .with_details("Invalid credentials"),
+                )
+                .await;
 
             // Create Access-Reject response
             let mut response = Packet::new(Code::AccessReject, request.identifier, [0u8; 16]);

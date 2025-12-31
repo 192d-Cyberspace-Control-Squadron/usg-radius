@@ -1,6 +1,8 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use radius_proto::auth::{
+    decrypt_user_password, encrypt_user_password, generate_request_authenticator,
+};
 use radius_proto::{Attribute, AttributeType, Code, Packet};
-use radius_proto::auth::{encrypt_user_password, decrypt_user_password, generate_request_authenticator};
 
 fn create_test_packet(num_attributes: usize) -> Packet {
     let req_auth = generate_request_authenticator();
@@ -39,9 +41,7 @@ fn bench_packet_encode(c: &mut Criterion) {
             num_attrs,
             |b, &num_attrs| {
                 let packet = create_test_packet(num_attrs);
-                b.iter(|| {
-                    packet.encode().expect("Failed to encode packet")
-                });
+                b.iter(|| packet.encode().expect("Failed to encode packet"));
             },
         );
     }
@@ -59,9 +59,7 @@ fn bench_packet_decode(c: &mut Criterion) {
             |b, &num_attrs| {
                 let packet = create_test_packet(num_attrs);
                 let encoded = packet.encode().expect("Failed to encode");
-                b.iter(|| {
-                    Packet::decode(black_box(&encoded)).expect("Failed to decode packet")
-                });
+                b.iter(|| Packet::decode(black_box(&encoded)).expect("Failed to decode packet"));
             },
         );
     }
@@ -86,7 +84,11 @@ fn bench_password_encryption(c: &mut Criterion) {
                 let secret = b"testing123";
                 let req_auth = generate_request_authenticator();
                 b.iter(|| {
-                    encrypt_user_password(black_box(password), black_box(secret), black_box(&req_auth))
+                    encrypt_user_password(
+                        black_box(password),
+                        black_box(secret),
+                        black_box(&req_auth),
+                    )
                 });
             },
         );
@@ -113,8 +115,12 @@ fn bench_password_decryption(c: &mut Criterion) {
                 let req_auth = generate_request_authenticator();
                 let encrypted = encrypt_user_password(password, secret, &req_auth);
                 b.iter(|| {
-                    decrypt_user_password(black_box(&encrypted), black_box(secret), black_box(&req_auth))
-                        .expect("Failed to decrypt password")
+                    decrypt_user_password(
+                        black_box(&encrypted),
+                        black_box(secret),
+                        black_box(&req_auth),
+                    )
+                    .expect("Failed to decrypt password")
                 });
             },
         );

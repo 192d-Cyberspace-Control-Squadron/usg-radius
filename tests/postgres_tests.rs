@@ -26,7 +26,10 @@ fn test_postgres_config_serialization() {
         timeout: 15,
         query: "SELECT username, password_hash FROM users WHERE username = $1".to_string(),
         password_hash: "bcrypt".to_string(),
-        attributes_query: Some("SELECT attribute_type, attribute_value FROM user_attributes WHERE username = $1".to_string()),
+        attributes_query: Some(
+            "SELECT attribute_type, attribute_value FROM user_attributes WHERE username = $1"
+                .to_string(),
+        ),
     };
 
     // Test serialization

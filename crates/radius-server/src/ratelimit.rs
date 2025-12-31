@@ -75,10 +75,10 @@ pub struct RateLimitConfig {
 impl Default for RateLimitConfig {
     fn default() -> Self {
         RateLimitConfig {
-            per_client_rps: 100,      // 100 requests/sec per client
-            per_client_burst: 200,    // Allow bursts up to 200
-            global_rps: 1000,         // 1000 requests/sec globally
-            global_burst: 2000,       // Allow bursts up to 2000
+            per_client_rps: 100,   // 100 requests/sec per client
+            per_client_burst: 200, // Allow bursts up to 200
+            global_rps: 1000,      // 1000 requests/sec globally
+            global_burst: 2000,    // Allow bursts up to 2000
         }
     }
 }

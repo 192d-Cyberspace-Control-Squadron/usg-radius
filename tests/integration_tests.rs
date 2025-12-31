@@ -1,13 +1,14 @@
 //! Integration tests for USG RADIUS Server
 //!
 //! These tests verify end-to-end functionality including:
-//! - Authentication flows
+//! - Authentication flows (PAP and CHAP)
 //! - Client validation
 //! - Rate limiting
 //! - Configuration validation
 //! - Audit logging
 
 use radius_proto::auth::{encrypt_user_password, generate_request_authenticator};
+use radius_proto::chap::{compute_chap_response, ChapChallenge, ChapResponse};
 use radius_proto::{Attribute, AttributeType, Code, Packet};
 use radius_server::{Config, RadiusServer, ServerConfig, SimpleAuthHandler};
 use std::net::SocketAddr;
@@ -15,7 +16,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 
-/// Test helper to create a RADIUS Access-Request packet
+/// Test helper to create a RADIUS Access-Request packet with PAP
 fn create_access_request(username: &str, password: &str, secret: &[u8], identifier: u8) -> Packet {
     let req_auth = generate_request_authenticator();
     let mut packet = Packet::new(Code::AccessRequest, identifier, req_auth);
@@ -31,6 +32,39 @@ fn create_access_request(username: &str, password: &str, secret: &[u8], identifi
     packet.add_attribute(
         Attribute::new(AttributeType::UserPassword as u8, encrypted_pwd)
             .expect("Failed to create User-Password attribute"),
+    );
+
+    packet
+}
+
+/// Test helper to create a RADIUS Access-Request packet with CHAP
+fn create_chap_access_request(
+    username: &str,
+    password: &str,
+    identifier: u8,
+    chap_ident: u8,
+) -> Packet {
+    let req_auth = generate_request_authenticator();
+    let mut packet = Packet::new(Code::AccessRequest, identifier, req_auth);
+
+    // Add User-Name attribute
+    packet.add_attribute(
+        Attribute::string(AttributeType::UserName as u8, username)
+            .expect("Failed to create User-Name attribute"),
+    );
+
+    // Compute CHAP response using Request Authenticator as challenge
+    let challenge = ChapChallenge::from_authenticator(&req_auth);
+    let response_hash = compute_chap_response(chap_ident, password, challenge.as_bytes());
+    let chap_response = ChapResponse {
+        ident: chap_ident,
+        response: response_hash,
+    };
+
+    // Add CHAP-Password attribute (17 bytes: 1 byte ident + 16 bytes hash)
+    packet.add_attribute(
+        Attribute::new(AttributeType::ChapPassword as u8, chap_response.to_bytes())
+            .expect("Failed to create CHAP-Password attribute"),
     );
 
     packet
@@ -503,4 +537,197 @@ async fn test_duplicate_request_detection() {
         result.is_err(),
         "Duplicate request should timeout (be silently dropped)"
     );
+}
+
+#[tokio::test]
+async fn test_chap_successful_authentication() {
+    // Create test configuration
+    let mut config = Config::default();
+    config.listen_address = "127.0.0.1".to_string();
+    config.listen_port = 0;
+    config.secret = "testing123".to_string();
+
+    // Create authentication handler
+    let mut handler = SimpleAuthHandler::new();
+    handler.add_user("chapuser", "chappass");
+
+    let server_config = ServerConfig::from_config(config, Arc::new(handler))
+        .expect("Failed to create server config");
+    let server = RadiusServer::new(server_config)
+        .await
+        .expect("Failed to create server");
+    let server_addr = server.local_addr().expect("Failed to get server address");
+
+    tokio::spawn(async move {
+        server.run().await.ok();
+    });
+
+    sleep(Duration::from_millis(500)).await;
+
+    // Create and send CHAP Access-Request
+    let packet = create_chap_access_request("chapuser", "chappass", 1, 42);
+
+    let response = send_radius_request(&packet, server_addr)
+        .await
+        .expect("Failed to send CHAP request");
+
+    // Verify Access-Accept response
+    assert_eq!(response.code, Code::AccessAccept);
+    assert_eq!(response.identifier, 1);
+}
+
+#[tokio::test]
+async fn test_chap_failed_authentication_wrong_password() {
+    let mut config = Config::default();
+    config.listen_address = "127.0.0.1".to_string();
+    config.listen_port = 0;
+    config.secret = "testing123".to_string();
+
+    let mut handler = SimpleAuthHandler::new();
+    handler.add_user("chapuser", "correctpass");
+
+    let server_config = ServerConfig::from_config(config, Arc::new(handler))
+        .expect("Failed to create server config");
+    let server = RadiusServer::new(server_config)
+        .await
+        .expect("Failed to create server");
+    let server_addr = server.local_addr().expect("Failed to get server address");
+
+    tokio::spawn(async move {
+        server.run().await.ok();
+    });
+
+    sleep(Duration::from_millis(500)).await;
+
+    // Send CHAP request with wrong password
+    let packet = create_chap_access_request("chapuser", "wrongpass", 2, 42);
+
+    let response = send_radius_request(&packet, server_addr)
+        .await
+        .expect("Failed to send CHAP request");
+
+    // Verify Access-Reject response
+    assert_eq!(response.code, Code::AccessReject);
+    assert_eq!(response.identifier, 2);
+}
+
+#[tokio::test]
+async fn test_chap_failed_authentication_unknown_user() {
+    let mut config = Config::default();
+    config.listen_address = "127.0.0.1".to_string();
+    config.listen_port = 0;
+    config.secret = "testing123".to_string();
+
+    let mut handler = SimpleAuthHandler::new();
+    handler.add_user("realuser", "password");
+
+    let server_config = ServerConfig::from_config(config, Arc::new(handler))
+        .expect("Failed to create server config");
+    let server = RadiusServer::new(server_config)
+        .await
+        .expect("Failed to create server");
+    let server_addr = server.local_addr().expect("Failed to get server address");
+
+    tokio::spawn(async move {
+        server.run().await.ok();
+    });
+
+    sleep(Duration::from_millis(500)).await;
+
+    // Send CHAP request for unknown user
+    let packet = create_chap_access_request("unknownuser", "password", 3, 42);
+
+    let response = send_radius_request(&packet, server_addr)
+        .await
+        .expect("Failed to send CHAP request");
+
+    // Verify Access-Reject response
+    assert_eq!(response.code, Code::AccessReject);
+    assert_eq!(response.identifier, 3);
+}
+
+#[tokio::test]
+async fn test_chap_and_pap_interleaved() {
+    // Test that server can handle both PAP and CHAP requests
+    let mut config = Config::default();
+    config.listen_address = "127.0.0.1".to_string();
+    config.listen_port = 0;
+    config.secret = "testing123".to_string();
+
+    let mut handler = SimpleAuthHandler::new();
+    handler.add_user("user1", "pass1");
+    handler.add_user("user2", "pass2");
+
+    let server_config = ServerConfig::from_config(config, Arc::new(handler))
+        .expect("Failed to create server config");
+    let server = RadiusServer::new(server_config)
+        .await
+        .expect("Failed to create server");
+    let server_addr = server.local_addr().expect("Failed to get server address");
+
+    tokio::spawn(async move {
+        server.run().await.ok();
+    });
+
+    sleep(Duration::from_millis(500)).await;
+
+    // Test PAP request
+    let pap_packet = create_access_request("user1", "pass1", b"testing123", 1);
+    let response = send_radius_request(&pap_packet, server_addr)
+        .await
+        .expect("Failed to send PAP request");
+    assert_eq!(response.code, Code::AccessAccept);
+
+    // Test CHAP request
+    let chap_packet = create_chap_access_request("user2", "pass2", 2, 42);
+    let response = send_radius_request(&chap_packet, server_addr)
+        .await
+        .expect("Failed to send CHAP request");
+    assert_eq!(response.code, Code::AccessAccept);
+
+    // Test another PAP request
+    let pap_packet2 = create_access_request("user1", "pass1", b"testing123", 3);
+    let response = send_radius_request(&pap_packet2, server_addr)
+        .await
+        .expect("Failed to send second PAP request");
+    assert_eq!(response.code, Code::AccessAccept);
+}
+
+#[tokio::test]
+async fn test_chap_different_identifiers() {
+    // Test that CHAP works with different CHAP identifiers
+    let mut config = Config::default();
+    config.listen_address = "127.0.0.1".to_string();
+    config.listen_port = 0;
+    config.secret = "testing123".to_string();
+
+    let mut handler = SimpleAuthHandler::new();
+    handler.add_user("chapuser", "chappass");
+
+    let server_config = ServerConfig::from_config(config, Arc::new(handler))
+        .expect("Failed to create server config");
+    let server = RadiusServer::new(server_config)
+        .await
+        .expect("Failed to create server");
+    let server_addr = server.local_addr().expect("Failed to get server address");
+
+    tokio::spawn(async move {
+        server.run().await.ok();
+    });
+
+    sleep(Duration::from_millis(500)).await;
+
+    // Test with different CHAP identifiers
+    for chap_ident in [0x01, 0x42, 0x7F, 0xFF] {
+        let packet = create_chap_access_request("chapuser", "chappass", chap_ident, chap_ident);
+        let response = send_radius_request(&packet, server_addr)
+            .await
+            .expect("Failed to send CHAP request");
+        assert_eq!(
+            response.code,
+            Code::AccessAccept,
+            "Failed with CHAP identifier {}",
+            chap_ident
+        );
+    }
 }

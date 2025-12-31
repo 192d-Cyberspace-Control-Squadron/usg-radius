@@ -79,12 +79,20 @@ fn test_search_filter_templates() {
     // Test different search filter templates
     let filters = vec![
         ("(uid={username})", "testuser", "(uid=testuser)"),
-        ("(sAMAccountName={username})", "jdoe", "(sAMAccountName=jdoe)"),
-        ("(mail={username}@example.com)", "alice", "(mail=alice@example.com)"),
+        (
+            "(sAMAccountName={username})",
+            "jdoe",
+            "(sAMAccountName=jdoe)",
+        ),
+        (
+            "(mail={username}@example.com)",
+            "alice",
+            "(mail=alice@example.com)",
+        ),
         (
             "(|(uid={username})(cn={username}))",
             "bob",
-            "(|(uid=bob)(cn=bob))"
+            "(|(uid=bob)(cn=bob))",
         ),
     ];
 

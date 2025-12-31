@@ -76,7 +76,10 @@ async fn main() {
         println!("  Listen: {}:{}", config.listen_address, config.listen_port);
         println!("  Clients: {}", config.clients.len());
         println!("  Users: {}", config.users.len());
-        println!("  Log level: {}", config.log_level.as_deref().unwrap_or("info"));
+        println!(
+            "  Log level: {}",
+            config.log_level.as_deref().unwrap_or("info")
+        );
         println!("  Strict RFC compliance: {}", config.strict_rfc_compliance);
         if let Some(ref path) = config.audit_log_path {
             println!("  Audit log: {}", path);
@@ -108,10 +111,7 @@ async fn main() {
     };
 
     tracing_subscriber::registry()
-        .with(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new(log_level))
-        )
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(log_level)))
         .with(tracing_subscriber::fmt::layer())
         .init();
 

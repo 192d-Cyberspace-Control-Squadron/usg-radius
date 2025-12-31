@@ -95,7 +95,10 @@ pub fn validate_packet(packet: &Packet, mode: ValidationMode) -> Result<(), Vali
 /// Validate Access-Request packet
 fn validate_access_request(packet: &Packet, _mode: ValidationMode) -> Result<(), ValidationError> {
     // RFC 2865 Section 4.1: User-Name is REQUIRED
-    if packet.find_attribute(AttributeType::UserName as u8).is_none() {
+    if packet
+        .find_attribute(AttributeType::UserName as u8)
+        .is_none()
+    {
         return Err(ValidationError::with_attribute(
             "User-Name attribute is required in Access-Request",
             AttributeType::UserName as u8,
@@ -208,7 +211,10 @@ fn validate_string_attribute(attr: &Attribute) -> Result<(), ValidationError> {
 fn validate_integer_attribute(attr: &Attribute) -> Result<(), ValidationError> {
     if attr.value.len() != 4 {
         return Err(ValidationError::with_attribute(
-            format!("Integer attribute must be 4 bytes, got {}", attr.value.len()),
+            format!(
+                "Integer attribute must be 4 bytes, got {}",
+                attr.value.len()
+            ),
             attr.attr_type,
         ));
     }
@@ -263,10 +269,7 @@ fn validate_service_type(attr: &Attribute, mode: ValidationMode) -> Result<(), V
 }
 
 /// Validate Framed-Protocol attribute (RFC 2865 Section 5.7)
-fn validate_framed_protocol(
-    attr: &Attribute,
-    mode: ValidationMode,
-) -> Result<(), ValidationError> {
+fn validate_framed_protocol(attr: &Attribute, mode: ValidationMode) -> Result<(), ValidationError> {
     validate_integer_attribute(attr)?;
     let value = attr.as_integer().unwrap();
 
@@ -279,7 +282,7 @@ fn validate_framed_protocol(
         | 4  // Gandalf proprietary SingleLink/MultiLink protocol
         | 5  // Xylogics proprietary IPX/SLIP
         | 6  // X.75 Synchronous
-        | 7  // GPRS PDP Context
+        | 7 // GPRS PDP Context
     );
 
     if !valid && mode == ValidationMode::Strict {
@@ -333,10 +336,7 @@ fn validate_framed_compression(
 
     if !valid && mode == ValidationMode::Strict {
         return Err(ValidationError::with_attribute(
-            format!(
-                "Invalid Framed-Compression value: {} (must be 0-3)",
-                value
-            ),
+            format!("Invalid Framed-Compression value: {} (must be 0-3)", value),
             attr.attr_type,
         ));
     }
@@ -387,10 +387,7 @@ fn validate_termination_action(
 
     if !valid && mode == ValidationMode::Strict {
         return Err(ValidationError::with_attribute(
-            format!(
-                "Invalid Termination-Action value: {} (must be 0-1)",
-                value
-            ),
+            format!("Invalid Termination-Action value: {} (must be 0-1)", value),
             attr.attr_type,
         ));
     }
@@ -482,8 +479,7 @@ mod tests {
 
     #[test]
     fn test_validate_integer_wrong_length() {
-        let attr =
-            Attribute::new(AttributeType::SessionTimeout as u8, vec![1, 2, 3]).unwrap(); // Only 3 bytes
+        let attr = Attribute::new(AttributeType::SessionTimeout as u8, vec![1, 2, 3]).unwrap(); // Only 3 bytes
         assert!(validate_attribute(&attr, ValidationMode::Lenient).is_err());
     }
 
@@ -495,8 +491,7 @@ mod tests {
 
     #[test]
     fn test_validate_string_invalid_utf8() {
-        let attr =
-            Attribute::new(AttributeType::UserName as u8, vec![0xFF, 0xFE, 0xFD]).unwrap();
+        let attr = Attribute::new(AttributeType::UserName as u8, vec![0xFF, 0xFE, 0xFD]).unwrap();
         assert!(validate_attribute(&attr, ValidationMode::Lenient).is_err());
     }
 }

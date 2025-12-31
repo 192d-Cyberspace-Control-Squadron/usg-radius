@@ -207,20 +207,30 @@ mod tests {
         assert!(verify_chap_response(&chap_response, password, &challenge));
 
         // Wrong password should fail
-        assert!(!verify_chap_response(&chap_response, "wrongpassword", &challenge));
+        assert!(!verify_chap_response(
+            &chap_response,
+            "wrongpassword",
+            &challenge
+        ));
 
         // Wrong ident should fail
         let wrong_ident_response = ChapResponse {
             ident: 0x20,
             response: expected,
         };
-        assert!(!verify_chap_response(&wrong_ident_response, password, &challenge));
+        assert!(!verify_chap_response(
+            &wrong_ident_response,
+            password,
+            &challenge
+        ));
     }
 
     #[test]
     fn test_chap_challenge_from_authenticator() {
-        let authenticator: [u8; 16] = [0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0,
-                                       0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88];
+        let authenticator: [u8; 16] = [
+            0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66,
+            0x77, 0x88,
+        ];
         let challenge = ChapChallenge::from_authenticator(&authenticator);
         assert_eq!(challenge.as_bytes(), &authenticator);
     }
@@ -229,8 +239,10 @@ mod tests {
     fn test_round_trip_response() {
         let original = ChapResponse {
             ident: 0x42,
-            response: [0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89,
-                      0x9A, 0xBC, 0xDE, 0xF0, 0x11, 0x22, 0x33, 0x44],
+            response: [
+                0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89, 0x9A, 0xBC, 0xDE, 0xF0, 0x11, 0x22,
+                0x33, 0x44,
+            ],
         };
 
         let bytes = original.to_bytes();
@@ -253,6 +265,10 @@ mod tests {
         // Server verifies
         let challenge = ChapChallenge::new(challenge_bytes.to_vec());
         assert!(verify_chap_response(&chap_response, password, &challenge));
-        assert!(!verify_chap_response(&chap_response, "WrongPassword", &challenge));
+        assert!(!verify_chap_response(
+            &chap_response,
+            "WrongPassword",
+            &challenge
+        ));
     }
 }

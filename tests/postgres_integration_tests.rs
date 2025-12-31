@@ -19,7 +19,8 @@ async fn test_postgres_connection() {
         url: "postgresql://radius:testpass@localhost:15432/radius_test".to_string(),
         max_connections: 5,
         timeout: 10,
-        query: "SELECT username, password_hash FROM users WHERE username = $1 AND enabled = true".to_string(),
+        query: "SELECT username, password_hash FROM users WHERE username = $1 AND enabled = true"
+            .to_string(),
         password_hash: "bcrypt".to_string(),
         attributes_query: None,
     };
@@ -39,7 +40,8 @@ async fn test_postgres_authentication_success() {
         url: "postgresql://radius:testpass@localhost:15432/radius_test".to_string(),
         max_connections: 5,
         timeout: 10,
-        query: "SELECT username, password_hash FROM users WHERE username = $1 AND enabled = true".to_string(),
+        query: "SELECT username, password_hash FROM users WHERE username = $1 AND enabled = true"
+            .to_string(),
         password_hash: "bcrypt".to_string(),
         attributes_query: None,
     };
@@ -51,7 +53,10 @@ async fn test_postgres_authentication_success() {
     // Test authentication with valid credentials
     // testuser: password123 (from test-data.sql)
     let result = handler.authenticate("testuser", "password123");
-    assert!(result, "Authentication should succeed with valid credentials");
+    assert!(
+        result,
+        "Authentication should succeed with valid credentials"
+    );
 }
 
 #[tokio::test]
@@ -61,7 +66,8 @@ async fn test_postgres_authentication_failure_wrong_password() {
         url: "postgresql://radius:testpass@localhost:15432/radius_test".to_string(),
         max_connections: 5,
         timeout: 10,
-        query: "SELECT username, password_hash FROM users WHERE username = $1 AND enabled = true".to_string(),
+        query: "SELECT username, password_hash FROM users WHERE username = $1 AND enabled = true"
+            .to_string(),
         password_hash: "bcrypt".to_string(),
         attributes_query: None,
     };
@@ -82,7 +88,8 @@ async fn test_postgres_authentication_user_not_found() {
         url: "postgresql://radius:testpass@localhost:15432/radius_test".to_string(),
         max_connections: 5,
         timeout: 10,
-        query: "SELECT username, password_hash FROM users WHERE username = $1 AND enabled = true".to_string(),
+        query: "SELECT username, password_hash FROM users WHERE username = $1 AND enabled = true"
+            .to_string(),
         password_hash: "bcrypt".to_string(),
         attributes_query: None,
     };
@@ -103,7 +110,8 @@ async fn test_postgres_disabled_user() {
         url: "postgresql://radius:testpass@localhost:15432/radius_test".to_string(),
         max_connections: 5,
         timeout: 10,
-        query: "SELECT username, password_hash FROM users WHERE username = $1 AND enabled = true".to_string(),
+        query: "SELECT username, password_hash FROM users WHERE username = $1 AND enabled = true"
+            .to_string(),
         password_hash: "bcrypt".to_string(),
         attributes_query: None,
     };
@@ -125,7 +133,8 @@ async fn test_postgres_multiple_users() {
         url: "postgresql://radius:testpass@localhost:15432/radius_test".to_string(),
         max_connections: 5,
         timeout: 10,
-        query: "SELECT username, password_hash FROM users WHERE username = $1 AND enabled = true".to_string(),
+        query: "SELECT username, password_hash FROM users WHERE username = $1 AND enabled = true"
+            .to_string(),
         password_hash: "bcrypt".to_string(),
         attributes_query: None,
     };
@@ -161,9 +170,13 @@ async fn test_postgres_user_attributes() {
         url: "postgresql://radius:testpass@localhost:15432/radius_test".to_string(),
         max_connections: 5,
         timeout: 10,
-        query: "SELECT username, password_hash FROM users WHERE username = $1 AND enabled = true".to_string(),
+        query: "SELECT username, password_hash FROM users WHERE username = $1 AND enabled = true"
+            .to_string(),
         password_hash: "bcrypt".to_string(),
-        attributes_query: Some("SELECT attribute_type, attribute_value FROM user_attributes WHERE username = $1".to_string()),
+        attributes_query: Some(
+            "SELECT attribute_type, attribute_value FROM user_attributes WHERE username = $1"
+                .to_string(),
+        ),
     };
 
     let handler = PostgresAuthHandler::new(config)
@@ -189,7 +202,8 @@ async fn test_postgres_connection_pool() {
         url: "postgresql://radius:testpass@localhost:15432/radius_test".to_string(),
         max_connections: 5,
         timeout: 10,
-        query: "SELECT username, password_hash FROM users WHERE username = $1 AND enabled = true".to_string(),
+        query: "SELECT username, password_hash FROM users WHERE username = $1 AND enabled = true"
+            .to_string(),
         password_hash: "bcrypt".to_string(),
         attributes_query: None,
     };
@@ -292,5 +306,8 @@ async fn test_postgres_connection_timeout() {
 
     // This should still succeed if database is responsive
     let result = PostgresAuthHandler::new(config).await;
-    assert!(result.is_ok(), "Should be able to connect even with short timeout");
+    assert!(
+        result.is_ok(),
+        "Should be able to connect even with short timeout"
+    );
 }

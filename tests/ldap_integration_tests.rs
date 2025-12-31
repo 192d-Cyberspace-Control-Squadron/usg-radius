@@ -52,7 +52,10 @@ async fn test_ldap_authentication_success() {
     // Test authentication with valid credentials
     // Password: password123 (from users.ldif)
     let result = handler.authenticate("testuser", "password123");
-    assert!(result, "Authentication should succeed with valid credentials");
+    assert!(
+        result,
+        "Authentication should succeed with valid credentials"
+    );
 }
 
 #[tokio::test]

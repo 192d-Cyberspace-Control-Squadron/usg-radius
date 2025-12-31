@@ -8,8 +8,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
 
     if args.len() < 4 {
-        eprintln!("Usage: {} <username> <password> <secret> [server_addr]", args[0]);
-        eprintln!("Example: {} admin admin123 testing123 127.0.0.1:1812", args[0]);
+        eprintln!(
+            "Usage: {} <username> <password> <secret> [server_addr]",
+            args[0]
+        );
+        eprintln!(
+            "Example: {} admin admin123 testing123 127.0.0.1:1812",
+            args[0]
+        );
         std::process::exit(1);
     }
 
@@ -22,7 +28,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("==================");
     println!("Server: {}", server_addr);
     println!("Username: {}", username);
-    println!("Secret: {}", std::str::from_utf8(secret).unwrap_or("<binary>"));
+    println!(
+        "Secret: {}",
+        std::str::from_utf8(secret).unwrap_or("<binary>")
+    );
     println!();
 
     // Create UDP socket
@@ -40,7 +49,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Add User-Password attribute (encrypted)
     let encrypted_password = encrypt_user_password(password, secret, &request_auth);
-    packet.add_attribute(Attribute::new(AttributeType::UserPassword as u8, encrypted_password)?);
+    packet.add_attribute(Attribute::new(
+        AttributeType::UserPassword as u8,
+        encrypted_password,
+    )?);
 
     // Add NAS-IP-Address (optional)
     packet.add_attribute(Attribute::ipv4(
@@ -111,7 +123,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Err(e) => {
             eprintln!("\n✗ No response from server: {}", e);
-            eprintln!("  Make sure the RADIUS server is running on {}", server_addr);
+            eprintln!(
+                "  Make sure the RADIUS server is running on {}",
+                server_addr
+            );
             Err(e.into())
         }
     }

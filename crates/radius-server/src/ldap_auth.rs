@@ -99,16 +99,14 @@ pub struct LdapAuthHandler {
 impl LdapAuthHandler {
     /// Create a new LDAP authentication handler
     pub fn new(config: LdapConfig) -> Self {
-        LdapAuthHandler {
-            config,
-        }
+        LdapAuthHandler { config }
     }
 
     /// Create LDAP connection for searching
     async fn connect_for_search(&self) -> Result<ldap3::Ldap, LdapError> {
         debug!("Creating LDAP connection to {}", self.config.url);
-        let settings = LdapConnSettings::new()
-            .set_conn_timeout(Duration::from_secs(self.config.timeout));
+        let settings =
+            LdapConnSettings::new().set_conn_timeout(Duration::from_secs(self.config.timeout));
 
         let (conn, mut ldap) = LdapConnAsync::with_settings(settings, &self.config.url)
             .await
@@ -201,8 +199,8 @@ impl LdapAuthHandler {
     async fn authenticate_ldap(&self, user_dn: &str, password: &str) -> Result<(), LdapError> {
         debug!(dn = %user_dn, "Attempting LDAP bind for user");
 
-        let settings = LdapConnSettings::new()
-            .set_conn_timeout(Duration::from_secs(self.config.timeout));
+        let settings =
+            LdapConnSettings::new().set_conn_timeout(Duration::from_secs(self.config.timeout));
 
         let (conn, mut ldap) = LdapConnAsync::with_settings(settings, &self.config.url)
             .await
@@ -219,18 +217,16 @@ impl LdapAuthHandler {
         let result = ldap.simple_bind(user_dn, password).await;
 
         match result {
-            Ok(bind_result) => {
-                match bind_result.success() {
-                    Ok(_) => {
-                        info!(dn = %user_dn, "LDAP authentication successful");
-                        Ok(())
-                    }
-                    Err(e) => {
-                        warn!(dn = %user_dn, error = %e, "LDAP bind failed");
-                        Err(LdapError::AuthFailed)
-                    }
+            Ok(bind_result) => match bind_result.success() {
+                Ok(_) => {
+                    info!(dn = %user_dn, "LDAP authentication successful");
+                    Ok(())
                 }
-            }
+                Err(e) => {
+                    warn!(dn = %user_dn, error = %e, "LDAP bind failed");
+                    Err(LdapError::AuthFailed)
+                }
+            },
             Err(e) => {
                 warn!(dn = %user_dn, error = %e, "LDAP bind error");
                 Err(LdapError::AuthFailed)
@@ -264,6 +260,10 @@ impl AuthHandler for LdapAuthHandler {
             })
         })
     }
+
+    // CHAP authentication is not supported for LDAP
+    // LDAP uses bind authentication which doesn't provide access to plaintext passwords
+    // The default implementation in AuthHandler will return false
 
     fn get_accept_attributes(&self, _username: &str) -> Vec<Attribute> {
         // Could retrieve group memberships or other attributes from LDAP

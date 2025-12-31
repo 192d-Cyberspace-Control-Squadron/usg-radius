@@ -195,6 +195,10 @@ mod tests {
         let response_auth = calculate_response_authenticator(&packet, &request_auth, secret);
         packet.authenticator = response_auth;
 
-        assert!(verify_response_authenticator(&packet, &request_auth, secret));
+        assert!(verify_response_authenticator(
+            &packet,
+            &request_auth,
+            secret
+        ));
     }
 }

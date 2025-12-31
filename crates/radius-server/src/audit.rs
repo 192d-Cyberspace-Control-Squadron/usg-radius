@@ -130,10 +130,7 @@ impl AuditLogger {
     /// Create a new audit logger
     pub fn new(file_path: Option<String>) -> std::io::Result<Self> {
         let file = if let Some(ref path) = file_path {
-            let f = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(path)?;
+            let f = OpenOptions::new().create(true).append(true).open(path)?;
             Some(Arc::new(Mutex::new(f)))
         } else {
             None

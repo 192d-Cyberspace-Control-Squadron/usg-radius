@@ -242,10 +242,9 @@ impl Config {
 
     /// Get socket address for binding
     pub fn socket_addr(&self) -> Result<SocketAddr, ConfigError> {
-        let addr: IpAddr = self
-            .listen_address
-            .parse()
-            .map_err(|_| ConfigError::Invalid(format!("Invalid IP address: {}", self.listen_address)))?;
+        let addr: IpAddr = self.listen_address.parse().map_err(|_| {
+            ConfigError::Invalid(format!("Invalid IP address: {}", self.listen_address))
+        })?;
         Ok(SocketAddr::new(addr, self.listen_port))
     }
 
@@ -278,10 +277,9 @@ impl Config {
     /// Validate configuration
     fn validate(&self) -> Result<(), ConfigError> {
         // Validate listen address
-        let _: IpAddr = self
-            .listen_address
-            .parse()
-            .map_err(|_| ConfigError::Invalid(format!("Invalid listen address: {}", self.listen_address)))?;
+        let _: IpAddr = self.listen_address.parse().map_err(|_| {
+            ConfigError::Invalid(format!("Invalid listen address: {}", self.listen_address))
+        })?;
 
         // Validate port
         if self.listen_port == 0 {
