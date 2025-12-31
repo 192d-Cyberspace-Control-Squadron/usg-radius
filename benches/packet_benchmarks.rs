@@ -1,8 +1,9 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use radius_proto::auth::{
     decrypt_user_password, encrypt_user_password, generate_request_authenticator,
 };
 use radius_proto::{Attribute, AttributeType, Code, Packet};
+use std::hint::black_box;
 
 fn create_test_packet(num_attributes: usize) -> Packet {
     let req_auth = generate_request_authenticator();
