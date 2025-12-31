@@ -207,7 +207,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 **Goal**: Add RADIUS Accounting support (RFC 2866)
 **Priority**: HIGH
-**Status**: 🚧 In Progress (85% complete)
+**Status**: 🚧 In Progress (90% complete)
 
 ### Accounting Protocol ✅ COMPLETED
 
@@ -264,12 +264,15 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 - [x] Bytes in/out tracking (Acct-Input-Octets, Acct-Output-Octets)
 - [x] Session duration tracking (Acct-Session-Time)
 - [x] Termination cause tracking (Acct-Terminate-Cause)
-- [ ] Packets in/out tracking (32-bit counter support)
-- [ ] 64-bit counter support (Acct-Input-Gigawords, Acct-Output-Gigawords)
+- [x] Packets in/out tracking (32-bit counter support)
+- [x] 64-bit counter support (Acct-Input-Gigawords, Acct-Output-Gigawords)
+  - [x] RFC 2869 gigaword attributes (52, 53)
+  - [x] Automatic 64-bit value calculation in all handlers
+  - [x] Backward compatible (gigawords optional)
 - [ ] Usage reports and aggregation queries
 - [ ] Export functionality (CSV, JSON reports)
 
-**Status**: 🚧 Partial (basic metrics complete, advanced reporting pending)
+**Status**: 🚧 Partial (all counters complete, reporting/export pending)
 
 ### Test Coverage
 
