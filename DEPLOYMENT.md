@@ -4,6 +4,7 @@ This guide covers deploying USG RADIUS in various environments.
 
 ## Table of Contents
 
+- [Command Line Interface](#command-line-interface)
 - [Quick Start](#quick-start)
 - [Docker Deployment](#docker-deployment)
 - [Systemd Deployment](#systemd-deployment)
@@ -11,6 +12,83 @@ This guide covers deploying USG RADIUS in various environments.
 - [Security Hardening](#security-hardening)
 - [Monitoring](#monitoring)
 - [Troubleshooting](#troubleshooting)
+
+---
+
+## Command Line Interface
+
+### Usage
+
+```text
+usg_radius [OPTIONS] [CONFIG]
+```
+
+### Arguments
+
+- `CONFIG` - Path to configuration file (default: `config.json`)
+
+### Options
+
+- `-v, --validate` - Validate configuration and exit (doesn't start server)
+- `-V, --version` - Print version information and exit
+- `-h, --help` - Print help message
+
+### Examples
+
+**Check version:**
+
+```bash
+usg_radius --version
+```
+
+**Output:**
+
+```text
+USG RADIUS Server v0.1.0
+RFC 2865 RADIUS Authentication Server
+
+Repository: https://github.com/192d-Cyberspace-Control-Squadron/usg-radius
+License: AGPL-3.0-or-later
+```
+
+**Validate configuration:**
+
+```bash
+usg_radius --validate /etc/radius/config.json
+```
+
+**Output:**
+
+```text
+✓ Configuration validated successfully!
+
+Configuration summary:
+  Listen: :::1812
+  Clients: 4
+  Users: 2
+  Log level: info
+  Strict RFC compliance: true
+  Audit log: /var/log/radius/audit.log
+
+Authorized clients:
+  ✓ 192.168.1.0/24 - Internal Network
+  ✓ 10.0.0.1 - VPN Gateway
+  ✓ 172.16.0.0/16 - Wireless Controllers
+  ✗ 203.0.113.100 - Remote NAS (disabled for testing)
+```
+
+**Start server with custom config:**
+
+```bash
+usg_radius /etc/radius/config.json
+```
+
+**Start server with default config:**
+
+```bash
+usg_radius
+# Uses config.json in current directory
+```
 
 ---
 

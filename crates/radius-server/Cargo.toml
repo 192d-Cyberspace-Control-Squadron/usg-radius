@@ -22,6 +22,7 @@ tracing-subscriber.workspace = true
 ipnetwork.workspace = true
 dashmap.workspace = true
 chrono.workspace = true
+clap.workspace = true
 
 [dev-dependencies]
 hex.workspace = true
