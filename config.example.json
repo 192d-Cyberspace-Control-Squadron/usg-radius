@@ -46,6 +46,7 @@
   "log_level": "info",
   "audit_log_path": "/var/log/radius/audit.log",
   "accounting_log_path": "/var/log/radius/accounting.jsonl",
+  "accounting_database_url": "postgresql://radius:password@localhost/radius",
   "strict_rfc_compliance": true,
   "request_cache_ttl": 60,
   "request_cache_max_entries": 10000,

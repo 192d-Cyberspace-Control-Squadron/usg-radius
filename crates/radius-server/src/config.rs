@@ -145,6 +145,12 @@ pub struct Config {
     #[serde(default)]
     pub accounting_log_path: Option<String>,
 
+    /// PostgreSQL database URL for accounting (optional)
+    /// When specified, enables PostgreSQL-based accounting storage.
+    /// Example: "postgresql://user:password@localhost/radius"
+    #[serde(default)]
+    pub accounting_database_url: Option<String>,
+
     /// Strict RFC 2865 compliance mode (default: true)
     /// When enabled, enforces strict validation of attribute values and types.
     /// Set to false for lenient mode if compatibility with non-compliant clients is needed.
@@ -212,6 +218,7 @@ impl Default for Config {
             log_level: None,
             audit_log_path: None,
             accounting_log_path: None,
+            accounting_database_url: None,
             strict_rfc_compliance: true,
             request_cache_ttl: None,
             request_cache_max_entries: None,
@@ -375,6 +382,9 @@ impl Config {
             log_level: Some("info".to_string()),
             audit_log_path: Some("/var/log/radius/audit.log".to_string()),
             accounting_log_path: Some("/var/log/radius/accounting.jsonl".to_string()),
+            accounting_database_url: Some(
+                "postgresql://radius:password@localhost/radius".to_string(),
+            ),
             strict_rfc_compliance: true,
             request_cache_ttl: Some(60),
             request_cache_max_entries: Some(10000),
@@ -422,6 +432,7 @@ mod tests {
             secret: "secret".to_string(),
             name: Some("Test".to_string()),
             enabled: true,
+            nas_identifier: None,
         };
 
         let network = client.parse_network().unwrap();
@@ -436,6 +447,7 @@ mod tests {
             secret: "secret".to_string(),
             name: Some("Test".to_string()),
             enabled: true,
+            nas_identifier: None,
         };
 
         let network = client.parse_network().unwrap();
@@ -451,6 +463,7 @@ mod tests {
             secret: "secret".to_string(),
             name: Some("Test".to_string()),
             enabled: true,
+            nas_identifier: None,
         };
 
         assert!(client.matches("10.1.2.3".parse().unwrap()).unwrap());
@@ -465,6 +478,7 @@ mod tests {
             secret: "secret".to_string(),
             name: Some("Test".to_string()),
             enabled: true,
+            nas_identifier: None,
         };
 
         assert!(client.parse_network().is_err());
@@ -479,12 +493,14 @@ mod tests {
                 secret: "secret1".to_string(),
                 name: Some("Network 1".to_string()),
                 enabled: true,
+                nas_identifier: None,
             },
             Client {
                 address: "10.0.0.1".to_string(),
                 secret: "secret2".to_string(),
                 name: Some("Single IP".to_string()),
                 enabled: true,
+                nas_identifier: None,
             },
         ];
 
@@ -511,6 +527,7 @@ mod tests {
             secret: "secret1".to_string(),
             name: Some("Network 1".to_string()),
             enabled: false, // Disabled
+            nas_identifier: None,
         }];
 
         // Should not find disabled client
@@ -527,6 +544,7 @@ mod tests {
             secret: "client_secret".to_string(),
             name: Some("Network 1".to_string()),
             enabled: true,
+            nas_identifier: None,
         }];
 
         // Should return client-specific secret
@@ -546,6 +564,7 @@ mod tests {
             secret: "secret".to_string(),
             name: Some("Test".to_string()),
             enabled: true,
+            nas_identifier: None,
         }];
 
         // Should fail validation due to invalid address
@@ -559,6 +578,7 @@ mod tests {
             secret: "secret".to_string(),
             name: Some("Test".to_string()),
             enabled: true,
+            nas_identifier: None,
         };
 
         let network = client.parse_network().unwrap();
@@ -573,6 +593,7 @@ mod tests {
             secret: "secret".to_string(),
             name: Some("Test".to_string()),
             enabled: true,
+            nas_identifier: None,
         };
 
         let network = client.parse_network().unwrap();
@@ -588,6 +609,7 @@ mod tests {
             secret: "secret".to_string(),
             name: Some("Test".to_string()),
             enabled: true,
+            nas_identifier: None,
         };
 
         assert!(client.matches("fe80::1".parse().unwrap()).unwrap());
@@ -604,12 +626,14 @@ mod tests {
                 secret: "secret1".to_string(),
                 name: Some("IPv6 Network".to_string()),
                 enabled: true,
+                nas_identifier: None,
             },
             Client {
                 address: "::1".to_string(),
                 secret: "secret2".to_string(),
                 name: Some("IPv6 Localhost".to_string()),
                 enabled: true,
+                nas_identifier: None,
             },
         ];
 

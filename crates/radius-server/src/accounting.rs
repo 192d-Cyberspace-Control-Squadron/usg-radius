@@ -640,3 +640,6 @@ mod tests {
 
 // File-based accounting backend
 pub mod file;
+
+// PostgreSQL accounting backend
+pub mod postgres;
