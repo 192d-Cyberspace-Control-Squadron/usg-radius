@@ -61,7 +61,6 @@ This document outlines the development roadmap for the USG RADIUS project, organ
 - ⚠️ No EAP support (planned for v0.5.0)
 - ⚠️ No accounting support (planned for v0.4.0)
 - ⚠️ No hot reload (requires server restart for config changes)
-- ⚠️ Message-Authenticator validation on requests not yet enforced (calculation/generation ready)
 
 See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
@@ -176,9 +175,10 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 - [x] HMAC-MD5 calculation
 - [x] calculate_message_authenticator() function
 - [x] verify_message_authenticator() function
-- [x] Comprehensive test suite (7 tests)
+- [x] Server-side validation enforcement in Access-Request handler
+- [x] Comprehensive test suite (10 tests: 7 unit + 3 integration)
 - [x] Support for packet integrity verification
-- [x] Backward compatibility with clients not using it
+- [x] Backward compatibility with clients not using it (validation only when present)
 
 **Status**: ✅ Complete (Dec 2024)
 

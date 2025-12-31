@@ -9,6 +9,7 @@ use radius_proto::auth::{
     calculate_accounting_request_authenticator, calculate_response_authenticator,
     decrypt_user_password,
 };
+use radius_proto::verify_message_authenticator;
 use radius_proto::{
     ChapChallenge, ChapResponse, Code, Packet, PacketError, ValidationMode, validate_packet,
     verify_chap_response,
@@ -547,6 +548,47 @@ impl RadiusServer {
                         )));
                     }
                 }
+            }
+        }
+
+        // RFC 2869: Validate Message-Authenticator if present
+        if let Some(_msg_auth_attr) =
+            request.find_attribute(AttributeType::MessageAuthenticator as u8)
+        {
+            // Encode the packet to get raw bytes for verification
+            let packet_bytes = request.encode()?;
+
+            // Find the offset of the Message-Authenticator value in the encoded packet
+            // Packet structure: Code (1) + ID (1) + Length (2) + Authenticator (16) + Attributes
+            let mut offset = 20; // Start after header (code + id + length + authenticator)
+
+            let mut msg_auth_offset = None;
+            for attr in &request.attributes {
+                if attr.attr_type == AttributeType::MessageAuthenticator as u8 {
+                    // Attribute structure: Type (1) + Length (1) + Value
+                    msg_auth_offset = Some(offset + 2); // Skip type and length bytes
+                    break;
+                }
+                // Move to next attribute: Type (1) + Length (1) + Value
+                offset += 2 + attr.value.len();
+            }
+
+            if let Some(offset) = msg_auth_offset {
+                if !verify_message_authenticator(&packet_bytes, secret, offset) {
+                    warn!(
+                        client_ip = %source_ip,
+                        request_id = request.identifier,
+                        "Invalid Message-Authenticator"
+                    );
+                    return Err(ServerError::Validation(
+                        "Invalid Message-Authenticator".to_string(),
+                    ));
+                }
+                debug!(
+                    client_ip = %source_ip,
+                    request_id = request.identifier,
+                    "Message-Authenticator validated successfully"
+                );
             }
         }
 

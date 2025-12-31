@@ -14,7 +14,7 @@ use radius_proto::auth::{
     generate_request_authenticator,
 };
 use radius_proto::chap::{ChapChallenge, ChapResponse, compute_chap_response};
-use radius_proto::{Attribute, AttributeType, Code, Packet};
+use radius_proto::{calculate_message_authenticator, Attribute, AttributeType, Code, Packet};
 use radius_server::{
     AccountingHandler, AuthHandler, AuthResult, Config, RadiusServer, ServerConfig,
     SimpleAccountingHandler, SimpleAuthHandler,
@@ -1445,4 +1445,199 @@ async fn test_accounting_without_handler() {
 
     // Should timeout since server doesn't respond to accounting without handler
     assert!(result.is_err() || result.unwrap().is_err());
+}
+
+/// Test Message-Authenticator validation (RFC 2869)
+#[tokio::test]
+async fn test_message_authenticator_valid() {
+    let mut config = Config::default();
+    config.listen_address = "127.0.0.1".to_string();
+    config.listen_port = 0;
+    config.secret = "testing123".to_string();
+
+    let mut handler = SimpleAuthHandler::new();
+    handler.add_user("testuser", "testpass");
+
+    let server_config = ServerConfig::from_config(config, Arc::new(handler))
+        .expect("Failed to create server config");
+    let server = RadiusServer::new(server_config)
+        .await
+        .expect("Failed to create server");
+    let server_addr = server.local_addr().expect("Failed to get server address");
+
+    tokio::spawn(async move {
+        server.run().await.ok();
+    });
+
+    sleep(Duration::from_millis(500)).await;
+
+    // Create Access-Request with Message-Authenticator
+    let secret = b"testing123";
+    let req_auth = generate_request_authenticator();
+    let mut packet = Packet::new(Code::AccessRequest, 1, req_auth);
+
+    // Add User-Name
+    packet.add_attribute(
+        Attribute::string(AttributeType::UserName as u8, "testuser")
+            .expect("Failed to create User-Name attribute"),
+    );
+
+    // Add encrypted User-Password
+    let encrypted_pwd = encrypt_user_password("testpass", secret, &req_auth);
+    packet.add_attribute(
+        Attribute::new(AttributeType::UserPassword as u8, encrypted_pwd)
+            .expect("Failed to create User-Password attribute"),
+    );
+
+    // Add NAS-IP-Address
+    packet.add_attribute(
+        Attribute::new(
+            AttributeType::NasIpAddress as u8,
+            vec![127, 0, 0, 1],
+        )
+        .expect("Failed to create NAS-IP-Address attribute"),
+    );
+
+    // Add Message-Authenticator placeholder (will be calculated)
+    packet.add_attribute(
+        Attribute::new(AttributeType::MessageAuthenticator as u8, vec![0u8; 16])
+            .expect("Failed to create Message-Authenticator attribute"),
+    );
+
+    // Calculate proper Message-Authenticator
+    let mut packet_bytes = packet.encode().expect("Failed to encode packet");
+
+    // Find Message-Authenticator offset
+    let mut offset = 20; // Header size
+    for attr in &packet.attributes {
+        if attr.attr_type == AttributeType::MessageAuthenticator as u8 {
+            // Skip Type (1) + Length (1) to get to value
+            offset += 2;
+            break;
+        }
+        offset += 2 + attr.value.len();
+    }
+
+    // Calculate and insert correct Message-Authenticator
+    let mut packet_copy = packet_bytes.clone();
+    packet_copy[offset..offset + 16].fill(0);
+    let msg_auth = calculate_message_authenticator(&packet_copy, secret);
+    packet_bytes[offset..offset + 16].copy_from_slice(&msg_auth);
+
+    // Decode the corrected packet
+    let packet = Packet::decode(&packet_bytes).expect("Failed to decode packet");
+
+    // Send request
+    let response = send_radius_request(&packet, server_addr)
+        .await
+        .expect("Failed to send request");
+
+    // Should succeed with Access-Accept
+    assert_eq!(response.code, Code::AccessAccept);
+    assert_eq!(response.identifier, 1);
+}
+
+/// Test Message-Authenticator validation with invalid authenticator
+#[tokio::test]
+async fn test_message_authenticator_invalid() {
+    let mut config = Config::default();
+    config.listen_address = "127.0.0.1".to_string();
+    config.listen_port = 0;
+    config.secret = "testing123".to_string();
+
+    let mut handler = SimpleAuthHandler::new();
+    handler.add_user("testuser", "testpass");
+
+    let server_config = ServerConfig::from_config(config, Arc::new(handler))
+        .expect("Failed to create server config");
+    let server = RadiusServer::new(server_config)
+        .await
+        .expect("Failed to create server");
+    let server_addr = server.local_addr().expect("Failed to get server address");
+
+    tokio::spawn(async move {
+        server.run().await.ok();
+    });
+
+    sleep(Duration::from_millis(500)).await;
+
+    // Create Access-Request with invalid Message-Authenticator
+    let secret = b"testing123";
+    let req_auth = generate_request_authenticator();
+    let mut packet = Packet::new(Code::AccessRequest, 2, req_auth);
+
+    // Add User-Name
+    packet.add_attribute(
+        Attribute::string(AttributeType::UserName as u8, "testuser")
+            .expect("Failed to create User-Name attribute"),
+    );
+
+    // Add encrypted User-Password
+    let encrypted_pwd = encrypt_user_password("testpass", secret, &req_auth);
+    packet.add_attribute(
+        Attribute::new(AttributeType::UserPassword as u8, encrypted_pwd)
+            .expect("Failed to create User-Password attribute"),
+    );
+
+    // Add NAS-IP-Address
+    packet.add_attribute(
+        Attribute::new(
+            AttributeType::NasIpAddress as u8,
+            vec![127, 0, 0, 1],
+        )
+        .expect("Failed to create NAS-IP-Address attribute"),
+    );
+
+    // Add INVALID Message-Authenticator (all 0xFF instead of proper HMAC)
+    packet.add_attribute(
+        Attribute::new(AttributeType::MessageAuthenticator as u8, vec![0xFF; 16])
+            .expect("Failed to create Message-Authenticator attribute"),
+    );
+
+    // Send request with invalid Message-Authenticator
+    let result = tokio::time::timeout(
+        Duration::from_secs(1),
+        send_radius_request(&packet, server_addr)
+    ).await;
+
+    // Server should reject the request (either timeout or no response)
+    // Typically servers don't respond to invalid Message-Authenticator for security
+    assert!(result.is_err() || matches!(result, Ok(Err(_))));
+}
+
+/// Test that requests without Message-Authenticator still work (it's optional)
+#[tokio::test]
+async fn test_message_authenticator_optional() {
+    let mut config = Config::default();
+    config.listen_address = "127.0.0.1".to_string();
+    config.listen_port = 0;
+    config.secret = "testing123".to_string();
+
+    let mut handler = SimpleAuthHandler::new();
+    handler.add_user("testuser", "testpass");
+
+    let server_config = ServerConfig::from_config(config, Arc::new(handler))
+        .expect("Failed to create server config");
+    let server = RadiusServer::new(server_config)
+        .await
+        .expect("Failed to create server");
+    let server_addr = server.local_addr().expect("Failed to get server address");
+
+    tokio::spawn(async move {
+        server.run().await.ok();
+    });
+
+    sleep(Duration::from_millis(500)).await;
+
+    // Create normal Access-Request WITHOUT Message-Authenticator
+    let packet = create_access_request("testuser", "testpass", b"testing123", 3);
+
+    // Send request
+    let response = send_radius_request(&packet, server_addr)
+        .await
+        .expect("Failed to send request");
+
+    // Should succeed - Message-Authenticator is optional
+    assert_eq!(response.code, Code::AccessAccept);
+    assert_eq!(response.identifier, 3);
 }
