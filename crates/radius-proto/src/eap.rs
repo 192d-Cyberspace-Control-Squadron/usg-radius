@@ -733,10 +733,8 @@ pub mod eap_tls {
         /// Returns Some(complete_data) when all fragments are received
         pub fn add_fragment(&mut self, packet: &EapTlsPacket) -> Result<Option<Vec<u8>>, EapError> {
             // Set expected length from first packet with L flag
-            if packet.flags.length_included() {
-                if self.expected_length.is_none() {
-                    self.expected_length = packet.tls_message_length;
-                }
+            if packet.flags.length_included() && self.expected_length.is_none() {
+                self.expected_length = packet.tls_message_length;
             }
 
             // Append fragment data
