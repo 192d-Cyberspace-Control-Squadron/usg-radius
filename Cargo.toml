@@ -1,8 +1,5 @@
 [workspace]
-members = [
-    "crates/radius-proto",
-    "crates/radius-server",
-]
+members = ["crates/radius-proto", "crates/radius-server"]
 resolver = "2"
 
 [workspace.package]
@@ -17,8 +14,10 @@ repository = "https://github.com/192d-Cyberspace-Control-Squadron/usg-radius"
 tokio = { version = "1", features = ["full"] }
 
 # Cryptography
-md5 = "0.7"
-rand = "0.8"
+hmac = "0.12"
+md5-digest = { package = "md-5", version = "0.10" }
+md5 = "0.8"
+rand = "0.9"
 
 # Error handling
 thiserror = "2.0"
@@ -32,7 +31,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 # Network
-ipnetwork = "0.20"
+ipnetwork = "0.21"
 
 # Caching and concurrency
 dashmap = "6.1"
@@ -44,16 +43,21 @@ chrono = "0.4"
 clap = { version = "4.5", features = ["derive", "cargo"] }
 
 # LDAP
-ldap3 = "0.11"
+ldap3 = "0.12"
 
 # Database
-sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "macros", "chrono"] }
-bcrypt = "0.15"
+sqlx = { version = "0.8", features = [
+    "runtime-tokio",
+    "postgres",
+    "macros",
+    "chrono",
+] }
+bcrypt = "0.17"
 
 # Development
 hex = "0.4"
-tempfile = "3.0"
-criterion = "0.5"
+tempfile = "3.24"
+criterion = "0.8"
 
 # Internal crates
 radius-proto = { path = "crates/radius-proto" }
