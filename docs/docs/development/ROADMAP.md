@@ -207,7 +207,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 **Goal**: Add RADIUS Accounting support (RFC 2866)
 **Priority**: HIGH
-**Status**: 🚧 In Progress (70% complete)
+**Status**: 🚧 In Progress (85% complete)
 
 ### Accounting Protocol ✅ COMPLETED
 
@@ -244,14 +244,20 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
   - [x] JSON Lines format (one record per line)
   - [x] Auto-creates parent directories
   - [x] Captures all event types and attributes
-- [ ] Database accounting backends
-  - [ ] PostgreSQL backend
+- [x] Database accounting backends
+  - [x] PostgreSQL backend
+    - [x] PostgresAccountingHandler implementation
+    - [x] Schema design (radius_sessions, radius_accounting_events)
+    - [x] Connection pooling with sqlx
+    - [x] Automatic migrations
+    - [x] All accounting event types supported
+    - [x] Session query methods
   - [ ] MySQL backend
-  - [ ] Schema design for sessions and events
-  - [ ] Connection pooling
 - [ ] Accounting data retention policies
+  - [ ] Configurable retention periods
+  - [ ] Automated cleanup for old records
 
-**Status**: 🚧 Partial (file backend complete, database backends pending)
+**Status**: 🚧 Partial (file and PostgreSQL backends complete, MySQL and retention policies pending)
 
 ### Usage Metrics
 
@@ -298,8 +304,18 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
   - Captures: timestamps, events, session IDs, usernames, IPs, usage metrics
   - Async file operations with proper error handling
 
-**Total v0.4.0 Actual Effort**: ~4 weeks (accounting protocol + session management + file backend)
-**Remaining Effort**: ~2 weeks (database backends + advanced metrics)
+- **PostgreSQL Backend** (radius-server/accounting/postgres.rs):
+  - 750+ lines of production-ready code
+  - Two-table schema: radius_sessions and radius_accounting_events
+  - Automatic migrations with comprehensive indexes
+  - Connection pooling with sqlx::PgPool
+  - All AccountingHandler trait methods implemented
+  - Session query APIs (get_active_sessions, get_session)
+  - IP address conversion (IpAddr ↔ INET)
+  - Configuration support via accounting_database_url
+
+**Total v0.4.0 Actual Effort**: ~5 weeks (accounting protocol + session management + file backend + PostgreSQL)
+**Remaining Effort**: ~1 week (MySQL backend + advanced metrics + retention policies)
 
 ---
 
