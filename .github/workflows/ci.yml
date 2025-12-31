@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 env:
   CARGO_TERM_COLOR: always
@@ -46,7 +46,7 @@ jobs:
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run unit tests
-        run: cargo test --lib --bins
+        run: cargo test --workspace --all-targets
 
       - name: Run integration tests
         run: cargo test --test '*'
