@@ -32,7 +32,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 # Network
-ipnetwork = "0.20"
+ipnetwork = "0.21"
 
 # Caching and concurrency
 dashmap = "6.1"
