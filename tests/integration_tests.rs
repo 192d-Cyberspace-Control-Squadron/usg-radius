@@ -2,6 +2,7 @@
 //!
 //! These tests verify end-to-end functionality including:
 //! - Authentication flows (PAP and CHAP)
+//! - Multi-round authentication (Access-Challenge)
 //! - Client validation
 //! - Rate limiting
 //! - Configuration validation
@@ -10,7 +11,7 @@
 use radius_proto::auth::{encrypt_user_password, generate_request_authenticator};
 use radius_proto::chap::{compute_chap_response, ChapChallenge, ChapResponse};
 use radius_proto::{Attribute, AttributeType, Code, Packet};
-use radius_server::{Config, RadiusServer, ServerConfig, SimpleAuthHandler};
+use radius_server::{AuthHandler, AuthResult, Config, RadiusServer, ServerConfig, SimpleAuthHandler};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -730,4 +731,212 @@ async fn test_chap_different_identifiers() {
             chap_ident
         );
     }
+}
+
+/// Custom authentication handler for testing Access-Challenge
+struct ChallengeAuthHandler {
+    users: std::collections::HashMap<String, String>,
+    pin: String,
+}
+
+impl ChallengeAuthHandler {
+    fn new() -> Self {
+        ChallengeAuthHandler {
+            users: std::collections::HashMap::new(),
+            pin: "1234".to_string(),
+        }
+    }
+
+    fn add_user(&mut self, username: impl Into<String>, password: impl Into<String>) {
+        self.users.insert(username.into(), password.into());
+    }
+}
+
+impl AuthHandler for ChallengeAuthHandler {
+    fn authenticate(&self, username: &str, password: &str) -> bool {
+        // Simple password check
+        self.users.get(username).map(|p| p == password).unwrap_or(false)
+    }
+
+    fn get_user_password(&self, username: &str) -> Option<String> {
+        self.users.get(username).cloned()
+    }
+
+    fn authenticate_with_challenge(
+        &self,
+        username: &str,
+        password: Option<&str>,
+        state: Option<&[u8]>,
+    ) -> AuthResult {
+        // Check if user exists
+        if !self.users.contains_key(username) {
+            return AuthResult::Reject;
+        }
+
+        // If no state, this is the first request - send challenge
+        if state.is_none() {
+            return AuthResult::Challenge {
+                message: Some("Please enter your PIN".to_string()),
+                state: b"challenge_state_123".to_vec(),
+                attributes: vec![],
+            };
+        }
+
+        // If we have state, verify it and check the PIN
+        if state == Some(b"challenge_state_123" as &[u8]) {
+            // Password should be the PIN
+            if let Some(pwd) = password {
+                if pwd == self.pin {
+                    return AuthResult::Accept;
+                }
+            }
+        }
+
+        AuthResult::Reject
+    }
+}
+
+#[tokio::test]
+async fn test_access_challenge() {
+    // Create test configuration
+    let mut config = Config::default();
+    config.listen_address = "127.0.0.1".to_string();
+    config.listen_port = 0;
+    config.secret = "testing123".to_string();
+
+    // Create challenge authentication handler
+    let mut handler = ChallengeAuthHandler::new();
+    handler.add_user("challengeuser", "password");
+
+    let server_config = ServerConfig::from_config(config, Arc::new(handler))
+        .expect("Failed to create server config");
+    let server = RadiusServer::new(server_config)
+        .await
+        .expect("Failed to create server");
+    let server_addr = server.local_addr().expect("Failed to get server address");
+
+    tokio::spawn(async move {
+        server.run().await.ok();
+    });
+
+    sleep(Duration::from_millis(500)).await;
+
+    // First request - should get Access-Challenge
+    let packet1 = create_access_request("challengeuser", "password", b"testing123", 1);
+    let response1 = send_radius_request(&packet1, server_addr)
+        .await
+        .expect("Failed to send first request");
+
+    assert_eq!(response1.code, Code::AccessChallenge);
+    assert_eq!(response1.identifier, 1);
+
+    // Extract State attribute from challenge
+    let state_attr = response1
+        .find_attribute(AttributeType::State as u8)
+        .expect("State attribute should be present in Access-Challenge");
+
+    // Verify Reply-Message is present
+    let reply_msg = response1
+        .find_attribute(AttributeType::ReplyMessage as u8)
+        .and_then(|attr| attr.as_string().ok());
+    assert_eq!(reply_msg, Some("Please enter your PIN".to_string()));
+
+    // Second request - with State and correct PIN
+    let req_auth2 = generate_request_authenticator();
+    let mut packet2 = Packet::new(Code::AccessRequest, 2, req_auth2);
+
+    // Add User-Name
+    packet2.add_attribute(
+        Attribute::string(AttributeType::UserName as u8, "challengeuser")
+            .expect("Failed to create User-Name attribute"),
+    );
+
+    // Add encrypted PIN as User-Password
+    let encrypted_pin = encrypt_user_password("1234", b"testing123", &req_auth2);
+    packet2.add_attribute(
+        Attribute::new(AttributeType::UserPassword as u8, encrypted_pin)
+            .expect("Failed to create User-Password attribute"),
+    );
+
+    // Add State attribute from previous response
+    packet2.add_attribute(
+        Attribute::new(AttributeType::State as u8, state_attr.value.clone())
+            .expect("Failed to create State attribute"),
+    );
+
+    let response2 = send_radius_request(&packet2, server_addr)
+        .await
+        .expect("Failed to send second request");
+
+    // Should now get Access-Accept
+    assert_eq!(response2.code, Code::AccessAccept);
+    assert_eq!(response2.identifier, 2);
+}
+
+#[tokio::test]
+async fn test_access_challenge_wrong_pin() {
+    // Create test configuration
+    let mut config = Config::default();
+    config.listen_address = "127.0.0.1".to_string();
+    config.listen_port = 0;
+    config.secret = "testing123".to_string();
+
+    // Create challenge authentication handler
+    let mut handler = ChallengeAuthHandler::new();
+    handler.add_user("challengeuser", "password");
+
+    let server_config = ServerConfig::from_config(config, Arc::new(handler))
+        .expect("Failed to create server config");
+    let server = RadiusServer::new(server_config)
+        .await
+        .expect("Failed to create server");
+    let server_addr = server.local_addr().expect("Failed to get server address");
+
+    tokio::spawn(async move {
+        server.run().await.ok();
+    });
+
+    sleep(Duration::from_millis(500)).await;
+
+    // First request - should get Access-Challenge
+    let packet1 = create_access_request("challengeuser", "password", b"testing123", 1);
+    let response1 = send_radius_request(&packet1, server_addr)
+        .await
+        .expect("Failed to send first request");
+
+    assert_eq!(response1.code, Code::AccessChallenge);
+
+    // Extract State attribute
+    let state_attr = response1
+        .find_attribute(AttributeType::State as u8)
+        .expect("State attribute should be present");
+
+    // Second request - with State but WRONG PIN
+    let req_auth2 = generate_request_authenticator();
+    let mut packet2 = Packet::new(Code::AccessRequest, 2, req_auth2);
+
+    packet2.add_attribute(
+        Attribute::string(AttributeType::UserName as u8, "challengeuser")
+            .expect("Failed to create User-Name attribute"),
+    );
+
+    // Add wrong PIN
+    let encrypted_pin = encrypt_user_password("9999", b"testing123", &req_auth2);
+    packet2.add_attribute(
+        Attribute::new(AttributeType::UserPassword as u8, encrypted_pin)
+            .expect("Failed to create User-Password attribute"),
+    );
+
+    packet2.add_attribute(
+        Attribute::new(AttributeType::State as u8, state_attr.value.clone())
+            .expect("Failed to create State attribute"),
+    );
+
+    let response2 = send_radius_request(&packet2, server_addr)
+        .await
+        .expect("Failed to send second request");
+
+    // Should get Access-Reject for wrong PIN
+    assert_eq!(response2.code, Code::AccessReject);
+    assert_eq!(response2.identifier, 2);
 }

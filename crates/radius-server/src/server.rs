@@ -33,6 +33,24 @@ pub enum ServerError {
     RateLimited,
 }
 
+/// Authentication result for multi-round authentication
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AuthResult {
+    /// Authentication succeeded
+    Accept,
+    /// Authentication failed
+    Reject,
+    /// Server needs more information (Access-Challenge)
+    Challenge {
+        /// Challenge message to display to user
+        message: Option<String>,
+        /// State to include in challenge response
+        state: Vec<u8>,
+        /// Additional attributes to include in challenge
+        attributes: Vec<Attribute>,
+    },
+}
+
 /// Authentication handler trait
 ///
 /// Implement this trait to provide custom authentication logic.
@@ -69,6 +87,36 @@ pub trait AuthHandler: Send + Sync {
         None // Default: not supported
     }
 
+    /// Multi-round authentication with challenge-response support
+    ///
+    /// This method is called when a request may require Access-Challenge.
+    /// The default implementation calls authenticate() and returns Accept/Reject.
+    ///
+    /// # Arguments
+    /// * `username` - The username from the request
+    /// * `password` - The password from the request (if present)
+    /// * `state` - The State attribute from the request (if this is a challenge response)
+    ///
+    /// # Returns
+    /// AuthResult indicating Accept, Reject, or Challenge
+    fn authenticate_with_challenge(
+        &self,
+        username: &str,
+        password: Option<&str>,
+        _state: Option<&[u8]>,
+    ) -> AuthResult {
+        // Default implementation: simple PAP authentication
+        if let Some(pwd) = password {
+            if self.authenticate(username, pwd) {
+                AuthResult::Accept
+            } else {
+                AuthResult::Reject
+            }
+        } else {
+            AuthResult::Reject
+        }
+    }
+
     /// Get additional attributes to include in Access-Accept response
     fn get_accept_attributes(&self, _username: &str) -> Vec<Attribute> {
         vec![]
@@ -77,6 +125,11 @@ pub trait AuthHandler: Send + Sync {
     /// Get additional attributes to include in Access-Reject response
     fn get_reject_attributes(&self, _username: &str) -> Vec<Attribute> {
         vec![Attribute::string(AttributeType::ReplyMessage as u8, "Authentication failed").unwrap()]
+    }
+
+    /// Get additional attributes to include in Access-Challenge response
+    fn get_challenge_attributes(&self, _username: &str) -> Vec<Attribute> {
+        vec![]
     }
 }
 
@@ -437,11 +490,16 @@ impl RadiusServer {
             )
             .await;
 
-        // Determine authentication method (CHAP or PAP)
-        let authenticated = if let Some(chap_password_attr) =
+        // Extract State attribute (for multi-round authentication)
+        let state = request
+            .find_attribute(AttributeType::State as u8)
+            .map(|attr| attr.value.as_slice());
+
+        // Determine authentication method and get result
+        let auth_result = if let Some(chap_password_attr) =
             request.find_attribute(AttributeType::ChapPassword as u8)
         {
-            // CHAP authentication
+            // CHAP authentication - always returns Accept or Reject (no challenge)
             debug!(
                 username = %username,
                 "Using CHAP authentication"
@@ -464,13 +522,18 @@ impl RadiusServer {
             };
 
             // Verify CHAP response using the auth handler
-            config
+            if config
                 .auth_handler
                 .authenticate_chap(&username, &chap_response, &challenge)
+            {
+                AuthResult::Accept
+            } else {
+                AuthResult::Reject
+            }
         } else if let Some(user_password_attr) =
             request.find_attribute(AttributeType::UserPassword as u8)
         {
-            // PAP authentication
+            // PAP authentication - may return Accept, Reject, or Challenge
             debug!(
                 username = %username,
                 "Using PAP authentication"
@@ -480,96 +543,154 @@ impl RadiusServer {
                 decrypt_user_password(&user_password_attr.value, secret, &request.authenticator)
                     .map_err(|_| ServerError::AuthFailed)?;
 
-            config.auth_handler.authenticate(&username, &password)
+            // Use multi-round authentication
+            config
+                .auth_handler
+                .authenticate_with_challenge(&username, Some(&password), state)
         } else {
-            warn!(
+            // No password provided - check if handler wants to challenge
+            debug!(
                 username = %username,
-                "No User-Password or CHAP-Password attribute found"
+                "No password attribute found - checking if challenge is needed"
             );
-            return Err(ServerError::AuthFailed);
+
+            config
+                .auth_handler
+                .authenticate_with_challenge(&username, None, state)
         };
 
-        if authenticated {
-            info!(
-                username = %username,
-                client_ip = %source_ip,
-                request_id = request.identifier,
-                "Authentication successful"
-            );
+        // Handle authentication result
+        match auth_result {
+            AuthResult::Accept => {
+                info!(
+                    username = %username,
+                    client_ip = %source_ip,
+                    request_id = request.identifier,
+                    "Authentication successful"
+                );
 
-            // Audit log authentication success
-            let client_name = config
-                .config
-                .as_ref()
-                .and_then(|c| c.find_client(source_ip))
-                .and_then(|client| client.name.clone());
+                // Audit log authentication success
+                let client_name = config
+                    .config
+                    .as_ref()
+                    .and_then(|c| c.find_client(source_ip))
+                    .and_then(|client| client.name.clone());
 
-            config
-                .audit_logger
-                .log(
-                    AuditEntry::new(AuditEventType::AuthSuccess)
-                        .with_username(&username)
-                        .with_client_ip(source_ip)
-                        .with_request_id(request.identifier)
-                        .with_client_name(client_name.unwrap_or_else(|| "unknown".to_string())),
-                )
-                .await;
+                config
+                    .audit_logger
+                    .log(
+                        AuditEntry::new(AuditEventType::AuthSuccess)
+                            .with_username(&username)
+                            .with_client_ip(source_ip)
+                            .with_request_id(request.identifier)
+                            .with_client_name(client_name.unwrap_or_else(|| "unknown".to_string())),
+                    )
+                    .await;
 
-            // Create Access-Accept response
-            let mut response = Packet::new(Code::AccessAccept, request.identifier, [0u8; 16]);
+                // Create Access-Accept response
+                let mut response = Packet::new(Code::AccessAccept, request.identifier, [0u8; 16]);
 
-            // Add attributes from auth handler
-            for attr in config.auth_handler.get_accept_attributes(&username) {
-                response.add_attribute(attr);
+                // Add attributes from auth handler
+                for attr in config.auth_handler.get_accept_attributes(&username) {
+                    response.add_attribute(attr);
+                }
+
+                // Calculate and set Response Authenticator using client-specific secret
+                let response_auth =
+                    calculate_response_authenticator(&response, &request.authenticator, secret);
+                response.authenticator = response_auth;
+
+                Ok(response)
             }
+            AuthResult::Challenge {
+                message,
+                state,
+                attributes,
+            } => {
+                info!(
+                    username = %username,
+                    client_ip = %source_ip,
+                    request_id = request.identifier,
+                    "Sending Access-Challenge"
+                );
 
-            // Calculate and set Response Authenticator using client-specific secret
-            let response_auth =
-                calculate_response_authenticator(&response, &request.authenticator, secret);
-            response.authenticator = response_auth;
+                // Create Access-Challenge response
+                let mut response =
+                    Packet::new(Code::AccessChallenge, request.identifier, [0u8; 16]);
 
-            Ok(response)
-        } else {
-            warn!(
-                username = %username,
-                client_ip = %source_ip,
-                request_id = request.identifier,
-                "Authentication failed"
-            );
+                // Add State attribute (required for Access-Challenge)
+                response.add_attribute(
+                    Attribute::new(AttributeType::State as u8, state)
+                        .map_err(|_| ServerError::AuthFailed)?,
+                );
 
-            // Audit log authentication failure
-            let client_name = config
-                .config
-                .as_ref()
-                .and_then(|c| c.find_client(source_ip))
-                .and_then(|client| client.name.clone());
+                // Add Reply-Message if provided
+                if let Some(msg) = message {
+                    response.add_attribute(
+                        Attribute::string(AttributeType::ReplyMessage as u8, &msg)
+                            .map_err(|_| ServerError::AuthFailed)?,
+                    );
+                }
 
-            config
-                .audit_logger
-                .log(
-                    AuditEntry::new(AuditEventType::AuthFailure)
-                        .with_username(&username)
-                        .with_client_ip(source_ip)
-                        .with_request_id(request.identifier)
-                        .with_client_name(client_name.unwrap_or_else(|| "unknown".to_string()))
-                        .with_details("Invalid credentials"),
-                )
-                .await;
+                // Add additional attributes
+                for attr in attributes {
+                    response.add_attribute(attr);
+                }
 
-            // Create Access-Reject response
-            let mut response = Packet::new(Code::AccessReject, request.identifier, [0u8; 16]);
+                // Add attributes from auth handler
+                for attr in config.auth_handler.get_challenge_attributes(&username) {
+                    response.add_attribute(attr);
+                }
 
-            // Add attributes from auth handler
-            for attr in config.auth_handler.get_reject_attributes(&username) {
-                response.add_attribute(attr);
+                // Calculate and set Response Authenticator using client-specific secret
+                let response_auth =
+                    calculate_response_authenticator(&response, &request.authenticator, secret);
+                response.authenticator = response_auth;
+
+                Ok(response)
             }
+            AuthResult::Reject => {
+                warn!(
+                    username = %username,
+                    client_ip = %source_ip,
+                    request_id = request.identifier,
+                    "Authentication failed"
+                );
 
-            // Calculate and set Response Authenticator using client-specific secret
-            let response_auth =
-                calculate_response_authenticator(&response, &request.authenticator, secret);
-            response.authenticator = response_auth;
+                // Audit log authentication failure
+                let client_name = config
+                    .config
+                    .as_ref()
+                    .and_then(|c| c.find_client(source_ip))
+                    .and_then(|client| client.name.clone());
 
-            Ok(response)
+                config
+                    .audit_logger
+                    .log(
+                        AuditEntry::new(AuditEventType::AuthFailure)
+                            .with_username(&username)
+                            .with_client_ip(source_ip)
+                            .with_request_id(request.identifier)
+                            .with_client_name(client_name.unwrap_or_else(|| "unknown".to_string()))
+                            .with_details("Invalid credentials"),
+                    )
+                    .await;
+
+                // Create Access-Reject response
+                let mut response = Packet::new(Code::AccessReject, request.identifier, [0u8; 16]);
+
+                // Add attributes from auth handler
+                for attr in config.auth_handler.get_reject_attributes(&username) {
+                    response.add_attribute(attr);
+                }
+
+                // Calculate and set Response Authenticator using client-specific secret
+                let response_auth =
+                    calculate_response_authenticator(&response, &request.authenticator, secret);
+                response.authenticator = response_auth;
+
+                Ok(response)
+            }
         }
     }
 
