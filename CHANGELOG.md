@@ -17,7 +17,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Full packet encoding and decoding with validation
   - Support for 11 EAP method types (Identity, MD5, TLS, TTLS, PEAP, MSCHAPv2, TEAP, etc.)
   - Comprehensive error handling with detailed error types
-  - 13 unit tests with 100% pass rate
+  - 1400+ lines of production-ready code
+  - 38 unit tests with 100% pass rate
+
+- **EAP State Machine**:
+  - 9 authentication states (Initialize through Success/Failure/Timeout)
+  - State transition validation with rules enforcement
+  - Terminal state detection
+  - Support for multi-round authentication flows
+  - can_transition_to() method for validated state changes
+  - is_terminal() method for terminal state detection
+
+- **EAP Session Management**:
+  - EapSession structure for individual session tracking
+  - Session lifecycle management (creation, activity, timeout, cleanup)
+  - EAP identifier auto-increment with wrapping
+  - Attempt counting and max attempts enforcement
+  - EapSessionManager for concurrent session support
+  - HashMap-based session storage with CRUD operations
+  - Session cleanup (timed out and terminal sessions)
+  - Session statistics and monitoring (SessionStats)
+  - 25 dedicated test suites for state machine and sessions
 
 - **EAP-MD5 Challenge Implementation**:
   - Challenge generation and parsing
