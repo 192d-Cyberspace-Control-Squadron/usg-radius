@@ -453,6 +453,9 @@ pub struct EapTeapServer {
     /// Current TEAP phase
     phase: TeapPhase,
 
+    /// Inner authentication method handler
+    inner_method: Option<Box<dyn InnerMethodHandler>>,
+
     /// Intermediate results from inner methods
     intermediate_results: Vec<TeapResult>,
 }
@@ -477,6 +480,25 @@ impl EapTeapServer {
         Self {
             tls_server: EapTlsServer::new(config),
             phase: TeapPhase::Phase1TlsHandshake,
+            inner_method: None,
+            intermediate_results: Vec::new(),
+        }
+    }
+
+    /// Create new TEAP server with inner method handler
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - rustls ServerConfig for TLS tunnel
+    /// * `inner_method` - Inner authentication method handler
+    pub fn with_inner_method(
+        config: Arc<rustls::ServerConfig>,
+        inner_method: Box<dyn InnerMethodHandler>,
+    ) -> Self {
+        Self {
+            tls_server: EapTlsServer::new(config),
+            phase: TeapPhase::Phase1TlsHandshake,
+            inner_method: Some(inner_method),
             intermediate_results: Vec::new(),
         }
     }
@@ -519,12 +541,108 @@ impl EapTeapServer {
                 Ok(response)
             }
             TeapPhase::Phase2InnerAuth => {
-                // Phase 2 will be implemented in next iteration
-                // For now, just return None
-                Ok(None)
+                // Decrypt TLS application data to get TLVs
+                let tlv_data = self.decrypt_tls_data(tls_packet)?;
+
+                // Parse TLVs from decrypted data
+                let tlvs = TeapTlv::parse_tlvs(&tlv_data)?;
+
+                // Process Phase 2 TLVs
+                self.process_phase2_tlvs(&tlvs)
             }
             TeapPhase::Complete => Err(EapError::InvalidState),
         }
+    }
+
+    /// Decrypt TLS application data from EAP-TLS packet
+    ///
+    /// In Phase 2, the client sends TLVs encrypted in the TLS tunnel.
+    /// We need to decrypt them using the established TLS connection.
+    ///
+    /// TODO: For MVP, this treats data as plaintext TLVs. In production, this must:
+    /// 1. Use rustls::ServerConnection::read_tls() to feed encrypted records
+    /// 2. Use rustls::ServerConnection::process_new_packets() to decrypt
+    /// 3. Use rustls::ServerConnection::reader() to extract application data
+    fn decrypt_tls_data(&mut self, tls_packet: &EapTlsPacket) -> Result<Vec<u8>, EapError> {
+        // For MVP, treat the data as plaintext TLVs
+        // In production, this would decrypt through the TLS connection
+        Ok(tls_packet.tls_data.clone())
+    }
+
+    /// Process Phase 2 TLVs
+    ///
+    /// Handles the TLV exchange for inner authentication.
+    fn process_phase2_tlvs(&mut self, tlvs: &[TeapTlv]) -> Result<Option<Vec<u8>>, EapError> {
+        if tlvs.is_empty() {
+            // No TLVs received, send Identity-Type request
+            return self.send_identity_type_request();
+        }
+
+        // Process each TLV
+        for tlv in tlvs {
+            match tlv.get_type() {
+                Some(TlvType::IdentityType) => {
+                    // Identity-Type response received
+                    // Send Basic-Password-Auth-Req
+                    return self.send_password_auth_request();
+                }
+                Some(TlvType::BasicPasswordAuthResp) => {
+                    // Password auth response received
+                    if let Some(ref mut handler) = self.inner_method {
+                        let result_tlv = handler.process_inner_request(tlv)?;
+
+                        // Check if authentication is complete
+                        if handler.is_complete() {
+                            self.phase = TeapPhase::Complete;
+
+                            // Encrypt and return result TLV
+                            return self.encrypt_and_send_tlvs(&[result_tlv]);
+                        }
+                    }
+                }
+                Some(TlvType::Result) => {
+                    // Final result TLV from client (acknowledgment)
+                    self.phase = TeapPhase::Complete;
+                    return Ok(None);
+                }
+                _ => {
+                    // Unknown or unsupported TLV
+                    continue;
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    /// Send Identity-Type TLV request
+    fn send_identity_type_request(&self) -> Result<Option<Vec<u8>>, EapError> {
+        let identity_tlv = IdentityType::User.to_tlv();
+        self.encrypt_and_send_tlvs(&[identity_tlv])
+    }
+
+    /// Send Basic-Password-Auth-Req TLV
+    fn send_password_auth_request(&self) -> Result<Option<Vec<u8>>, EapError> {
+        let request_tlv = BasicPasswordAuthHandler::create_password_request();
+        self.encrypt_and_send_tlvs(&[request_tlv])
+    }
+
+    /// Encrypt TLVs and send in TLS tunnel
+    ///
+    /// This encrypts the TLVs using the established TLS connection
+    /// and returns the encrypted data for transmission.
+    ///
+    /// TODO: For MVP, this returns plaintext TLVs. In production, this must:
+    /// 1. Use rustls::ServerConnection::writer() to write application data
+    /// 2. Use rustls::ServerConnection::write_tls() to get encrypted records
+    /// 3. Properly handle mutable access to the TLS connection
+    fn encrypt_and_send_tlvs(&self, tlvs: &[TeapTlv]) -> Result<Option<Vec<u8>>, EapError> {
+        // Encode TLVs
+        let tlv_data = TeapTlv::encode_tlvs(tlvs);
+
+        // For MVP, return plaintext TLVs
+        // In production, this would be encrypted through the TLS connection
+        Ok(Some(tlv_data))
     }
 }
 
@@ -1064,5 +1182,324 @@ mod tests {
         assert!(!handler.is_complete());
         assert_eq!(handler.get_result(), TeapResult::Failure);
         assert_eq!(handler.get_identity(), None);
+    }
+
+    // Phase 2 Integration Tests
+    #[test]
+    fn test_eap_teap_server_creation() {
+        use std::sync::Arc as StdArc;
+
+        let config = StdArc::new(
+            rustls::ServerConfig::builder()
+                .with_no_client_auth()
+                .with_cert_resolver(StdArc::new(
+                    rustls::server::ResolvesServerCertUsingSni::new(),
+                )),
+        );
+
+        let server = EapTeapServer::new(config);
+        assert_eq!(server.phase, TeapPhase::Phase1TlsHandshake);
+    }
+
+    #[test]
+    fn test_eap_teap_server_with_inner_method() {
+        use std::sync::Arc as StdArc;
+
+        let config = StdArc::new(
+            rustls::ServerConfig::builder()
+                .with_no_client_auth()
+                .with_cert_resolver(StdArc::new(
+                    rustls::server::ResolvesServerCertUsingSni::new(),
+                )),
+        );
+
+        let handler = BasicPasswordAuthHandler::new("alice".to_string(), "secret".to_string());
+        let server = EapTeapServer::with_inner_method(config, Box::new(handler));
+
+        assert_eq!(server.phase, TeapPhase::Phase1TlsHandshake);
+        assert!(server.inner_method.is_some());
+    }
+
+    #[test]
+    fn test_phase2_empty_tlvs_sends_identity_request() {
+        use std::sync::Arc as StdArc;
+
+        let config = StdArc::new(
+            rustls::ServerConfig::builder()
+                .with_no_client_auth()
+                .with_cert_resolver(StdArc::new(
+                    rustls::server::ResolvesServerCertUsingSni::new(),
+                )),
+        );
+
+        let handler = BasicPasswordAuthHandler::new("alice".to_string(), "secret".to_string());
+        let mut server = EapTeapServer::with_inner_method(config, Box::new(handler));
+
+        // Manually transition to Phase 2 (in real scenario, this happens after TLS handshake)
+        server.phase = TeapPhase::Phase2InnerAuth;
+
+        // Process empty TLVs should send Identity-Type request
+        let result = server.process_phase2_tlvs(&[]);
+        assert!(result.is_ok());
+
+        let response = result.unwrap();
+        assert!(response.is_some());
+
+        // Parse the response TLVs
+        let tlvs = TeapTlv::parse_tlvs(&response.unwrap()).unwrap();
+        assert_eq!(tlvs.len(), 1);
+        assert_eq!(tlvs[0].get_type(), Some(TlvType::IdentityType));
+    }
+
+    #[test]
+    fn test_phase2_identity_response_sends_password_request() {
+        use std::sync::Arc as StdArc;
+
+        let config = StdArc::new(
+            rustls::ServerConfig::builder()
+                .with_no_client_auth()
+                .with_cert_resolver(StdArc::new(
+                    rustls::server::ResolvesServerCertUsingSni::new(),
+                )),
+        );
+
+        let handler = BasicPasswordAuthHandler::new("alice".to_string(), "secret".to_string());
+        let mut server = EapTeapServer::with_inner_method(config, Box::new(handler));
+
+        server.phase = TeapPhase::Phase2InnerAuth;
+
+        // Simulate Identity-Type response
+        let identity_response = IdentityType::User.to_tlv();
+
+        // Process identity response should send password request
+        let result = server.process_phase2_tlvs(&[identity_response]);
+        assert!(result.is_ok());
+
+        let response = result.unwrap();
+        assert!(response.is_some());
+
+        // Parse the response TLVs
+        let tlvs = TeapTlv::parse_tlvs(&response.unwrap()).unwrap();
+        assert_eq!(tlvs.len(), 1);
+        assert_eq!(tlvs[0].get_type(), Some(TlvType::BasicPasswordAuthReq));
+    }
+
+    #[test]
+    fn test_phase2_password_response_successful_auth() {
+        use std::sync::Arc as StdArc;
+
+        let config = StdArc::new(
+            rustls::ServerConfig::builder()
+                .with_no_client_auth()
+                .with_cert_resolver(StdArc::new(
+                    rustls::server::ResolvesServerCertUsingSni::new(),
+                )),
+        );
+
+        let handler = BasicPasswordAuthHandler::new("alice".to_string(), "secret".to_string());
+        let mut server = EapTeapServer::with_inner_method(config, Box::new(handler));
+
+        server.phase = TeapPhase::Phase2InnerAuth;
+
+        // Create password response TLV
+        let mut value = Vec::new();
+        value.extend_from_slice(&5u16.to_be_bytes()); // username length = 5
+        value.extend_from_slice(b"alice");
+        value.extend_from_slice(&6u16.to_be_bytes()); // password length = 6
+        value.extend_from_slice(b"secret");
+
+        let password_response = TeapTlv::new(TlvType::BasicPasswordAuthResp, true, value);
+
+        // Process password response
+        let result = server.process_phase2_tlvs(&[password_response]);
+        assert!(result.is_ok());
+
+        // Server should transition to Complete
+        assert_eq!(server.phase, TeapPhase::Complete);
+
+        let response = result.unwrap();
+        assert!(response.is_some());
+
+        // Parse the response TLVs - should be Result TLV with Success
+        let tlvs = TeapTlv::parse_tlvs(&response.unwrap()).unwrap();
+        assert_eq!(tlvs.len(), 1);
+        assert_eq!(tlvs[0].get_type(), Some(TlvType::Result));
+
+        // Parse Result TLV value
+        let result_value = u16::from_be_bytes([tlvs[0].value[0], tlvs[0].value[1]]);
+        assert_eq!(result_value, TeapResult::Success as u16);
+    }
+
+    #[test]
+    fn test_phase2_password_response_failed_auth() {
+        use std::sync::Arc as StdArc;
+
+        let config = StdArc::new(
+            rustls::ServerConfig::builder()
+                .with_no_client_auth()
+                .with_cert_resolver(StdArc::new(
+                    rustls::server::ResolvesServerCertUsingSni::new(),
+                )),
+        );
+
+        let handler = BasicPasswordAuthHandler::new("alice".to_string(), "secret".to_string());
+        let mut server = EapTeapServer::with_inner_method(config, Box::new(handler));
+
+        server.phase = TeapPhase::Phase2InnerAuth;
+
+        // Create password response TLV with WRONG password
+        let mut value = Vec::new();
+        value.extend_from_slice(&5u16.to_be_bytes());
+        value.extend_from_slice(b"alice");
+        value.extend_from_slice(&5u16.to_be_bytes());
+        value.extend_from_slice(b"wrong"); // Wrong password
+
+        let password_response = TeapTlv::new(TlvType::BasicPasswordAuthResp, true, value);
+
+        // Process password response
+        let result = server.process_phase2_tlvs(&[password_response]);
+        assert!(result.is_ok());
+
+        // Server should transition to Complete
+        assert_eq!(server.phase, TeapPhase::Complete);
+
+        let response = result.unwrap();
+        assert!(response.is_some());
+
+        // Parse the response TLVs - should be Result TLV with Failure
+        let tlvs = TeapTlv::parse_tlvs(&response.unwrap()).unwrap();
+        assert_eq!(tlvs.len(), 1);
+        assert_eq!(tlvs[0].get_type(), Some(TlvType::Result));
+
+        let result_value = u16::from_be_bytes([tlvs[0].value[0], tlvs[0].value[1]]);
+        assert_eq!(result_value, TeapResult::Failure as u16);
+    }
+
+    #[test]
+    fn test_phase2_complete_flow_success() {
+        use std::sync::Arc as StdArc;
+
+        let config = StdArc::new(
+            rustls::ServerConfig::builder()
+                .with_no_client_auth()
+                .with_cert_resolver(StdArc::new(
+                    rustls::server::ResolvesServerCertUsingSni::new(),
+                )),
+        );
+
+        let handler = BasicPasswordAuthHandler::new("alice".to_string(), "secret".to_string());
+        let mut server = EapTeapServer::with_inner_method(config, Box::new(handler));
+
+        server.phase = TeapPhase::Phase2InnerAuth;
+
+        // Step 1: Empty TLVs -> Identity request
+        let result1 = server.process_phase2_tlvs(&[]).unwrap();
+        assert!(result1.is_some());
+        let tlvs1 = TeapTlv::parse_tlvs(&result1.unwrap()).unwrap();
+        assert_eq!(tlvs1[0].get_type(), Some(TlvType::IdentityType));
+
+        // Step 2: Identity response -> Password request
+        let identity_response = IdentityType::User.to_tlv();
+        let result2 = server.process_phase2_tlvs(&[identity_response]).unwrap();
+        assert!(result2.is_some());
+        let tlvs2 = TeapTlv::parse_tlvs(&result2.unwrap()).unwrap();
+        assert_eq!(tlvs2[0].get_type(), Some(TlvType::BasicPasswordAuthReq));
+
+        // Step 3: Password response -> Result (Success)
+        let mut value = Vec::new();
+        value.extend_from_slice(&5u16.to_be_bytes());
+        value.extend_from_slice(b"alice");
+        value.extend_from_slice(&6u16.to_be_bytes());
+        value.extend_from_slice(b"secret");
+        let password_response = TeapTlv::new(TlvType::BasicPasswordAuthResp, true, value);
+
+        let result3 = server.process_phase2_tlvs(&[password_response]).unwrap();
+        assert!(result3.is_some());
+        assert_eq!(server.phase, TeapPhase::Complete);
+
+        let tlvs3 = TeapTlv::parse_tlvs(&result3.unwrap()).unwrap();
+        assert_eq!(tlvs3[0].get_type(), Some(TlvType::Result));
+        let result_value = u16::from_be_bytes([tlvs3[0].value[0], tlvs3[0].value[1]]);
+        assert_eq!(result_value, TeapResult::Success as u16);
+    }
+
+    #[test]
+    fn test_phase2_result_acknowledgment() {
+        use std::sync::Arc as StdArc;
+
+        let config = StdArc::new(
+            rustls::ServerConfig::builder()
+                .with_no_client_auth()
+                .with_cert_resolver(StdArc::new(
+                    rustls::server::ResolvesServerCertUsingSni::new(),
+                )),
+        );
+
+        let handler = BasicPasswordAuthHandler::new("alice".to_string(), "secret".to_string());
+        let mut server = EapTeapServer::with_inner_method(config, Box::new(handler));
+
+        server.phase = TeapPhase::Phase2InnerAuth;
+
+        // Simulate receiving Result TLV from client (acknowledgment)
+        let result_tlv = TeapResult::Success.to_result_tlv();
+
+        let response = server.process_phase2_tlvs(&[result_tlv]);
+        assert!(response.is_ok());
+
+        // Should transition to Complete and return None (no more data)
+        assert_eq!(server.phase, TeapPhase::Complete);
+        assert!(response.unwrap().is_none());
+    }
+
+    #[test]
+    fn test_decrypt_tls_data_mvp() {
+        use std::sync::Arc as StdArc;
+
+        let config = StdArc::new(
+            rustls::ServerConfig::builder()
+                .with_no_client_auth()
+                .with_cert_resolver(StdArc::new(
+                    rustls::server::ResolvesServerCertUsingSni::new(),
+                )),
+        );
+
+        let mut server = EapTeapServer::new(config);
+
+        // Create test TLS packet with data
+        let test_data = vec![1, 2, 3, 4, 5];
+        let tls_packet = EapTlsPacket {
+            flags: crate::eap::eap_tls::TlsFlags::new(false, false, false),
+            tls_message_length: None,
+            tls_data: test_data.clone(),
+        };
+
+        // For MVP, decrypt should return data as-is (plaintext)
+        let decrypted = server.decrypt_tls_data(&tls_packet).unwrap();
+        assert_eq!(decrypted, test_data);
+    }
+
+    #[test]
+    fn test_encrypt_and_send_tlvs_mvp() {
+        use std::sync::Arc as StdArc;
+
+        let config = StdArc::new(
+            rustls::ServerConfig::builder()
+                .with_no_client_auth()
+                .with_cert_resolver(StdArc::new(
+                    rustls::server::ResolvesServerCertUsingSni::new(),
+                )),
+        );
+
+        let server = EapTeapServer::new(config);
+
+        // Create test TLVs
+        let tlv = IdentityType::User.to_tlv();
+        let encrypted = server.encrypt_and_send_tlvs(&[tlv.clone()]).unwrap();
+
+        assert!(encrypted.is_some());
+
+        // For MVP, encrypted data should be plaintext TLV encoding
+        let expected = TeapTlv::encode_tlvs(&[tlv]);
+        assert_eq!(encrypted.unwrap(), expected);
     }
 }
