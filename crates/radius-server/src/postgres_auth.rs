@@ -3,12 +3,14 @@
 //! This module provides RADIUS authentication against a PostgreSQL database.
 
 use crate::server::AuthHandler;
+use dashmap::DashMap;
 use radius_proto::attributes::Attribute;
 use serde::{Deserialize, Serialize};
+use sha2::{Sha256, Digest};
 use sqlx::Row;
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use thiserror::Error;
 use tracing::{debug, error, info, warn};
 
@@ -60,6 +62,18 @@ pub struct PostgresConfig {
     /// Example: "SELECT attribute_type, attribute_value FROM user_attributes WHERE username = $1"
     #[serde(default)]
     pub attributes_query: Option<String>,
+
+    /// Enable password verification caching (reduces bcrypt CPU overhead)
+    #[serde(default = "default_true")]
+    pub enable_password_cache: bool,
+
+    /// Password cache TTL in seconds (default: 300 = 5 minutes)
+    #[serde(default = "default_cache_ttl")]
+    pub password_cache_ttl: u64,
+
+    /// Maximum password cache entries (default: 1000)
+    #[serde(default = "default_cache_size")]
+    pub password_cache_size: usize,
 }
 
 fn default_max_connections() -> u32 {
@@ -78,6 +92,18 @@ fn default_password_hash() -> String {
     "bcrypt".to_string()
 }
 
+fn default_true() -> bool {
+    true
+}
+
+fn default_cache_ttl() -> u64 {
+    300 // 5 minutes
+}
+
+fn default_cache_size() -> usize {
+    1000
+}
+
 impl Default for PostgresConfig {
     fn default() -> Self {
         PostgresConfig {
@@ -87,14 +113,29 @@ impl Default for PostgresConfig {
             query: default_query(),
             password_hash: default_password_hash(),
             attributes_query: None,
+            enable_password_cache: default_true(),
+            password_cache_ttl: default_cache_ttl(),
+            password_cache_size: default_cache_size(),
         }
     }
+}
+
+/// Password cache entry
+#[derive(Clone)]
+struct PasswordCacheEntry {
+    /// Hash that was successfully verified
+    hash: String,
+    /// Timestamp of the successful verification
+    verified_at: Instant,
 }
 
 /// PostgreSQL authentication handler
 pub struct PostgresAuthHandler {
     config: PostgresConfig,
     pool: Arc<PgPool>,
+    /// Password verification cache (username+password -> hash + timestamp)
+    /// Key is blake3 hash of username:password for security and fixed size
+    password_cache: Arc<DashMap<[u8; 32], PasswordCacheEntry>>,
 }
 
 impl PostgresAuthHandler {
@@ -123,7 +164,75 @@ impl PostgresAuthHandler {
         Ok(PostgresAuthHandler {
             config,
             pool: Arc::new(pool),
+            password_cache: Arc::new(DashMap::new()),
         })
+    }
+
+    /// Generate cache key from username and password
+    fn cache_key(username: &str, password: &str) -> [u8; 32] {
+        let mut hasher = Sha256::new();
+        hasher.update(username.as_bytes());
+        hasher.update(b":");
+        hasher.update(password.as_bytes());
+        hasher.finalize().into()
+    }
+
+    /// Check password cache and return hash if valid
+    fn check_cache(&self, username: &str, password: &str) -> Option<String> {
+        if !self.config.enable_password_cache {
+            return None;
+        }
+
+        let key = Self::cache_key(username, password);
+        if let Some(entry) = self.password_cache.get(&key) {
+            let age = entry.verified_at.elapsed();
+            if age.as_secs() < self.config.password_cache_ttl {
+                debug!(
+                    username = %username,
+                    age_secs = age.as_secs(),
+                    "Password cache hit"
+                );
+                return Some(entry.hash.clone());
+            } else {
+                debug!(username = %username, "Password cache entry expired");
+                // Entry expired, remove it
+                drop(entry);
+                self.password_cache.remove(&key);
+            }
+        }
+        None
+    }
+
+    /// Store successful verification in cache
+    fn cache_verification(&self, username: &str, password: &str, hash: String) {
+        if !self.config.enable_password_cache {
+            return;
+        }
+
+        // Enforce max cache size with simple eviction
+        if self.password_cache.len() >= self.config.password_cache_size {
+            // Remove oldest entry (simple FIFO eviction)
+            if let Some(entry) = self.password_cache.iter().next() {
+                let key_to_remove = *entry.key();
+                drop(entry);
+                self.password_cache.remove(&key_to_remove);
+            }
+        }
+
+        let key = Self::cache_key(username, password);
+        self.password_cache.insert(
+            key,
+            PasswordCacheEntry {
+                hash,
+                verified_at: Instant::now(),
+            },
+        );
+
+        debug!(
+            username = %username,
+            cache_size = self.password_cache.len(),
+            "Cached password verification"
+        );
     }
 
     /// Verify password against stored hash
@@ -231,6 +340,26 @@ impl AuthHandler for PostgresAuthHandler {
         // Database operations are async, so we need to use block_in_place
         tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
+                // Check password cache first
+                if let Some(cached_hash) = self.check_cache(username, password) {
+                    // We have a cached successful verification for this username+password
+                    // Verify the cached hash is still the current hash
+                    match self.get_user_credentials(username).await {
+                        Ok(current_hash) if current_hash == cached_hash => {
+                            info!(username = %username, "PostgreSQL authentication successful (cached)");
+                            return true;
+                        }
+                        Ok(_) => {
+                            debug!(username = %username, "Password hash changed, invalidating cache");
+                            // Hash changed, fall through to full verification
+                        }
+                        Err(e) => {
+                            debug!(username = %username, error = %e, "Failed to get user credentials");
+                            return false;
+                        }
+                    }
+                }
+
                 // Get user credentials from database
                 let password_hash = match self.get_user_credentials(username).await {
                     Ok(hash) => hash,
@@ -240,11 +369,13 @@ impl AuthHandler for PostgresAuthHandler {
                     }
                 };
 
-                // Verify password
+                // Verify password (expensive bcrypt operation)
                 match self.verify_password(password, &password_hash).await {
                     Ok(valid) => {
                         if valid {
                             info!(username = %username, "PostgreSQL authentication successful");
+                            // Cache successful verification
+                            self.cache_verification(username, password, password_hash);
                             true
                         } else {
                             warn!(username = %username, "PostgreSQL authentication failed - invalid password");
@@ -311,6 +442,9 @@ mod tests {
         assert_eq!(config.timeout, 10);
         assert_eq!(config.password_hash, "bcrypt");
         assert!(config.query.contains("SELECT"));
+        assert!(config.enable_password_cache);
+        assert_eq!(config.password_cache_ttl, 300);
+        assert_eq!(config.password_cache_size, 1000);
     }
 
     #[test]

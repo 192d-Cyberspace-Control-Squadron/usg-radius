@@ -659,19 +659,25 @@ The following legacy methods will **not** be implemented due to modern alternati
   - Eliminates 2 connection creations per authentication (search + bind)
   - Expected 50-100ms latency reduction per LDAP authentication
   - Automatic connection lifecycle with `OwnedSemaphorePermit` RAII pattern
+- [x] **Password verification result caching** - ✅ **COMPLETED (Dec 31, 2025)**
+  - Intelligent caching of successful bcrypt verifications
+  - SHA-256 hashed cache keys (username:password) for security
+  - Configurable TTL (default: 300s/5min) and max size (default: 1000 entries)
+  - Automatic hash change detection and cache invalidation
+  - Expected ~100ms CPU reduction per cached authentication
+  - Simple FIFO eviction when cache is full
 - [ ] Query optimization for database backends
 - [ ] Request cache expiry optimization (time-wheel vs lazy cleanup)
 - [ ] Rate limiter global bucket optimization (reduce Mutex contention)
-- [ ] Password verification result caching (reduce bcrypt CPU overhead)
 - ✅ **Performance benchmarking framework** - Criterion-based benchmarks
   - Packet encoding/decoding benchmarks (existing)
   - Server performance benchmarks (cache, rate limiter, password verification)
 - [ ] Memory profiling and optimization
 - [ ] CPU profiling and hot path optimization
 
-**Status**: 🔄 In Progress - LDAP pooling complete, other optimizations pending
-**Completed**: LDAP connection pooling (Dec 31, 2025)
-**Estimated Remaining**: 1-1.5 weeks
+**Status**: 🔄 In Progress - LDAP pooling & password caching complete
+**Completed**: LDAP connection pooling + Password caching (Dec 31, 2025)
+**Estimated Remaining**: 0.5-1 week
 
 ### Certificate Revocation (CRL/OCSP) ✅ COMPLETED (Phase 1: CRL)
 
