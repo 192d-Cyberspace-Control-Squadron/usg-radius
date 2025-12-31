@@ -9,6 +9,8 @@ This document outlines the development roadmap for the USG RADIUS project, organ
 
 ### Completed Features (v0.1.0 + v0.2.0 + v0.3.0)
 
+### Known Limitations
+
 #### **Core Protocol (v0.1.0)**
 
 - ✅ Basic RADIUS protocol implementation (RFC 2865)
@@ -18,6 +20,13 @@ This document outlines the development roadmap for the USG RADIUS project, organ
 - ✅ 60+ standard attributes
 - ✅ Status-Server support (RFC 5997)
 - ✅ Async I/O with Tokio
+
+- ⚠️ No hot reload (requires server restart for config changes)
+
+See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
+
+---
+
 - ✅ JSON configuration
 - ✅ Simple in-memory authentication
 - ✅ Workspace structure with separate protocol and server crates
@@ -55,14 +64,6 @@ This document outlines the development roadmap for the USG RADIUS project, organ
 - ✅ Proxy-State preservation (RFC 2865 Section 5.33)
 - ✅ State attribute handling for multi-round flows
 - ✅ AuthResult enum (Accept/Reject/Challenge)
-
-### Known Limitations
-
-- ⚠️ No hot reload (requires server restart for config changes)
-
-See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
-
----
 
 ## v0.2.0 - Security & Production Hardening (Q4 2025)
 
@@ -374,7 +375,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 **Status**: ✅ Core framework complete (Dec 2025)
 
-### EAP Methods
+### EAP Methods ✅ COMPLETE
 
 - ✅ **EAP-MD5 Challenge** (Type 4) - RFC 3748
   - ✅ Challenge generation and parsing
@@ -421,22 +422,22 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
   - Modern replacement for EAP-TTLS, PEAP, and EAP-MSCHAPv2
   - More flexible and secure than legacy tunneled methods
   - Supports cryptographic binding, channel binding, and inner method negotiation
-  - **Week 1 Complete**: TLV protocol layer, 18 tests passing ✅
-  - **Week 2 Complete**: Phase 2 state machine, BasicPasswordAuthHandler, 37 tests passing ✅
-  - **Week 3 Complete**: EapAuthHandler integration, example server, MVP ready! ✅
-  - **Week 4-5 Complete**: Cryptographic Binding integrated, 48 tests passing! ✅
-    - IMCK/CMK derivation (RFC 7170 Section 5.2/5.3)
-    - Compound MAC calculation & verification
-    - Crypto-Binding Request/Response flow
-    - Timing attack protection (constant-time MAC comparison)
-  - **Week 6-7 Complete**: EAP-Payload inner methods, 59 tests passing! ✅
-    - EapPayloadTlv structure (RFC 7170 Section 4.2.9)
-    - Inner EAP state machine (Identity → Method → Result)
-    - EAP-MD5 Challenge support (tunneled)
-    - Intermediate-Result TLV for multi-round auth
-    - Full integration with process_phase2_tlvs()
-  - **Status**: PRODUCTION READY with full feature set!
-  - **Test Coverage**: 59 comprehensive tests, all passing
+  - ✅ **Week 1 Complete**: TLV protocol layer, 18 tests passing
+  - ✅ **Week 2 Complete**: Phase 2 state machine, BasicPasswordAuthHandler, 37 tests passing
+  - ✅ **Week 3 Complete**: EapAuthHandler integration, example server, MVP ready!
+  - ✅ **Week 4-5 Complete**: Cryptographic Binding integrated, 48 tests passing!
+    - ✅ IMCK/CMK derivation (RFC 7170 Section 5.2/5.3)
+    - ✅ Compound MAC calculation & verification
+    - ✅ Crypto-Binding Request/Response flow
+    - ✅ Timing attack protection (constant-time MAC comparison)
+  - ✅ **Week 6-7 Complete**: EAP-Payload inner methods, 59 tests passing!
+    - ✅ EapPayloadTlv structure (RFC 7170 Section 4.2.9)
+    - ✅ Inner EAP state machine (Identity → Method → Result)
+    - ✅ EAP-MD5 Challenge support (tunneled)
+    - ✅ Intermediate-Result TLV for multi-round auth
+    - ✅ Full integration with process_phase2_tlvs()
+  - **Status**: ✅ PRODUCTION READY with full feature set!
+  - **Test Coverage**: ✅ 59 comprehensive tests, all passing
 
 **Rationale**: EAP-TEAP is the modern IETF standard (RFC 7170) that supersedes legacy tunneled methods. It provides better security, flexibility, and is actively maintained. Organizations should migrate to EAP-TEAP rather than implement legacy protocols.
 

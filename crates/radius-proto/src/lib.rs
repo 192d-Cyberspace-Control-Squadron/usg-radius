@@ -43,6 +43,8 @@ pub mod chap;
 pub mod eap;
 pub mod message_auth;
 pub mod packet;
+#[cfg(feature = "revocation")]
+pub mod revocation;
 pub mod validation;
 
 pub use accounting::{AccountingError, AcctAuthentic, AcctStatusType, AcctTerminateCause};

@@ -23,6 +23,12 @@ rustls-pemfile = { workspace = true, optional = true }
 x509-parser = { workspace = true, optional = true }
 pki-types = { workspace = true, optional = true }
 
+# Revocation checking (CRL/OCSP)
+reqwest = { workspace = true, optional = true }
+url = { workspace = true, optional = true }
+chrono = { workspace = true, optional = true }
+dashmap = { workspace = true, optional = true }
+
 [dev-dependencies]
 hex.workspace = true
 
@@ -30,3 +36,4 @@ hex.workspace = true
 default = []
 serde = ["dep:serde", "dep:serde_json"]
 tls = ["dep:rustls", "dep:rustls-pemfile", "dep:x509-parser", "dep:pki-types"]
+revocation = ["tls", "serde", "dep:reqwest", "dep:url", "dep:chrono", "dep:dashmap"]
