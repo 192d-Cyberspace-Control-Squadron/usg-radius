@@ -50,6 +50,7 @@ pub mod config;
 pub mod eap_auth;
 pub mod ldap_auth;
 pub mod postgres_auth;
+pub mod proxy;
 pub mod ratelimit;
 pub mod server;
 
