@@ -442,7 +442,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 **Estimated Effort**: 4 weeks
 
-### Certificate Management
+### Certificate Management for RadSec
 
 - [ ] Dynamic certificate loading
 - [ ] Certificate rotation
@@ -617,7 +617,7 @@ We welcome community contributions! Priority areas:
 ## Timeline Summary
 
 | Version | Quarter | Focus | Weeks |
-|---------|---------|-------|-------|
+| --------- | --------- | ------- | ------- |
 | v0.1.0 | Now | Core Protocol | ✅ Done |
 | v0.2.0 | Q1 2025 | Security & Production | 6-8 |
 | v0.3.0 | Q2 2025 | Auth Methods | 6 |
