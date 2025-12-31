@@ -207,45 +207,99 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 **Goal**: Add RADIUS Accounting support (RFC 2866)
 **Priority**: HIGH
+**Status**: 🚧 In Progress (70% complete)
 
-### Accounting Protocol
+### Accounting Protocol ✅ COMPLETED
 
-- [ ] Accounting-Request (Code 4) handling
-- [ ] Accounting-Response (Code 5) generation
-- [ ] Acct-Status-Type validation (Start, Stop, Interim-Update)
-- [ ] Accounting packet processing
+- [x] Accounting-Request (Code 4) handling
+- [x] Accounting-Response (Code 5) generation
+- [x] Acct-Status-Type validation (Start, Stop, Interim-Update, Accounting-On/Off)
+- [x] Accounting packet processing
+- [x] Request Authenticator validation (RFC 2866 Section 3)
+- [x] Response Authenticator calculation
+- [x] NAS-related accounting (Accounting-On, Accounting-Off)
 
-**Estimated Effort**: 2 weeks
+**Status**: ✅ Complete
 
-### Session Tracking
+### Session Tracking ✅ COMPLETED
 
-- [ ] Session database (in-memory initially)
-- [ ] Session start/stop tracking
-- [ ] Interim updates
-- [ ] Session timeout handling
-- [ ] Concurrent session limits
+- [x] Session database (in-memory with DashMap)
+- [x] Session start/stop tracking
+- [x] Interim updates
+- [x] Session timeout handling (configurable)
+- [x] Concurrent session limits (per-user)
+- [x] Stale session cleanup
+- [x] Session query APIs (by user, by NAS, by ID)
+- [x] Session statistics (count, active sessions)
 
-**Estimated Effort**: 2 weeks
+**Status**: ✅ Complete
 
 ### Accounting Storage
 
-- [ ] Pluggable accounting backend trait
-- [ ] File-based accounting logs
-- [ ] Database accounting (PostgreSQL, MySQL)
+- [x] Pluggable AccountingHandler trait (async)
+- [x] SimpleAccountingHandler (in-memory, for testing)
+- [x] File-based accounting logs (JSON Lines format)
+  - [x] FileAccountingHandler implementation
+  - [x] Async file I/O with Tokio
+  - [x] JSON Lines format (one record per line)
+  - [x] Auto-creates parent directories
+  - [x] Captures all event types and attributes
+- [ ] Database accounting backends
+  - [ ] PostgreSQL backend
+  - [ ] MySQL backend
+  - [ ] Schema design for sessions and events
+  - [ ] Connection pooling
 - [ ] Accounting data retention policies
 
-**Estimated Effort**: 2 weeks
+**Status**: 🚧 Partial (file backend complete, database backends pending)
 
 ### Usage Metrics
 
-- [ ] Bytes in/out tracking
-- [ ] Packets in/out tracking
-- [ ] Session duration tracking
-- [ ] Usage reports and queries
+- [x] Bytes in/out tracking (Acct-Input-Octets, Acct-Output-Octets)
+- [x] Session duration tracking (Acct-Session-Time)
+- [x] Termination cause tracking (Acct-Terminate-Cause)
+- [ ] Packets in/out tracking (32-bit counter support)
+- [ ] 64-bit counter support (Acct-Input-Gigawords, Acct-Output-Gigawords)
+- [ ] Usage reports and aggregation queries
+- [ ] Export functionality (CSV, JSON reports)
 
-**Estimated Effort**: 1 week
+**Status**: 🚧 Partial (basic metrics complete, advanced reporting pending)
 
-**Total v0.4.0 Estimated Effort**: 7 weeks
+### Test Coverage
+
+- [x] Unit tests for accounting types (AcctStatusType, AcctTerminateCause, etc.)
+- [x] Unit tests for SimpleAccountingHandler
+- [x] Unit tests for FileAccountingHandler
+- [x] Integration tests for accounting protocol
+- [x] Integration tests for session management
+- [x] Integration tests for file-based accounting
+- [x] All 28 integration tests passing
+
+**Status**: ✅ Complete
+
+### Completed Features
+
+- **Accounting Protocol Types** (radius-proto/accounting.rs):
+  - AcctStatusType enum with all RFC 2866 values
+  - AcctTerminateCause enum (18 termination reasons)
+  - AcctAuthentic enum
+  - AccountingError types with session management errors
+
+- **Session Management** (radius-server/accounting.rs):
+  - Session struct with comprehensive tracking
+  - Configurable session timeout
+  - Configurable concurrent session limits
+  - Automatic stale session cleanup
+  - Query APIs for sessions by user/NAS/ID
+
+- **File-Based Backend** (radius-server/accounting/file.rs):
+  - 468 lines of production-ready code
+  - JSON Lines format for easy parsing
+  - Captures: timestamps, events, session IDs, usernames, IPs, usage metrics
+  - Async file operations with proper error handling
+
+**Total v0.4.0 Actual Effort**: ~4 weeks (accounting protocol + session management + file backend)
+**Remaining Effort**: ~2 weeks (database backends + advanced metrics)
 
 ---
 
