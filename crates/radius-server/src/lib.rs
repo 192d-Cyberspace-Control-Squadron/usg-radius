@@ -57,4 +57,6 @@ pub use config::{Client, Config, ConfigError, User};
 pub use ldap_auth::{LdapAuthHandler, LdapConfig, LdapError};
 pub use postgres_auth::{PostgresAuthHandler, PostgresConfig, PostgresError};
 pub use ratelimit::{RateLimitConfig, RateLimiter};
-pub use server::{AuthHandler, AuthResult, RadiusServer, ServerConfig, ServerError, SimpleAuthHandler};
+pub use server::{
+    AuthHandler, AuthResult, RadiusServer, ServerConfig, ServerError, SimpleAuthHandler,
+};

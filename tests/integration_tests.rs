@@ -11,7 +11,9 @@
 use radius_proto::auth::{encrypt_user_password, generate_request_authenticator};
 use radius_proto::chap::{compute_chap_response, ChapChallenge, ChapResponse};
 use radius_proto::{Attribute, AttributeType, Code, Packet};
-use radius_server::{AuthHandler, AuthResult, Config, RadiusServer, ServerConfig, SimpleAuthHandler};
+use radius_server::{
+    AuthHandler, AuthResult, Config, RadiusServer, ServerConfig, SimpleAuthHandler,
+};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -755,7 +757,10 @@ impl ChallengeAuthHandler {
 impl AuthHandler for ChallengeAuthHandler {
     fn authenticate(&self, username: &str, password: &str) -> bool {
         // Simple password check
-        self.users.get(username).map(|p| p == password).unwrap_or(false)
+        self.users
+            .get(username)
+            .map(|p| p == password)
+            .unwrap_or(false)
     }
 
     fn get_user_password(&self, username: &str) -> Option<String> {

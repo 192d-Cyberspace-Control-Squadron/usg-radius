@@ -27,8 +27,7 @@ type HmacMd5 = Hmac<Md5>;
 /// # Returns
 /// 16-byte HMAC-MD5 hash
 pub fn calculate_message_authenticator(packet_bytes: &[u8], secret: &[u8]) -> [u8; 16] {
-    let mut mac = HmacMd5::new_from_slice(secret)
-        .expect("HMAC can take key of any size");
+    let mut mac = HmacMd5::new_from_slice(secret).expect("HMAC can take key of any size");
     mac.update(packet_bytes);
     let result = mac.finalize();
     let bytes = result.into_bytes();
@@ -96,7 +95,10 @@ mod tests {
         let auth1 = calculate_message_authenticator(&packet, secret1);
         let auth2 = calculate_message_authenticator(&packet, secret2);
 
-        assert_ne!(auth1, auth2, "Different secrets should produce different authenticators");
+        assert_ne!(
+            auth1, auth2,
+            "Different secrets should produce different authenticators"
+        );
     }
 
     #[test]
@@ -109,7 +111,10 @@ mod tests {
         let auth1 = calculate_message_authenticator(&packet1, secret);
         let auth2 = calculate_message_authenticator(&packet2, secret);
 
-        assert_ne!(auth1, auth2, "Different packets should produce different authenticators");
+        assert_ne!(
+            auth1, auth2,
+            "Different packets should produce different authenticators"
+        );
     }
 
     #[test]
@@ -124,7 +129,11 @@ mod tests {
         packet[msg_auth_offset..msg_auth_offset + 16].copy_from_slice(&auth);
 
         // Verify should succeed
-        assert!(verify_message_authenticator(&packet, secret, msg_auth_offset));
+        assert!(verify_message_authenticator(
+            &packet,
+            secret,
+            msg_auth_offset
+        ));
     }
 
     #[test]
@@ -137,7 +146,11 @@ mod tests {
         packet[msg_auth_offset..msg_auth_offset + 16].fill(0xFF);
 
         // Verify should fail
-        assert!(!verify_message_authenticator(&packet, secret, msg_auth_offset));
+        assert!(!verify_message_authenticator(
+            &packet,
+            secret,
+            msg_auth_offset
+        ));
     }
 
     #[test]
@@ -152,7 +165,11 @@ mod tests {
         packet[msg_auth_offset..msg_auth_offset + 16].copy_from_slice(&auth);
 
         // Verify with secret2 should fail
-        assert!(!verify_message_authenticator(&packet, secret2, msg_auth_offset));
+        assert!(!verify_message_authenticator(
+            &packet,
+            secret2,
+            msg_auth_offset
+        ));
     }
 
     #[test]
