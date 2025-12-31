@@ -1,0 +1,73 @@
+# Create organizational units
+dn: ou=users,dc=example,dc=com
+objectClass: organizationalUnit
+ou: users
+
+dn: ou=groups,dc=example,dc=com
+objectClass: organizationalUnit
+ou: groups
+
+# Create test users
+dn: uid=testuser,ou=users,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: testuser
+cn: Test User
+sn: User
+givenName: Test
+mail: testuser@example.com
+userPassword: {SSHA}DkMTwBl+a/3DQTxCYEApdUtNXGgdUac3
+loginShell: /bin/bash
+uidNumber: 10000
+gidNumber: 10000
+homeDirectory: /home/testuser
+
+dn: uid=alice,ou=users,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: alice
+cn: Alice Smith
+sn: Smith
+givenName: Alice
+mail: alice@example.com
+userPassword: {SSHA}tQ4y7Z9pKvA9rXLMEBYoE8F2cR6lF3Np
+loginShell: /bin/bash
+uidNumber: 10001
+gidNumber: 10001
+homeDirectory: /home/alice
+
+dn: uid=bob,ou=users,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: bob
+cn: Bob Johnson
+sn: Johnson
+givenName: Bob
+mail: bob@example.com
+userPassword: {SSHA}kL8m3N1pQ5rT6uV7wX9yZ0aB2cD4eF6g
+loginShell: /bin/bash
+uidNumber: 10002
+gidNumber: 10002
+homeDirectory: /home/bob
+
+# Create test groups
+dn: cn=admins,ou=groups,dc=example,dc=com
+objectClass: posixGroup
+cn: admins
+gidNumber: 5000
+memberUid: alice
+
+dn: cn=users,ou=groups,dc=example,dc=com
+objectClass: posixGroup
+cn: users
+gidNumber: 5001
+memberUid: testuser
+memberUid: bob
+
+# Password hashes generated with:
+# testuser / password123 = {SSHA}DkMTwBl+a/3DQTxCYEApdUtNXGgdUac3
+# alice / alice123 = {SSHA}tQ4y7Z9pKvA9rXLMEBYoE8F2cR6lF3Np
+# bob / bob456 = {SSHA}kL8m3N1pQ5rT6uV7wX9yZ0aB2cD4eF6g

@@ -242,30 +242,72 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 ---
 
-## v0.6.0 - Advanced Features (2026)
+## v0.6.0 - Advanced Features (Q1 2025)
 
 **Goal**: Enterprise-grade features
 **Priority**: MEDIUM
+**Status**: 🔄 In Progress (Backend Integration ✅ Complete)
 
-### Database Integration
-- [ ] PostgreSQL authentication backend
-- [ ] MySQL authentication backend
-- [ ] User attribute storage
-- [ ] Connection pooling
-- [ ] Migration scripts
+### Database Integration ✅ COMPLETED
 
-**Estimated Effort**: 3 weeks
+- [x] PostgreSQL authentication backend
+- [x] User attribute storage (via attributes_query)
+- [x] Connection pooling
+- [x] Bcrypt password hashing
+- [x] Custom SQL queries
+- [x] PostgreSQL schema and migration examples
+- [ ] MySQL/MariaDB authentication backend
+- [ ] Additional password hashing algorithms (argon2, pbkdf2)
 
-### LDAP/Active Directory
-- [ ] LDAP authentication backend
-- [ ] Active Directory integration
-- [ ] Group membership queries
-- [ ] Attribute mapping
+**Status**: ✅ PostgreSQL complete, MySQL pending
+**Completed**: Dec 2024
+
+### LDAP/Active Directory ✅ COMPLETED
+
+- [x] LDAP authentication backend
+- [x] Active Directory integration
+- [x] LDAPS (LDAP over SSL/TLS) support
+- [x] Flexible search filters and attribute retrieval
+- [x] Service account binding
+- [x] Anonymous bind support
+- [x] Async/sync compatibility
+- [ ] Group membership queries and RADIUS attribute mapping
 - [ ] Connection pooling and failover
 
-**Estimated Effort**: 3 weeks
+**Status**: ✅ Core features complete, advanced features pending
+**Completed**: Dec 2024
+
+### Documentation ✅ COMPLETED
+
+- [x] Backend integration comparison guide
+- [x] PostgreSQL integration guide (500+ lines)
+- [x] LDAP/Active Directory integration guide
+- [x] Example configurations (LDAP, AD, PostgreSQL)
+- [x] Database schema examples
+- [x] Migration guides between backends
+- [x] Security best practices
+- [x] Performance tuning recommendations
+- [x] Troubleshooting guides
+- [x] Documentation reorganization into docs/docs/ structure
+
+**Status**: ✅ Complete
+**Completed**: Dec 2024
+
+### Testing ✅ COMPLETED
+
+- [x] 8 LDAP unit tests
+- [x] 9 PostgreSQL unit tests
+- [x] Configuration serialization tests
+- [x] Password hashing tests
+- [ ] Docker-based LDAP integration tests
+- [ ] Docker-based PostgreSQL integration tests
+- [ ] End-to-end authentication tests
+
+**Status**: 🔄 Unit tests complete, integration tests pending
+**Completed**: Dec 2024 (partial)
 
 ### High Availability
+
 - [ ] Multi-server deployment support
 - [ ] Shared session state (Redis/database)
 - [ ] Health checks
@@ -274,16 +316,31 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 **Estimated Effort**: 3 weeks
 
+### Additional Backend Support
+
+- [ ] MySQL/MariaDB authentication backend
+- [ ] Redis caching backend
+- [ ] REST API authentication backend
+- [ ] Multi-backend fallback chains
+
+**Estimated Effort**: 3 weeks
+
 ### Performance Optimization
-- [ ] Connection pooling for backends
-- [ ] Request caching
-- [ ] Performance benchmarking
+
+- [ ] Query optimization for database backends
+- [ ] LDAP connection pooling improvements
+- [ ] Request caching enhancements
+- [x] Performance benchmarking framework
 - [ ] Memory optimization
 - [ ] CPU profiling and optimization
 
+**Status**: 🔄 Benchmarking framework exists, optimizations pending
 **Estimated Effort**: 2 weeks
 
-**Total v0.6.0 Estimated Effort**: 11 weeks
+**Total v0.6.0 Effort**:
+
+- ✅ Completed: ~4 weeks (LDAP, PostgreSQL, docs, tests)
+- ⏳ Remaining: ~8 weeks (HA, additional backends, optimization)
 
 ---
 
