@@ -13,13 +13,15 @@
       "address": "10.0.0.1",
       "secret": "vpn_gateway_secret",
       "name": "VPN Gateway",
-      "enabled": true
+      "enabled": true,
+      "nas_identifier": "vpn-gateway.example.com"
     },
     {
       "address": "172.16.0.0/16",
       "secret": "wireless_controller_secret",
       "name": "Wireless Controllers",
-      "enabled": true
+      "enabled": true,
+      "nas_identifier": "wireless-controller-01.example.com"
     },
     {
       "address": "203.0.113.100",

@@ -73,6 +73,8 @@ pub fn validate_packet(packet: &Packet, mode: ValidationMode) -> Result<(), Vali
         Code::AccessAccept => validate_access_accept(packet, mode)?,
         Code::AccessReject => validate_access_reject(packet, mode)?,
         Code::StatusServer => validate_status_server(packet, mode)?,
+        Code::AccountingRequest => validate_accounting_request(packet, mode)?,
+        Code::AccountingResponse => validate_accounting_response(packet, mode)?,
         _ => {
             // Other packet types not yet fully supported
             if mode == ValidationMode::Strict {
@@ -126,6 +128,20 @@ fn validate_access_request(packet: &Packet, _mode: ValidationMode) -> Result<(),
         ));
     }
 
+    // RFC 2865 Section 5.32 & 5.4: Either NAS-IP-Address or NAS-Identifier MUST be present
+    let has_nas_ip = packet
+        .find_attribute(AttributeType::NasIpAddress as u8)
+        .is_some();
+    let has_nas_identifier = packet
+        .find_attribute(AttributeType::NasIdentifier as u8)
+        .is_some();
+
+    if !has_nas_ip && !has_nas_identifier {
+        return Err(ValidationError::new(
+            "Either NAS-IP-Address or NAS-Identifier is required in Access-Request (RFC 2865)",
+        ));
+    }
+
     Ok(())
 }
 
@@ -144,6 +160,28 @@ fn validate_access_reject(_packet: &Packet, _mode: ValidationMode) -> Result<(),
 /// Validate Status-Server packet
 fn validate_status_server(_packet: &Packet, _mode: ValidationMode) -> Result<(), ValidationError> {
     // RFC 5997: No required attributes
+    Ok(())
+}
+
+/// Validate Accounting-Request packet
+fn validate_accounting_request(packet: &Packet, _mode: ValidationMode) -> Result<(), ValidationError> {
+    // RFC 2866 Section 4.1: Acct-Status-Type is REQUIRED
+    if packet
+        .find_attribute(AttributeType::AcctStatusType as u8)
+        .is_none()
+    {
+        return Err(ValidationError::with_attribute(
+            "Acct-Status-Type attribute is required in Accounting-Request",
+            AttributeType::AcctStatusType as u8,
+        ));
+    }
+
+    Ok(())
+}
+
+/// Validate Accounting-Response packet
+fn validate_accounting_response(_packet: &Packet, _mode: ValidationMode) -> Result<(), ValidationError> {
+    // RFC 2866: Accounting-Response has no required attributes
     Ok(())
 }
 

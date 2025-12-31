@@ -5,7 +5,10 @@ use crate::config::Config;
 use crate::ratelimit::{RateLimitConfig, RateLimiter};
 use radius_proto::accounting::{AcctStatusType, AccountingError};
 use radius_proto::attributes::{Attribute, AttributeType};
-use radius_proto::auth::{calculate_response_authenticator, decrypt_user_password};
+use radius_proto::auth::{
+    calculate_accounting_request_authenticator, calculate_response_authenticator,
+    decrypt_user_password,
+};
 use radius_proto::{
     ChapChallenge, ChapResponse, Code, Packet, PacketError, ValidationMode, validate_packet,
     verify_chap_response,
@@ -492,6 +495,61 @@ impl RadiusServer {
             "Authentication request received"
         );
 
+        // RFC 2865 Section 5.32: Validate NAS-Identifier or NAS-IP-Address presence
+        let has_nas_ip = request
+            .find_attribute(AttributeType::NasIpAddress as u8)
+            .is_some();
+        let nas_identifier = request
+            .find_attribute(AttributeType::NasIdentifier as u8)
+            .and_then(|attr| attr.as_string().ok());
+
+        if !has_nas_ip && nas_identifier.is_none() {
+            warn!(
+                client_ip = %source_ip,
+                request_id = request.identifier,
+                "Access-Request missing both NAS-IP-Address and NAS-Identifier"
+            );
+            return Err(ServerError::Validation(
+                "Access-Request MUST contain either NAS-IP-Address or NAS-Identifier (RFC 2865)".to_string(),
+            ));
+        }
+
+        // Validate NAS-Identifier if client has one configured
+        if let Some(client_config) = config.config.as_ref().and_then(|c| c.find_client(source_ip))
+        {
+            if let Some(expected_nas_id) = &client_config.nas_identifier {
+                match &nas_identifier {
+                    Some(actual_nas_id) => {
+                        if actual_nas_id != expected_nas_id {
+                            warn!(
+                                client_ip = %source_ip,
+                                request_id = request.identifier,
+                                expected = %expected_nas_id,
+                                actual = %actual_nas_id,
+                                "NAS-Identifier mismatch"
+                            );
+                            return Err(ServerError::Validation(format!(
+                                "NAS-Identifier mismatch: expected '{}', got '{}'",
+                                expected_nas_id, actual_nas_id
+                            )));
+                        }
+                    }
+                    None => {
+                        warn!(
+                            client_ip = %source_ip,
+                            request_id = request.identifier,
+                            expected = %expected_nas_id,
+                            "Missing required NAS-Identifier"
+                        );
+                        return Err(ServerError::Validation(format!(
+                            "Missing required NAS-Identifier: expected '{}'",
+                            expected_nas_id
+                        )));
+                    }
+                }
+            }
+        }
+
         // Audit log authentication attempt
         let client_name = config
             .config
@@ -749,6 +807,24 @@ impl RadiusServer {
 
         // Get the appropriate shared secret for this client
         let secret = config.get_secret_for_client(source_ip);
+
+        // Validate Request Authenticator (RFC 2866 Section 3)
+        // The Request Authenticator must be MD5(Code + ID + Length + 16 zero octets + Attributes + Secret)
+        // We need to create a copy of the packet with authenticator set to zeros for validation
+        let mut validation_packet = request.clone();
+        validation_packet.authenticator = [0u8; 16];
+        let expected_auth = calculate_accounting_request_authenticator(&validation_packet, secret);
+
+        if request.authenticator != expected_auth {
+            warn!(
+                client_ip = %source_ip,
+                request_id = request.identifier,
+                "Invalid Request Authenticator in Accounting-Request"
+            );
+            return Err(ServerError::Validation(
+                "Invalid Request Authenticator".to_string(),
+            ));
+        }
 
         // Extract Acct-Status-Type (required)
         let status_type_attr = request

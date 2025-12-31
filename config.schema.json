@@ -70,6 +70,11 @@
             "type": "boolean",
             "description": "Whether this client is enabled. Disabled clients are rejected",
             "default": true
+          },
+          "nas_identifier": {
+            "type": "string",
+            "description": "Expected NAS-Identifier for this client (RFC 2865). If specified, incoming requests must include a matching NAS-Identifier attribute for authentication",
+            "examples": ["switch01.example.com", "vpn-gateway.example.com", "wireless-controller-01.example.com"]
           }
         },
         "additionalProperties": false

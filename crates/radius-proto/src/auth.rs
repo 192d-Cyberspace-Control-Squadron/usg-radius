@@ -9,6 +9,45 @@ pub fn generate_request_authenticator() -> [u8; 16] {
     authenticator
 }
 
+/// Calculate Accounting Request Authenticator per RFC 2866 Section 3
+///
+/// Request Authenticator = MD5(Code + ID + Length + 16 zero octets + Attributes + Secret)
+///
+/// This is used for Accounting-Request packets (Code 4).
+/// The authenticator field should be set to all zeros before calling this function.
+pub fn calculate_accounting_request_authenticator(packet: &Packet, secret: &[u8]) -> [u8; 16] {
+    let mut data = Vec::new();
+
+    // Code (1 byte)
+    data.push(packet.code.as_u8());
+
+    // Identifier (1 byte)
+    data.push(packet.identifier);
+
+    // Length (2 bytes)
+    let length = packet.length();
+    data.push((length >> 8) as u8);
+    data.push((length & 0xff) as u8);
+
+    // 16 zero octets (placeholder for authenticator)
+    data.extend_from_slice(&[0u8; 16]);
+
+    // Attributes
+    for attr in &packet.attributes {
+        let encoded = attr.encode().expect("Failed to encode attribute");
+        data.extend_from_slice(&encoded);
+    }
+
+    // Secret
+    data.extend_from_slice(secret);
+
+    // Calculate MD5
+    let digest = md5::compute(&data);
+    let mut authenticator = [0u8; 16];
+    authenticator.copy_from_slice(&digest.0);
+    authenticator
+}
+
 /// Calculate Response Authenticator per RFC 2865 Section 3
 ///
 /// Response Authenticator = MD5(Code + ID + Length + Request Authenticator + Attributes + Secret)
@@ -200,5 +239,33 @@ mod tests {
             &request_auth,
             secret
         ));
+    }
+
+    #[test]
+    fn test_accounting_request_authenticator() {
+        use crate::Attribute;
+
+        let secret = b"testing123";
+
+        // Create a packet with zero authenticator
+        let mut packet = Packet::new(Code::AccountingRequest, 1, [0u8; 16]);
+
+        // Add some attributes (like in the integration test)
+        packet.add_attribute(Attribute::new(40, vec![0, 0, 0, 1]).unwrap()); // Acct-Status-Type = Start
+        packet.add_attribute(Attribute::string(44, "session123").unwrap()); // Acct-Session-Id
+        packet.add_attribute(Attribute::string(1, "testuser").unwrap()); // User-Name
+
+        // Calculate authenticator on client side
+        let client_auth = calculate_accounting_request_authenticator(&packet, secret);
+        packet.authenticator = client_auth;
+
+        // Server side validation: create copy with zero authenticator
+        let mut validation_packet = packet.clone();
+        validation_packet.authenticator = [0u8; 16];
+        let server_auth = calculate_accounting_request_authenticator(&validation_packet, secret);
+
+        // They should match
+        assert_eq!(client_auth, server_auth);
+        assert_eq!(packet.authenticator, server_auth);
     }
 }

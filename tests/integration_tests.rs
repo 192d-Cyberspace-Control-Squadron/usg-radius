@@ -9,7 +9,10 @@
 //! - Audit logging
 
 use radius_proto::accounting::AcctStatusType;
-use radius_proto::auth::{encrypt_user_password, generate_request_authenticator};
+use radius_proto::auth::{
+    calculate_accounting_request_authenticator, encrypt_user_password,
+    generate_request_authenticator,
+};
 use radius_proto::chap::{ChapChallenge, ChapResponse, compute_chap_response};
 use radius_proto::{Attribute, AttributeType, Code, Packet};
 use radius_server::{
@@ -37,6 +40,15 @@ fn create_access_request(username: &str, password: &str, secret: &[u8], identifi
     packet.add_attribute(
         Attribute::new(AttributeType::UserPassword as u8, encrypted_pwd)
             .expect("Failed to create User-Password attribute"),
+    );
+
+    // Add NAS-IP-Address (RFC 2865 requires either NAS-IP-Address or NAS-Identifier)
+    packet.add_attribute(
+        Attribute::new(
+            AttributeType::NasIpAddress as u8,
+            vec![127, 0, 0, 1], // 127.0.0.1
+        )
+        .expect("Failed to create NAS-IP-Address attribute"),
     );
 
     packet
@@ -70,6 +82,15 @@ fn create_chap_access_request(
     packet.add_attribute(
         Attribute::new(AttributeType::ChapPassword as u8, chap_response.to_bytes())
             .expect("Failed to create CHAP-Password attribute"),
+    );
+
+    // Add NAS-IP-Address (RFC 2865 requires either NAS-IP-Address or NAS-Identifier)
+    packet.add_attribute(
+        Attribute::new(
+            AttributeType::NasIpAddress as u8,
+            vec![127, 0, 0, 1], // 127.0.0.1
+        )
+        .expect("Failed to create NAS-IP-Address attribute"),
     );
 
     packet
@@ -438,6 +459,129 @@ async fn test_client_ip_validation() {
 
     // Should succeed because 127.0.0.1 is authorized
     assert_eq!(response.code, Code::AccessAccept);
+}
+
+#[tokio::test]
+async fn test_nas_identifier_validation() {
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    // Create config with NAS-Identifier requirement
+    let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
+    write!(
+        temp_file,
+        r#"{{
+        "listen_address": "127.0.0.1",
+        "listen_port": 1812,
+        "secret": "testing123",
+        "clients": [
+            {{
+                "name": "Test Switch",
+                "address": "127.0.0.1",
+                "secret": "testing123",
+                "nas_identifier": "switch01.example.com"
+            }}
+        ],
+        "users": [
+            {{
+                "username": "testuser",
+                "password": "testpass"
+            }}
+        ]
+    }}"#
+    )
+    .expect("Failed to write to temp file");
+
+    let mut config = Config::from_file(temp_file.path()).expect("Failed to load config");
+    config.listen_port = 0; // OS-assigned port
+
+    let mut handler = SimpleAuthHandler::new();
+    handler.add_user("testuser", "testpass");
+
+    let server_config = ServerConfig::from_config(config, Arc::new(handler))
+        .expect("Failed to create server config");
+    let server = RadiusServer::new(server_config)
+        .await
+        .expect("Failed to create server");
+    let server_addr = server.local_addr().expect("Failed to get server address");
+
+    tokio::spawn(async move {
+        server.run().await.ok();
+    });
+
+    sleep(Duration::from_millis(500)).await;
+
+    // Test 1: Request with correct NAS-Identifier
+    let req_auth1 = generate_request_authenticator();
+    let mut packet1 = Packet::new(Code::AccessRequest, 1, req_auth1);
+    packet1.add_attribute(
+        Attribute::string(AttributeType::UserName as u8, "testuser")
+            .expect("Failed to create User-Name attribute"),
+    );
+    let encrypted_pwd1 = encrypt_user_password("testpass", b"testing123", &req_auth1);
+    packet1.add_attribute(
+        Attribute::new(AttributeType::UserPassword as u8, encrypted_pwd1)
+            .expect("Failed to create User-Password attribute"),
+    );
+    packet1.add_attribute(
+        Attribute::string(AttributeType::NasIdentifier as u8, "switch01.example.com")
+            .expect("Failed to create NAS-Identifier attribute"),
+    );
+
+    let response1 = send_radius_request(&packet1, server_addr)
+        .await
+        .expect("Failed to send request with correct NAS-Identifier");
+
+    // Should succeed with correct NAS-Identifier
+    assert_eq!(response1.code, Code::AccessAccept);
+
+    // Test 2: Request with wrong NAS-Identifier
+    let req_auth2 = generate_request_authenticator();
+    let mut packet2 = Packet::new(Code::AccessRequest, 2, req_auth2);
+    packet2.add_attribute(
+        Attribute::string(AttributeType::UserName as u8, "testuser")
+            .expect("Failed to create User-Name attribute"),
+    );
+    let encrypted_pwd2 = encrypt_user_password("testpass", b"testing123", &req_auth2);
+    packet2.add_attribute(
+        Attribute::new(AttributeType::UserPassword as u8, encrypted_pwd2)
+            .expect("Failed to create User-Password attribute"),
+    );
+    packet2.add_attribute(
+        Attribute::string(AttributeType::NasIdentifier as u8, "wrongswitch.example.com")
+            .expect("Failed to create NAS-Identifier attribute"),
+    );
+
+    let result2 = send_radius_request(&packet2, server_addr).await;
+
+    // Should timeout because server rejects packets with wrong NAS-Identifier
+    assert!(result2.is_err(), "Expected timeout for wrong NAS-Identifier");
+
+    // Test 3: Request without NAS-Identifier (when required)
+    let req_auth3 = generate_request_authenticator();
+    let mut packet3 = Packet::new(Code::AccessRequest, 3, req_auth3);
+    packet3.add_attribute(
+        Attribute::string(AttributeType::UserName as u8, "testuser")
+            .expect("Failed to create User-Name attribute"),
+    );
+    let encrypted_pwd3 = encrypt_user_password("testpass", b"testing123", &req_auth3);
+    packet3.add_attribute(
+        Attribute::new(AttributeType::UserPassword as u8, encrypted_pwd3)
+            .expect("Failed to create User-Password attribute"),
+    );
+    // Add NAS-IP-Address instead of NAS-Identifier
+    packet3.add_attribute(
+        Attribute::new(
+            AttributeType::NasIpAddress as u8,
+            vec![127, 0, 0, 1],
+        )
+        .expect("Failed to create NAS-IP-Address attribute"),
+    );
+
+    let result3 = send_radius_request(&packet3, server_addr).await;
+
+    // Should timeout because NAS-Identifier is required but not provided
+    assert!(result3.is_err(), "Expected timeout for missing NAS-Identifier");
 }
 
 #[tokio::test]
@@ -878,6 +1022,15 @@ async fn test_access_challenge() {
             .expect("Failed to create State attribute"),
     );
 
+    // Add NAS-IP-Address (RFC 2865 requires either NAS-IP-Address or NAS-Identifier)
+    packet2.add_attribute(
+        Attribute::new(
+            AttributeType::NasIpAddress as u8,
+            vec![127, 0, 0, 1], // 127.0.0.1
+        )
+        .expect("Failed to create NAS-IP-Address attribute"),
+    );
+
     let response2 = send_radius_request(&packet2, server_addr)
         .await
         .expect("Failed to send second request");
@@ -946,6 +1099,15 @@ async fn test_access_challenge_wrong_pin() {
             .expect("Failed to create State attribute"),
     );
 
+    // Add NAS-IP-Address (RFC 2865 requires either NAS-IP-Address or NAS-Identifier)
+    packet2.add_attribute(
+        Attribute::new(
+            AttributeType::NasIpAddress as u8,
+            vec![127, 0, 0, 1], // 127.0.0.1
+        )
+        .expect("Failed to create NAS-IP-Address attribute"),
+    );
+
     let response2 = send_radius_request(&packet2, server_addr)
         .await
         .expect("Failed to send second request");
@@ -965,9 +1127,10 @@ fn create_accounting_request(
     session_id: &str,
     username: &str,
     identifier: u8,
+    secret: &[u8],
 ) -> Packet {
-    let req_auth = generate_request_authenticator();
-    let mut packet = Packet::new(Code::AccountingRequest, identifier, req_auth);
+    // Create packet with zero authenticator initially
+    let mut packet = Packet::new(Code::AccountingRequest, identifier, [0u8; 16]);
 
     // Add Acct-Status-Type
     let status_bytes = status_type.as_u32().to_be_bytes().to_vec();
@@ -991,6 +1154,10 @@ fn create_accounting_request(
                 .expect("Failed to create User-Name attribute"),
         );
     }
+
+    // Calculate and set the accounting request authenticator (RFC 2866)
+    let authenticator = calculate_accounting_request_authenticator(&packet, secret);
+    packet.authenticator = authenticator;
 
     packet
 }
@@ -1026,6 +1193,7 @@ async fn test_accounting_session_lifecycle() {
     // Give server time to start
     sleep(Duration::from_millis(100)).await;
 
+    let secret = b"testing123";
     let session_id = "session-12345";
 
     // Test 1: Accounting Start
@@ -1034,6 +1202,7 @@ async fn test_accounting_session_lifecycle() {
         session_id,
         "testuser",
         1,
+        secret,
     );
     let start_response = send_radius_request(&start_packet, server_addr)
         .await
@@ -1044,11 +1213,25 @@ async fn test_accounting_session_lifecycle() {
     assert_eq!(accounting_handler_impl.session_count(), 1);
 
     // Test 2: Interim Update
-    let mut interim_packet = create_accounting_request(
-        AcctStatusType::InterimUpdate,
-        session_id,
-        "testuser",
-        2,
+    let mut interim_packet = Packet::new(Code::AccountingRequest, 2, [0u8; 16]);
+
+    // Add Acct-Status-Type
+    interim_packet.add_attribute(
+        Attribute::new(
+            AttributeType::AcctStatusType as u8,
+            AcctStatusType::InterimUpdate.as_u32().to_be_bytes().to_vec(),
+        )
+        .expect("Failed to create Acct-Status-Type attribute"),
+    );
+
+    // Add session info
+    interim_packet.add_attribute(
+        Attribute::string(AttributeType::AcctSessionId as u8, session_id)
+            .expect("Failed to create Acct-Session-Id attribute"),
+    );
+    interim_packet.add_attribute(
+        Attribute::string(AttributeType::UserName as u8, "testuser")
+            .expect("Failed to create User-Name attribute"),
     );
 
     // Add usage statistics
@@ -1060,6 +1243,10 @@ async fn test_accounting_session_lifecycle() {
         Attribute::new(AttributeType::AcctInputOctets as u8, vec![0, 0, 1, 0])
             .expect("Failed to create Acct-Input-Octets attribute"),
     );
+
+    // Calculate authenticator after all attributes are added
+    let interim_auth = calculate_accounting_request_authenticator(&interim_packet, secret);
+    interim_packet.authenticator = interim_auth;
 
     let interim_response = send_radius_request(&interim_packet, server_addr)
         .await
@@ -1076,11 +1263,25 @@ async fn test_accounting_session_lifecycle() {
     assert_eq!(sessions[0].input_octets, 256);
 
     // Test 3: Accounting Stop
-    let mut stop_packet = create_accounting_request(
-        AcctStatusType::Stop,
-        session_id,
-        "testuser",
-        3,
+    let mut stop_packet = Packet::new(Code::AccountingRequest, 3, [0u8; 16]);
+
+    // Add Acct-Status-Type
+    stop_packet.add_attribute(
+        Attribute::new(
+            AttributeType::AcctStatusType as u8,
+            AcctStatusType::Stop.as_u32().to_be_bytes().to_vec(),
+        )
+        .expect("Failed to create Acct-Status-Type attribute"),
+    );
+
+    // Add session info
+    stop_packet.add_attribute(
+        Attribute::string(AttributeType::AcctSessionId as u8, session_id)
+            .expect("Failed to create Acct-Session-Id attribute"),
+    );
+    stop_packet.add_attribute(
+        Attribute::string(AttributeType::UserName as u8, "testuser")
+            .expect("Failed to create User-Name attribute"),
     );
 
     // Add final usage statistics
@@ -1096,6 +1297,10 @@ async fn test_accounting_session_lifecycle() {
         Attribute::new(AttributeType::AcctOutputOctets as u8, vec![0, 0, 3, 0])
             .expect("Failed to create Acct-Output-Octets attribute"),
     );
+
+    // Calculate authenticator after all attributes are added
+    let stop_auth = calculate_accounting_request_authenticator(&stop_packet, secret);
+    stop_packet.authenticator = stop_auth;
 
     let stop_response = send_radius_request(&stop_packet, server_addr)
         .await
@@ -1139,12 +1344,15 @@ async fn test_accounting_nas_events() {
     // Give server time to start
     sleep(Duration::from_millis(100)).await;
 
+    let secret = b"testing123";
+
     // Test Accounting-On
     let on_packet = create_accounting_request(
         AcctStatusType::AccountingOn,
         "",
         "",
         1,
+        secret,
     );
     let on_response = send_radius_request(&on_packet, server_addr)
         .await
@@ -1161,6 +1369,7 @@ async fn test_accounting_nas_events() {
             &session_id,
             "testuser",
             i + 2,
+            secret,
         );
         let _ = send_radius_request(&start_packet, server_addr).await;
     }
@@ -1173,6 +1382,7 @@ async fn test_accounting_nas_events() {
         "",
         "",
         10,
+        secret,
     );
     let off_response = send_radius_request(&off_packet, server_addr)
         .await
@@ -1215,12 +1425,15 @@ async fn test_accounting_without_handler() {
     // Give server time to start
     sleep(Duration::from_millis(100)).await;
 
+    let secret = b"testing123";
+
     // Try to send accounting request
     let start_packet = create_accounting_request(
         AcctStatusType::Start,
         "session-123",
         "testuser",
         1,
+        secret,
     );
 
     // Request should fail silently or return no response

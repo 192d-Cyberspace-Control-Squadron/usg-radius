@@ -80,9 +80,9 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 - [x] Per-client shared secrets
 - [x] Client database with enable/disable flags
 - [x] Source IP verification against configuration
-- [ ] NAS-Identifier validation
+- [x] NAS-Identifier validation
 
-**Status**: ✅ Complete (except NAS-Identifier)
+**Status**: ✅ Complete
 
 #### Request Security ✅ COMPLETED
 

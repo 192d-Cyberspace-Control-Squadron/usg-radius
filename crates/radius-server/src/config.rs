@@ -63,6 +63,9 @@ pub struct Client {
     /// Enable/disable this client
     #[serde(default = "default_enabled")]
     pub enabled: bool,
+    /// Expected NAS-Identifier for this client (if specified, will be validated)
+    #[serde(default)]
+    pub nas_identifier: Option<String>,
 }
 
 fn default_enabled() -> bool {
@@ -325,24 +328,28 @@ impl Config {
                     secret: "client_secret_1".to_string(),
                     name: Some("Internal Network".to_string()),
                     enabled: true,
+                    nas_identifier: None,
                 },
                 Client {
                     address: "10.0.0.1".to_string(),
                     secret: "client_secret_2".to_string(),
                     name: Some("VPN Gateway".to_string()),
                     enabled: true,
+                    nas_identifier: Some("vpn-gateway.example.com".to_string()),
                 },
                 Client {
                     address: "2001:db8::/32".to_string(),
                     secret: "client_secret_3".to_string(),
                     name: Some("IPv6 Network".to_string()),
                     enabled: true,
+                    nas_identifier: None,
                 },
                 Client {
                     address: "::1".to_string(),
                     secret: "client_secret_4".to_string(),
                     name: Some("IPv6 Localhost".to_string()),
                     enabled: true,
+                    nas_identifier: None,
                 },
             ],
             users: vec![
