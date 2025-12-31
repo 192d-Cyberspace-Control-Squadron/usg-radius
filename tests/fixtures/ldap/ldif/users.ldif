@@ -17,7 +17,7 @@ cn: Test User
 sn: User
 givenName: Test
 mail: testuser@example.com
-userPassword: {SSHA}DkMTwBl+a/3DQTxCYEApdUtNXGgdUac3
+userPassword: {SSHA}esxzmaPlJlIIQYPxtMGs1sFqUcaDrIM/
 loginShell: /bin/bash
 uidNumber: 10000
 gidNumber: 10000
@@ -32,7 +32,7 @@ cn: Alice Smith
 sn: Smith
 givenName: Alice
 mail: alice@example.com
-userPassword: {SSHA}tQ4y7Z9pKvA9rXLMEBYoE8F2cR6lF3Np
+userPassword: {SSHA}qihVgsw/+0wUjNjgLfkKG21I2bMcCaze
 loginShell: /bin/bash
 uidNumber: 10001
 gidNumber: 10001
@@ -47,7 +47,7 @@ cn: Bob Johnson
 sn: Johnson
 givenName: Bob
 mail: bob@example.com
-userPassword: {SSHA}kL8m3N1pQ5rT6uV7wX9yZ0aB2cD4eF6g
+userPassword: {SSHA}65hYkg2XszJqzJeQcHKj8yfdRkhDBA2/
 loginShell: /bin/bash
 uidNumber: 10002
 gidNumber: 10002
@@ -67,7 +67,7 @@ gidNumber: 5001
 memberUid: testuser
 memberUid: bob
 
-# Password hashes generated with:
-# testuser / password123 = {SSHA}DkMTwBl+a/3DQTxCYEApdUtNXGgdUac3
-# alice / alice123 = {SSHA}tQ4y7Z9pKvA9rXLMEBYoE8F2cR6lF3Np
-# bob / bob456 = {SSHA}kL8m3N1pQ5rT6uV7wX9yZ0aB2cD4eF6g
+# Password hashes generated with slappasswd:
+# testuser / password123 = {SSHA}esxzmaPlJlIIQYPxtMGs1sFqUcaDrIM/
+# alice / alice123 = {SSHA}qihVgsw/+0wUjNjgLfkKG21I2bMcCaze
+# bob / bob456 = {SSHA}65hYkg2XszJqzJeQcHKj8yfdRkhDBA2/

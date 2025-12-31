@@ -9,10 +9,10 @@
 --   disabled: disabled123 (but account is disabled)
 
 INSERT INTO users (username, password_hash, enabled) VALUES
-    ('testuser', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqJxm1O3yG', true),
-    ('alice', '$2b$12$KSdL5K91f8.1H0jvR6F5wOf8jCPP3E2VQh4RKmjX7vP5ZJQjD2jNu', true),
-    ('bob', '$2b$12$yGqMZq.1TqLqE1F5wOL8vOH0jvR6F5wOf8jCPP3E2VQh4RKmjX7vP', true),
-    ('disabled', '$2b$12$aB1cD2eF3gH4iJ5kL6mN7oP8qR9sT0uV1wX2yZ3aB4cD5eF6gH7iJ', false)
+    ('testuser', '$2b$12$vMsD81dcf/ga2G8eAux9hO1QzSu8bZbAZBGMnttsWEJ05QQzryqeC', true),
+    ('alice', '$2b$12$LVDpbqZhE5PWYTd1hZb4A.b1EJoJ1QAWs8XIwdPBDz0StqRcLyQGy', true),
+    ('bob', '$2b$12$1u1CL.AzbwgOWNE0pqV0MeGs4PQWBSISoewyPx3TzikQS35mOa2hW', true),
+    ('disabled', '$2b$12$uIjpdHMWobqRd5ku3SC4LOFbJHFUCojCce0E6.920OupgX6bBv1IO', false)
 ON CONFLICT (username) DO NOTHING;
 
 -- Add RADIUS attributes for test users
