@@ -117,7 +117,9 @@ impl FileAccountingHandler {
     }
 
     /// Extract accounting attributes from packet
-    fn extract_accounting_attrs(packet: &Packet) -> (Option<u32>, Option<u64>, Option<u64>, Option<u32>) {
+    fn extract_accounting_attrs(
+        packet: &Packet,
+    ) -> (Option<u32>, Option<u64>, Option<u64>, Option<u32>) {
         let session_time = packet
             .find_attribute(AttributeType::AcctSessionTime as u8)
             .and_then(|attr| {
@@ -270,12 +272,12 @@ impl AccountingHandler for FileAccountingHandler {
                 terminate_cause: None,
             };
 
-            self.write_record(record)
-                .await
-                .map_err(|e| AccountingError::InvalidAttributeValue {
+            self.write_record(record).await.map_err(|e| {
+                AccountingError::InvalidAttributeValue {
                     attribute: "file_write",
                     reason: e.to_string(),
-                })?;
+                }
+            })?;
 
             Ok(AccountingResult::Success)
         })
@@ -314,12 +316,12 @@ impl AccountingHandler for FileAccountingHandler {
                 terminate_cause,
             };
 
-            self.write_record(record)
-                .await
-                .map_err(|e| AccountingError::InvalidAttributeValue {
+            self.write_record(record).await.map_err(|e| {
+                AccountingError::InvalidAttributeValue {
                     attribute: "file_write",
                     reason: e.to_string(),
-                })?;
+                }
+            })?;
 
             Ok(AccountingResult::Success)
         })
@@ -358,12 +360,12 @@ impl AccountingHandler for FileAccountingHandler {
                 terminate_cause: None,
             };
 
-            self.write_record(record)
-                .await
-                .map_err(|e| AccountingError::InvalidAttributeValue {
+            self.write_record(record).await.map_err(|e| {
+                AccountingError::InvalidAttributeValue {
                     attribute: "file_write",
                     reason: e.to_string(),
-                })?;
+                }
+            })?;
 
             Ok(AccountingResult::Success)
         })
@@ -393,12 +395,12 @@ impl AccountingHandler for FileAccountingHandler {
                 terminate_cause: None,
             };
 
-            self.write_record(record)
-                .await
-                .map_err(|e| AccountingError::InvalidAttributeValue {
+            self.write_record(record).await.map_err(|e| {
+                AccountingError::InvalidAttributeValue {
                     attribute: "file_write",
                     reason: e.to_string(),
-                })?;
+                }
+            })?;
 
             Ok(AccountingResult::Success)
         })
@@ -428,12 +430,12 @@ impl AccountingHandler for FileAccountingHandler {
                 terminate_cause: None,
             };
 
-            self.write_record(record)
-                .await
-                .map_err(|e| AccountingError::InvalidAttributeValue {
+            self.write_record(record).await.map_err(|e| {
+                AccountingError::InvalidAttributeValue {
                     attribute: "file_write",
                     reason: e.to_string(),
-                })?;
+                }
+            })?;
 
             Ok(AccountingResult::Success)
         })
@@ -464,7 +466,12 @@ mod tests {
         // Write a start event
         let packet = create_test_packet();
         let result = handler
-            .handle_start("session123", "testuser", "192.168.1.1".parse().unwrap(), &packet)
+            .handle_start(
+                "session123",
+                "testuser",
+                "192.168.1.1".parse().unwrap(),
+                &packet,
+            )
             .await;
 
         assert!(result.is_ok());
@@ -497,7 +504,12 @@ mod tests {
         );
 
         let result = handler
-            .handle_stop("session123", "testuser", "192.168.1.1".parse().unwrap(), &packet)
+            .handle_stop(
+                "session123",
+                "testuser",
+                "192.168.1.1".parse().unwrap(),
+                &packet,
+            )
             .await;
 
         assert!(result.is_ok());

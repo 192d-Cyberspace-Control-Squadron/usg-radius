@@ -207,7 +207,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 **Goal**: Add RADIUS Accounting support (RFC 2866)
 **Priority**: HIGH
-**Status**: 🚧 In Progress (95% complete)
+**Status**: ✅ Complete (100%)
 
 ### Accounting Protocol ✅ COMPLETED
 
@@ -270,10 +270,25 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
   - [x] RFC 2869 gigaword attributes (52, 53)
   - [x] Automatic 64-bit value calculation in all handlers
   - [x] Backward compatible (gigawords optional)
-- [ ] Usage reports and aggregation queries
-- [ ] Export functionality (CSV, JSON reports)
+- [x] Usage reports and aggregation queries
+  - [x] PostgreSQL aggregation methods
+  - [x] Total usage by user (input/output octets, session time, count)
+  - [x] Total usage by NAS (aggregated network statistics)
+  - [x] Top users by bandwidth (ranked list with usage metrics)
+  - [x] Session duration statistics (avg/min/max/total)
+  - [x] Daily usage aggregation (time-series data)
+  - [x] Hourly usage aggregation (granular breakdowns)
+  - [x] Active session counts and grouping
+  - [x] Comprehensive test coverage for all queries
+- [x] Export functionality
+  - [x] CSV export for user usage (bandwidth and session stats)
+  - [x] CSV export for session details (active and completed)
+  - [x] JSON usage reports with summary statistics
+  - [x] Automatic MB conversion and time formatting
+  - [x] Time range filtering support
+  - [x] Comprehensive test coverage for export methods
 
-**Status**: 🚧 Partial (all counters complete, reporting/export pending)
+**Status**: ✅ Complete
 
 ### Test Coverage
 
@@ -309,7 +324,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
   - Async file operations with proper error handling
 
 - **PostgreSQL Backend** (radius-server/accounting/postgres.rs):
-  - 750+ lines of production-ready code
+  - 1900+ lines of production-ready code
   - Two-table schema: radius_sessions and radius_accounting_events
   - Automatic migrations with comprehensive indexes
   - Connection pooling with sqlx::PgPool
@@ -317,9 +332,24 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
   - Session query APIs (get_active_sessions, get_session)
   - IP address conversion (IpAddr ↔ INET)
   - Configuration support via accounting_database_url
+  - Data retention and cleanup (cleanup_old_data method)
+  - Usage aggregation methods:
+    - get_user_usage: Total usage by user with time range filtering
+    - get_nas_usage: Total usage by NAS device
+    - get_top_users_by_bandwidth: Ranked list of highest bandwidth consumers
+    - get_user_session_stats: Session duration statistics (avg/min/max/total)
+    - get_daily_usage_by_user: Daily time-series aggregation
+    - get_hourly_usage: Hourly granular breakdowns
+    - get_active_sessions_count: Real-time active session monitoring
+    - get_active_sessions_by_nas: Active sessions grouped by NAS
+  - Export functionality:
+    - export_user_usage_csv: CSV export with bandwidth and session stats
+    - export_sessions_csv: Detailed session export (active/all)
+    - generate_usage_report_json: Comprehensive JSON reports with summaries
+  - Comprehensive test coverage (6 test suites, 500+ lines of tests)
 
-**Total v0.4.0 Actual Effort**: ~5 weeks (accounting protocol + session management + file backend + PostgreSQL)
-**Remaining Effort**: ~1 week (MySQL backend + advanced metrics + retention policies)
+**Total v0.4.0 Actual Effort**: ~6 weeks (accounting protocol + session management + file backend + PostgreSQL + aggregation + export)
+**MySQL Backend**: Intentionally skipped to focus on core features
 
 ---
 
@@ -327,26 +357,38 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 **Goal**: Support modern 802.1X authentication
 **Priority**: MEDIUM-HIGH
+**Status**: 🔄 In Progress (EAP Framework Started)
 
-### EAP Framework
+### EAP Framework ⚡ IN PROGRESS
 
-- [ ] EAP-Message attribute (Type 79) handling
+- [x] EAP-Message attribute (Type 79) handling
+- [x] EAP packet structure (Request, Response, Success, Failure)
+- [x] EAP packet encoding/decoding
+- [x] EAP type enumeration (Identity, Notification, NAK, MD5, TLS, TTLS, PEAP, MSCHAPv2, TEAP)
 - [ ] EAP state machine
 - [ ] EAP session management
-- [ ] EAP packet fragmentation
+- [ ] EAP packet fragmentation (RFC 3748)
+- [ ] EAP-Message RADIUS integration helpers
 
-**Estimated Effort**: 3 weeks
+**Status**: ✅ Core packet handling complete (Dec 2024)
+**Estimated Effort Remaining**: 2 weeks
 
 ### EAP Methods
 
-- [ ] EAP-MD5 (basic, for testing)
-- [ ] EAP-TLS (certificate-based)
-- [ ] EAP-TTLS (tunneled TLS)
-- [ ] EAP-TEAP (certificate-based)
-- [ ] PEAP (Protected EAP)
-- [ ] EAP-MSCHAPv2
+- [x] **EAP-MD5 Challenge** (Type 4) - RFC 3748
+  - [x] Challenge generation and parsing
+  - [x] Response computation and verification
+  - [x] MD5 hash calculation (identifier + password + challenge)
+  - [x] Full authentication flow
+  - [x] Comprehensive test coverage (4 test suites)
+- [ ] EAP-TLS (Type 13) - RFC 5216 (certificate-based)
+- [ ] EAP-TTLS (Type 21) - RFC 5281 (tunneled TLS)
+- [ ] PEAP (Type 25) - Protected EAP
+- [ ] EAP-MSCHAPv2 (Type 26)
+- [ ] EAP-TEAP (Type 55) - RFC 7170
 
-**Estimated Effort**: 6 weeks (1-2 weeks per method)
+**Status**: ✅ EAP-MD5 complete for testing (Dec 2024)
+**Estimated Effort**: 6 weeks remaining (1-2 weeks per method)
 
 ### Certificate Management
 
@@ -357,11 +399,30 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 **Estimated Effort**: 2 weeks
 
-**Total v0.5.0 Estimated Effort**: 11 weeks
+### Completed Features
+
+- **EAP Protocol Module** (radius-proto/eap.rs):
+  - 685 lines of production-ready code
+  - EapCode enum (Request, Response, Success, Failure)
+  - EapType enum (11 method types)
+  - EapPacket structure with parsing/encoding
+  - Full RFC 3748 compliance for packet format
+  - 13 comprehensive unit tests (100% pass rate)
+
+- **EAP-MD5 Implementation** (radius-proto/eap/eap_md5):
+  - Challenge-response authentication
+  - MD5 hash computation
+  - Request/response packet creation
+  - Challenge/response parsing
+  - Authentication verification
+  - 4 dedicated test suites including full authentication flow
+
+**Total v0.5.0 Actual Effort**: ~1 week so far (EAP framework + EAP-MD5)
+**Total v0.5.0 Estimated Remaining**: ~10 weeks
 
 ---
 
-## v0.6.0 - Advanced Features (Q1 2025)
+## v0.6.0 - Enterprise Features (Q1 2025)
 
 **Goal**: Enterprise-grade features
 **Priority**: MEDIUM

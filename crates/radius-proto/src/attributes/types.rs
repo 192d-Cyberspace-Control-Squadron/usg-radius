@@ -114,6 +114,9 @@ pub enum AttributeType {
     PortLimit = 62,
     /// Login-LAT-Port (63) - RFC 2865
     LoginLatPort = 63,
+    /// EAP-Message (79) - RFC 3579
+    /// Encapsulates EAP packets for transport over RADIUS
+    EapMessage = 79,
     /// Message-Authenticator (80) - RFC 2869
     MessageAuthenticator = 80,
 }
@@ -176,6 +179,7 @@ impl AttributeType {
             61 => Some(AttributeType::NasPortType),
             62 => Some(AttributeType::PortLimit),
             63 => Some(AttributeType::LoginLatPort),
+            79 => Some(AttributeType::EapMessage),
             80 => Some(AttributeType::MessageAuthenticator),
             _ => None,
         }

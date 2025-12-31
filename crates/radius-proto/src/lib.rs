@@ -40,6 +40,7 @@ pub mod accounting;
 pub mod attributes;
 pub mod auth;
 pub mod chap;
+pub mod eap;
 pub mod message_auth;
 pub mod packet;
 pub mod validation;
@@ -54,6 +55,7 @@ pub use auth::{
 pub use chap::{
     ChapChallenge, ChapError, ChapResponse, compute_chap_response, verify_chap_response,
 };
+pub use eap::{EapCode, EapError, EapPacket, EapType};
 pub use message_auth::{calculate_message_authenticator, verify_message_authenticator};
 pub use packet::{Code, Packet, PacketError};
 pub use validation::{ValidationError, ValidationMode, validate_packet};

@@ -3,7 +3,7 @@ use crate::audit::{AuditEntry, AuditEventType, AuditLogger};
 use crate::cache::{RequestCache, RequestFingerprint};
 use crate::config::Config;
 use crate::ratelimit::{RateLimitConfig, RateLimiter};
-use radius_proto::accounting::{AcctStatusType, AccountingError};
+use radius_proto::accounting::{AccountingError, AcctStatusType};
 use radius_proto::attributes::{Attribute, AttributeType};
 use radius_proto::auth::{
     calculate_accounting_request_authenticator, calculate_response_authenticator,
@@ -511,12 +511,16 @@ impl RadiusServer {
                 "Access-Request missing both NAS-IP-Address and NAS-Identifier"
             );
             return Err(ServerError::Validation(
-                "Access-Request MUST contain either NAS-IP-Address or NAS-Identifier (RFC 2865)".to_string(),
+                "Access-Request MUST contain either NAS-IP-Address or NAS-Identifier (RFC 2865)"
+                    .to_string(),
             ));
         }
 
         // Validate NAS-Identifier if client has one configured
-        if let Some(client_config) = config.config.as_ref().and_then(|c| c.find_client(source_ip))
+        if let Some(client_config) = config
+            .config
+            .as_ref()
+            .and_then(|c| c.find_client(source_ip))
         {
             if let Some(expected_nas_id) = &client_config.nas_identifier {
                 match &nas_identifier {

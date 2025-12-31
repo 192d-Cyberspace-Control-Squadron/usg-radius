@@ -137,7 +137,7 @@ impl SimpleAccountingHandler {
     pub fn new() -> Self {
         SimpleAccountingHandler {
             sessions: Arc::new(dashmap::DashMap::new()),
-            session_timeout: 3600, // Default: 1 hour timeout
+            session_timeout: 3600,    // Default: 1 hour timeout
             max_sessions_per_user: 0, // Default: unlimited sessions
         }
     }
@@ -549,11 +549,12 @@ impl AccountingHandler for SimpleAccountingHandler {
         })
     }
 
-    fn get_session(&self, session_id: &str) -> Pin<Box<dyn Future<Output = Option<Session>> + Send + '_>> {
+    fn get_session(
+        &self,
+        session_id: &str,
+    ) -> Pin<Box<dyn Future<Output = Option<Session>> + Send + '_>> {
         let session_id = session_id.to_string();
-        Box::pin(async move {
-            self.sessions.get(&session_id).map(|entry| entry.clone())
-        })
+        Box::pin(async move { self.sessions.get(&session_id).map(|entry| entry.clone()) })
     }
 }
 

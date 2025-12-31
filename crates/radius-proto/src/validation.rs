@@ -164,7 +164,10 @@ fn validate_status_server(_packet: &Packet, _mode: ValidationMode) -> Result<(),
 }
 
 /// Validate Accounting-Request packet
-fn validate_accounting_request(packet: &Packet, _mode: ValidationMode) -> Result<(), ValidationError> {
+fn validate_accounting_request(
+    packet: &Packet,
+    _mode: ValidationMode,
+) -> Result<(), ValidationError> {
     // RFC 2866 Section 4.1: Acct-Status-Type is REQUIRED
     if packet
         .find_attribute(AttributeType::AcctStatusType as u8)
@@ -180,7 +183,10 @@ fn validate_accounting_request(packet: &Packet, _mode: ValidationMode) -> Result
 }
 
 /// Validate Accounting-Response packet
-fn validate_accounting_response(_packet: &Packet, _mode: ValidationMode) -> Result<(), ValidationError> {
+fn validate_accounting_response(
+    _packet: &Packet,
+    _mode: ValidationMode,
+) -> Result<(), ValidationError> {
     // RFC 2866: Accounting-Response has no required attributes
     Ok(())
 }

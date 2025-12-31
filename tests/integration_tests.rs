@@ -14,7 +14,7 @@ use radius_proto::auth::{
     generate_request_authenticator,
 };
 use radius_proto::chap::{ChapChallenge, ChapResponse, compute_chap_response};
-use radius_proto::{calculate_message_authenticator, Attribute, AttributeType, Code, Packet};
+use radius_proto::{Attribute, AttributeType, Code, Packet, calculate_message_authenticator};
 use radius_server::{
     AccountingHandler, AuthHandler, AuthResult, Config, RadiusServer, ServerConfig,
     SimpleAccountingHandler, SimpleAuthHandler,
@@ -548,14 +548,20 @@ async fn test_nas_identifier_validation() {
             .expect("Failed to create User-Password attribute"),
     );
     packet2.add_attribute(
-        Attribute::string(AttributeType::NasIdentifier as u8, "wrongswitch.example.com")
-            .expect("Failed to create NAS-Identifier attribute"),
+        Attribute::string(
+            AttributeType::NasIdentifier as u8,
+            "wrongswitch.example.com",
+        )
+        .expect("Failed to create NAS-Identifier attribute"),
     );
 
     let result2 = send_radius_request(&packet2, server_addr).await;
 
     // Should timeout because server rejects packets with wrong NAS-Identifier
-    assert!(result2.is_err(), "Expected timeout for wrong NAS-Identifier");
+    assert!(
+        result2.is_err(),
+        "Expected timeout for wrong NAS-Identifier"
+    );
 
     // Test 3: Request without NAS-Identifier (when required)
     let req_auth3 = generate_request_authenticator();
@@ -571,17 +577,17 @@ async fn test_nas_identifier_validation() {
     );
     // Add NAS-IP-Address instead of NAS-Identifier
     packet3.add_attribute(
-        Attribute::new(
-            AttributeType::NasIpAddress as u8,
-            vec![127, 0, 0, 1],
-        )
-        .expect("Failed to create NAS-IP-Address attribute"),
+        Attribute::new(AttributeType::NasIpAddress as u8, vec![127, 0, 0, 1])
+            .expect("Failed to create NAS-IP-Address attribute"),
     );
 
     let result3 = send_radius_request(&packet3, server_addr).await;
 
     // Should timeout because NAS-Identifier is required but not provided
-    assert!(result3.is_err(), "Expected timeout for missing NAS-Identifier");
+    assert!(
+        result3.is_err(),
+        "Expected timeout for missing NAS-Identifier"
+    );
 }
 
 #[tokio::test]
@@ -1197,13 +1203,8 @@ async fn test_accounting_session_lifecycle() {
     let session_id = "session-12345";
 
     // Test 1: Accounting Start
-    let start_packet = create_accounting_request(
-        AcctStatusType::Start,
-        session_id,
-        "testuser",
-        1,
-        secret,
-    );
+    let start_packet =
+        create_accounting_request(AcctStatusType::Start, session_id, "testuser", 1, secret);
     let start_response = send_radius_request(&start_packet, server_addr)
         .await
         .expect("Failed to send Accounting-Start");
@@ -1219,7 +1220,10 @@ async fn test_accounting_session_lifecycle() {
     interim_packet.add_attribute(
         Attribute::new(
             AttributeType::AcctStatusType as u8,
-            AcctStatusType::InterimUpdate.as_u32().to_be_bytes().to_vec(),
+            AcctStatusType::InterimUpdate
+                .as_u32()
+                .to_be_bytes()
+                .to_vec(),
         )
         .expect("Failed to create Acct-Status-Type attribute"),
     );
@@ -1347,13 +1351,7 @@ async fn test_accounting_nas_events() {
     let secret = b"testing123";
 
     // Test Accounting-On
-    let on_packet = create_accounting_request(
-        AcctStatusType::AccountingOn,
-        "",
-        "",
-        1,
-        secret,
-    );
+    let on_packet = create_accounting_request(AcctStatusType::AccountingOn, "", "", 1, secret);
     let on_response = send_radius_request(&on_packet, server_addr)
         .await
         .expect("Failed to send Accounting-On");
@@ -1377,13 +1375,7 @@ async fn test_accounting_nas_events() {
     assert_eq!(accounting_handler_impl.session_count(), 3);
 
     // Test Accounting-Off (should terminate all sessions from this NAS)
-    let off_packet = create_accounting_request(
-        AcctStatusType::AccountingOff,
-        "",
-        "",
-        10,
-        secret,
-    );
+    let off_packet = create_accounting_request(AcctStatusType::AccountingOff, "", "", 10, secret);
     let off_response = send_radius_request(&off_packet, server_addr)
         .await
         .expect("Failed to send Accounting-Off");
@@ -1428,20 +1420,16 @@ async fn test_accounting_without_handler() {
     let secret = b"testing123";
 
     // Try to send accounting request
-    let start_packet = create_accounting_request(
-        AcctStatusType::Start,
-        "session-123",
-        "testuser",
-        1,
-        secret,
-    );
+    let start_packet =
+        create_accounting_request(AcctStatusType::Start, "session-123", "testuser", 1, secret);
 
     // Request should fail silently or return no response
     // (server will log an error but won't respond to invalid requests)
     let result = tokio::time::timeout(
         Duration::from_secs(1),
-        send_radius_request(&start_packet, server_addr)
-    ).await;
+        send_radius_request(&start_packet, server_addr),
+    )
+    .await;
 
     // Should timeout since server doesn't respond to accounting without handler
     assert!(result.is_err() || result.unwrap().is_err());
@@ -1491,11 +1479,8 @@ async fn test_message_authenticator_valid() {
 
     // Add NAS-IP-Address
     packet.add_attribute(
-        Attribute::new(
-            AttributeType::NasIpAddress as u8,
-            vec![127, 0, 0, 1],
-        )
-        .expect("Failed to create NAS-IP-Address attribute"),
+        Attribute::new(AttributeType::NasIpAddress as u8, vec![127, 0, 0, 1])
+            .expect("Failed to create NAS-IP-Address attribute"),
     );
 
     // Add Message-Authenticator placeholder (will be calculated)
@@ -1581,11 +1566,8 @@ async fn test_message_authenticator_invalid() {
 
     // Add NAS-IP-Address
     packet.add_attribute(
-        Attribute::new(
-            AttributeType::NasIpAddress as u8,
-            vec![127, 0, 0, 1],
-        )
-        .expect("Failed to create NAS-IP-Address attribute"),
+        Attribute::new(AttributeType::NasIpAddress as u8, vec![127, 0, 0, 1])
+            .expect("Failed to create NAS-IP-Address attribute"),
     );
 
     // Add INVALID Message-Authenticator (all 0xFF instead of proper HMAC)
@@ -1597,8 +1579,9 @@ async fn test_message_authenticator_invalid() {
     // Send request with invalid Message-Authenticator
     let result = tokio::time::timeout(
         Duration::from_secs(1),
-        send_radius_request(&packet, server_addr)
-    ).await;
+        send_radius_request(&packet, server_addr),
+    )
+    .await;
 
     // Server should reject the request (either timeout or no response)
     // Typically servers don't respond to invalid Message-Authenticator for security
@@ -1676,13 +1659,8 @@ async fn test_accounting_session_timeout() {
 
     // Start a session
     let session_id = "timeout-session-123";
-    let start_packet = create_accounting_request(
-        AcctStatusType::Start,
-        session_id,
-        "testuser",
-        1,
-        secret,
-    );
+    let start_packet =
+        create_accounting_request(AcctStatusType::Start, session_id, "testuser", 1, secret);
 
     let start_response = send_radius_request(&start_packet, server_addr)
         .await
@@ -1752,13 +1730,8 @@ async fn test_accounting_concurrent_session_limit() {
     let secret = b"testing123";
 
     // Start first session - should succeed
-    let start1 = create_accounting_request(
-        AcctStatusType::Start,
-        "session-1",
-        "testuser",
-        1,
-        secret,
-    );
+    let start1 =
+        create_accounting_request(AcctStatusType::Start, "session-1", "testuser", 1, secret);
     let response1 = send_radius_request(&start1, server_addr)
         .await
         .expect("Failed to send first start");
@@ -1766,13 +1739,8 @@ async fn test_accounting_concurrent_session_limit() {
     assert_eq!(accounting_handler_impl.session_count(), 1);
 
     // Start second session - should succeed
-    let start2 = create_accounting_request(
-        AcctStatusType::Start,
-        "session-2",
-        "testuser",
-        2,
-        secret,
-    );
+    let start2 =
+        create_accounting_request(AcctStatusType::Start, "session-2", "testuser", 2, secret);
     let response2 = send_radius_request(&start2, server_addr)
         .await
         .expect("Failed to send second start");
@@ -1780,20 +1748,16 @@ async fn test_accounting_concurrent_session_limit() {
     assert_eq!(accounting_handler_impl.session_count(), 2);
 
     // Try to start third session - should fail (limit exceeded)
-    let start3 = create_accounting_request(
-        AcctStatusType::Start,
-        "session-3",
-        "testuser",
-        3,
-        secret,
-    );
+    let start3 =
+        create_accounting_request(AcctStatusType::Start, "session-3", "testuser", 3, secret);
 
     // Server currently doesn't respond when session limit exceeded (returns error)
     // This causes a timeout - in future, should send Accounting-Response per RFC 2866
     let result3 = tokio::time::timeout(
         Duration::from_secs(1),
-        send_radius_request(&start3, server_addr)
-    ).await;
+        send_radius_request(&start3, server_addr),
+    )
+    .await;
 
     // Should timeout or error (session limit exceeded)
     assert!(result3.is_err() || matches!(result3, Ok(Err(_))));
@@ -1802,31 +1766,35 @@ async fn test_accounting_concurrent_session_limit() {
     assert_eq!(accounting_handler_impl.session_count(), 2);
 
     // Verify only the first two sessions exist
-    assert!(accounting_handler_impl.get_session("session-1").await.is_some());
-    assert!(accounting_handler_impl.get_session("session-2").await.is_some());
-    assert!(accounting_handler_impl.get_session("session-3").await.is_none());
+    assert!(
+        accounting_handler_impl
+            .get_session("session-1")
+            .await
+            .is_some()
+    );
+    assert!(
+        accounting_handler_impl
+            .get_session("session-2")
+            .await
+            .is_some()
+    );
+    assert!(
+        accounting_handler_impl
+            .get_session("session-3")
+            .await
+            .is_none()
+    );
 
     // Stop one session
-    let stop1 = create_accounting_request(
-        AcctStatusType::Stop,
-        "session-1",
-        "testuser",
-        4,
-        secret,
-    );
+    let stop1 = create_accounting_request(AcctStatusType::Stop, "session-1", "testuser", 4, secret);
     send_radius_request(&stop1, server_addr)
         .await
         .expect("Failed to send stop");
     assert_eq!(accounting_handler_impl.session_count(), 1);
 
     // Now we should be able to start a new session
-    let start4 = create_accounting_request(
-        AcctStatusType::Start,
-        "session-4",
-        "testuser",
-        5,
-        secret,
-    );
+    let start4 =
+        create_accounting_request(AcctStatusType::Start, "session-4", "testuser", 5, secret);
     let response4 = send_radius_request(&start4, server_addr)
         .await
         .expect("Failed to send fourth start");
@@ -1956,11 +1924,7 @@ async fn test_file_accounting_handler() {
         secret,
     );
     start_packet.add_attribute(
-        Attribute::new(
-            AttributeType::FramedIpAddress as u8,
-            vec![192, 168, 10, 50],
-        )
-        .unwrap(),
+        Attribute::new(AttributeType::FramedIpAddress as u8, vec![192, 168, 10, 50]).unwrap(),
     );
     // Recalculate authenticator after adding framed IP
     start_packet.authenticator = calculate_accounting_request_authenticator(&start_packet, secret);
@@ -2019,8 +1983,7 @@ async fn test_file_accounting_handler() {
         Attribute::new(AttributeType::AcctTerminateCause as u8, vec![0, 0, 0, 1]).unwrap(),
     );
     // Recalculate authenticator after adding attributes
-    stop_packet.authenticator =
-        calculate_accounting_request_authenticator(&stop_packet, secret);
+    stop_packet.authenticator = calculate_accounting_request_authenticator(&stop_packet, secret);
 
     send_radius_request(&stop_packet, server_addr)
         .await

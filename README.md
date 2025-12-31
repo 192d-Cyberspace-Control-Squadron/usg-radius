@@ -5,17 +5,33 @@ A RADIUS (Remote Authentication Dial-In User Service) server implementation in R
 ## Features
 
 ### Core Protocol
-- **RFC 2865 Compliant**: Full implementation of the RADIUS protocol
-- **Authentication**: Support for Access-Request, Access-Accept, and Access-Reject
+- **RFC 2865 Compliant**: Full implementation of the RADIUS authentication protocol
+- **RFC 2866 Accounting**: Complete accounting protocol support with session tracking
+- **Authentication**: Support for Access-Request, Access-Accept, Access-Reject, and Access-Challenge
+- **Accounting**: Accounting-Request and Accounting-Response with full session lifecycle
+- **EAP Support**: EAP-Message attribute (Type 79) for 802.1X authentication (v0.5.0 in progress)
 - **Status Server**: RFC 5997 Status-Server support for monitoring
 - **Password Encryption**: MD5-based User-Password encryption per RFC 2865 Section 5.2
 - **Packet Authentication**: Request/Response Authenticator validation
 - **Strict Validation**: RFC 2865 attribute validation with strict/lenient modes
 
+### Accounting Features (v0.4.0)
+
+- **Session Lifecycle Management**: Start, interim-update, and stop session tracking
+- **PostgreSQL Backend**: Production-ready async backend with connection pooling
+- **Comprehensive Attributes**: All RFC 2866 accounting attributes including gigaword counters
+- **Data Export**: CSV and JSON export functionality with automatic unit conversion
+  - User usage aggregation (bandwidth and session statistics)
+  - Detailed session export (active and completed)
+  - JSON reports with summary statistics and top users
+- **Query Operations**: Session lookup, user history, active sessions, statistics
+- **Trait-based Design**: Extensible AccountingHandler trait for custom backends
+
 ### Security Features
 - **Client Authorization**: IP/CIDR-based client validation
 - **Request Deduplication**: Replay attack prevention with caching
 - **Rate Limiting**: Per-client and global rate limiting with token bucket algorithm
+- **Message-Authenticator**: HMAC-MD5 integrity protection (RFC 2869)
 - **Audit Logging**: JSON audit trail for compliance and forensics
 - **Structured Logging**: Configurable log levels with tracing framework
 
@@ -23,14 +39,16 @@ A RADIUS (Remote Authentication Dial-In User Service) server implementation in R
 - **JSON Configuration**: Schema-validated configuration with comprehensive options
 - **Dual-Stack Networking**: Full IPv4 and IPv6 support for all network operations
 - **Async/Await**: Built on Tokio for high-performance asynchronous I/O
-- **Extensible**: Trait-based authentication handler for custom logic
+- **Extensible**: Trait-based handlers for custom authentication and accounting logic
 - **Production Ready**: DoS protection, security hardening, monitoring capabilities
 
 ## Supported RFCs
 
-- **RFC 2865**: Remote Authentication Dial In User Service (RADIUS)
-- **RFC 2866**: RADIUS Accounting (attribute definitions)
-- **RFC 2869**: RADIUS Extensions (Message-Authenticator)
+- **RFC 2865**: Remote Authentication Dial In User Service (RADIUS) - Full compliance
+- **RFC 2866**: RADIUS Accounting - Full implementation with PostgreSQL backend
+- **RFC 2869**: RADIUS Extensions - Message-Authenticator, Gigaword counters
+- **RFC 3579**: RADIUS Support for EAP - EAP-Message attribute (v0.5.0 in progress)
+- **RFC 3748**: Extensible Authentication Protocol (EAP) - Core framework (v0.5.0 in progress)
 - **RFC 5997**: RADIUS Status-Server packets
 
 ## Installation
@@ -188,14 +206,22 @@ Per RFC 2865 Section 3:
 
 ### Supported Packet Types
 
+**Authentication (RFC 2865):**
+
 - **Access-Request (1)**: Client authentication request
 - **Access-Accept (2)**: Authentication successful
 - **Access-Reject (3)**: Authentication failed
-- **Accounting-Request (4)**: Accounting data (attributes only)
-- **Accounting-Response (5)**: Accounting acknowledgment (attributes only)
-- **Access-Challenge (11)**: Additional authentication required
+- **Access-Challenge (11)**: Additional authentication required (multi-round auth, EAP)
+
+**Accounting (RFC 2866):**
+
+- **Accounting-Request (4)**: Session accounting data (start, interim, stop)
+- **Accounting-Response (5)**: Accounting acknowledgment
+
+**Monitoring (RFC 5997):**
+
 - **Status-Server (12)**: Server health check
-- **Status-Client (13)**: Client health check (attributes only)
+- **Status-Client (13)**: Client health check response
 
 ### Authentication Flow
 
