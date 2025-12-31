@@ -202,6 +202,13 @@ impl RadiusServer {
         })
     }
 
+    /// Get the local address the server is listening on
+    ///
+    /// This is useful for testing when binding to port 0 (OS-assigned port)
+    pub fn local_addr(&self) -> Result<std::net::SocketAddr, ServerError> {
+        self.socket.local_addr().map_err(ServerError::from)
+    }
+
     /// Start the server and handle incoming requests
     pub async fn run(&self) -> Result<(), ServerError> {
         let mut buf = vec![0u8; 4096];

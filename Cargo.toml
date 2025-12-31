@@ -51,6 +51,18 @@ tempfile = "3.0"
 radius-proto = { path = "crates/radius-proto" }
 radius-server = { path = "crates/radius-server" }
 
+[package]
+name = "usg-radius-workspace"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+radius-proto.workspace = true
+radius-server.workspace = true
+tokio.workspace = true
+tempfile.workspace = true
+
 [profile.release]
 opt-level = 3
 lto = true
