@@ -528,6 +528,193 @@ impl EapTeapServer {
     }
 }
 
+/// Inner authentication method handler trait
+///
+/// Defines the interface for handling inner authentication methods within
+/// the TEAP tunnel (Phase 2).
+pub trait InnerMethodHandler: Send + Sync {
+    /// Process inner authentication request
+    ///
+    /// # Arguments
+    ///
+    /// * `request_tlv` - TLV containing the inner auth request
+    ///
+    /// # Returns
+    ///
+    /// Returns response TLV or error
+    fn process_inner_request(&mut self, request_tlv: &TeapTlv) -> Result<TeapTlv, EapError>;
+
+    /// Check if authentication is complete
+    fn is_complete(&self) -> bool;
+
+    /// Get authentication result
+    fn get_result(&self) -> TeapResult;
+
+    /// Get authenticated identity (if successful)
+    fn get_identity(&self) -> Option<String>;
+}
+
+/// Basic Password Authentication Handler
+///
+/// Implements simple username/password authentication inside TEAP tunnel.
+/// This is the simplest inner method for MVP.
+///
+/// # Example
+///
+/// ```no_run
+/// # use radius_proto::eap::eap_teap::*;
+/// let handler = BasicPasswordAuthHandler::new();
+/// // Process authentication TLVs...
+/// ```
+pub struct BasicPasswordAuthHandler {
+    /// Expected username
+    expected_username: Option<String>,
+    /// Expected password
+    expected_password: Option<String>,
+    /// Received username
+    username: Option<String>,
+    /// Authentication complete flag
+    complete: bool,
+    /// Authentication result
+    result: TeapResult,
+}
+
+impl BasicPasswordAuthHandler {
+    /// Create new Basic Password Auth handler
+    ///
+    /// # Arguments
+    ///
+    /// * `expected_username` - Expected username for authentication
+    /// * `expected_password` - Expected password for authentication
+    pub fn new(expected_username: String, expected_password: String) -> Self {
+        Self {
+            expected_username: Some(expected_username),
+            expected_password: Some(expected_password),
+            username: None,
+            complete: false,
+            result: TeapResult::Failure,
+        }
+    }
+
+    /// Create handler without pre-set credentials (for testing)
+    pub fn new_empty() -> Self {
+        Self {
+            expected_username: None,
+            expected_password: None,
+            username: None,
+            complete: false,
+            result: TeapResult::Failure,
+        }
+    }
+
+    /// Parse Basic-Password-Auth-Resp TLV
+    ///
+    /// Format (RFC 7170 Section 4.2.14):
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |            Username Length    |          Username...
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |            Password Length    |          Password...
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```
+    fn parse_password_response(&mut self, tlv: &TeapTlv) -> Result<(), EapError> {
+        if tlv.value.len() < 4 {
+            return Err(EapError::InvalidLength(tlv.value.len()));
+        }
+
+        let mut offset = 0;
+
+        // Parse username length (2 bytes)
+        let username_len =
+            u16::from_be_bytes([tlv.value[offset], tlv.value[offset + 1]]) as usize;
+        offset += 2;
+
+        if offset + username_len > tlv.value.len() {
+            return Err(EapError::InvalidLength(username_len));
+        }
+
+        // Parse username
+        let username = String::from_utf8(tlv.value[offset..offset + username_len].to_vec())
+            .map_err(|_| EapError::InvalidResponseFormat)?;
+        offset += username_len;
+
+        if offset + 2 > tlv.value.len() {
+            return Err(EapError::InvalidLength(tlv.value.len() - offset));
+        }
+
+        // Parse password length (2 bytes)
+        let password_len =
+            u16::from_be_bytes([tlv.value[offset], tlv.value[offset + 1]]) as usize;
+        offset += 2;
+
+        if offset + password_len > tlv.value.len() {
+            return Err(EapError::InvalidLength(password_len));
+        }
+
+        // Parse password
+        let password = String::from_utf8(tlv.value[offset..offset + password_len].to_vec())
+            .map_err(|_| EapError::InvalidResponseFormat)?;
+
+        // Verify credentials
+        let auth_success = if let (Some(exp_user), Some(exp_pass)) =
+            (&self.expected_username, &self.expected_password)
+        {
+            &username == exp_user && &password == exp_pass
+        } else {
+            false
+        };
+
+        self.username = Some(username);
+        self.complete = true;
+        self.result = if auth_success {
+            TeapResult::Success
+        } else {
+            TeapResult::Failure
+        };
+
+        Ok(())
+    }
+
+    /// Create Basic-Password-Auth-Req TLV
+    ///
+    /// Simple request with no prompt (minimal implementation)
+    fn create_password_request() -> TeapTlv {
+        // Empty prompt for simplicity (MVP)
+        TeapTlv::new(TlvType::BasicPasswordAuthReq, true, vec![])
+    }
+}
+
+impl InnerMethodHandler for BasicPasswordAuthHandler {
+    fn process_inner_request(&mut self, request_tlv: &TeapTlv) -> Result<TeapTlv, EapError> {
+        match request_tlv.get_type() {
+            Some(TlvType::BasicPasswordAuthResp) => {
+                // Process password response
+                self.parse_password_response(request_tlv)?;
+                // Return result TLV
+                Ok(self.result.to_result_tlv())
+            }
+            _ => {
+                // Unknown TLV type, return NAK
+                Err(EapError::InvalidResponseFormat)
+            }
+        }
+    }
+
+    fn is_complete(&self) -> bool {
+        self.complete
+    }
+
+    fn get_result(&self) -> TeapResult {
+        self.result
+    }
+
+    fn get_identity(&self) -> Option<String> {
+        self.username.clone()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -727,5 +914,155 @@ mod tests {
 
         let (decoded, _) = TeapTlv::from_bytes(&bytes).unwrap();
         assert_eq!(decoded.value.len(), 0);
+    }
+
+    // BasicPasswordAuthHandler tests
+    #[test]
+    fn test_basic_password_auth_handler_creation() {
+        let handler = BasicPasswordAuthHandler::new("alice".to_string(), "secret".to_string());
+
+        assert!(!handler.is_complete());
+        assert_eq!(handler.get_result(), TeapResult::Failure);
+        assert_eq!(handler.get_identity(), None);
+    }
+
+    #[test]
+    fn test_basic_password_auth_success() {
+        let mut handler = BasicPasswordAuthHandler::new("alice".to_string(), "secret".to_string());
+
+        // Create Basic-Password-Auth-Resp TLV
+        // Format: username_len (2) | username | password_len (2) | password
+        let mut value = Vec::new();
+        value.extend_from_slice(&5u16.to_be_bytes()); // username length = 5
+        value.extend_from_slice(b"alice");
+        value.extend_from_slice(&6u16.to_be_bytes()); // password length = 6
+        value.extend_from_slice(b"secret");
+
+        let response_tlv = TeapTlv::new(TlvType::BasicPasswordAuthResp, true, value);
+
+        // Process the response
+        let result_tlv = handler.process_inner_request(&response_tlv).unwrap();
+
+        // Should be complete with success
+        assert!(handler.is_complete());
+        assert_eq!(handler.get_result(), TeapResult::Success);
+        assert_eq!(handler.get_identity(), Some("alice".to_string()));
+
+        // Result TLV should indicate success
+        assert_eq!(result_tlv.tlv_type, TlvType::Result as u16);
+        assert_eq!(
+            TeapResult::from_result_tlv(&result_tlv).unwrap(),
+            TeapResult::Success
+        );
+    }
+
+    #[test]
+    fn test_basic_password_auth_failure_wrong_password() {
+        let mut handler = BasicPasswordAuthHandler::new("alice".to_string(), "secret".to_string());
+
+        // Create response with wrong password
+        let mut value = Vec::new();
+        value.extend_from_slice(&5u16.to_be_bytes());
+        value.extend_from_slice(b"alice");
+        value.extend_from_slice(&5u16.to_be_bytes());
+        value.extend_from_slice(b"wrong");
+
+        let response_tlv = TeapTlv::new(TlvType::BasicPasswordAuthResp, true, value);
+
+        let result_tlv = handler.process_inner_request(&response_tlv).unwrap();
+
+        // Should be complete with failure
+        assert!(handler.is_complete());
+        assert_eq!(handler.get_result(), TeapResult::Failure);
+        assert_eq!(handler.get_identity(), Some("alice".to_string()));
+
+        assert_eq!(
+            TeapResult::from_result_tlv(&result_tlv).unwrap(),
+            TeapResult::Failure
+        );
+    }
+
+    #[test]
+    fn test_basic_password_auth_failure_wrong_username() {
+        let mut handler = BasicPasswordAuthHandler::new("alice".to_string(), "secret".to_string());
+
+        // Create response with wrong username
+        let mut value = Vec::new();
+        value.extend_from_slice(&3u16.to_be_bytes());
+        value.extend_from_slice(b"bob");
+        value.extend_from_slice(&6u16.to_be_bytes());
+        value.extend_from_slice(b"secret");
+
+        let response_tlv = TeapTlv::new(TlvType::BasicPasswordAuthResp, true, value);
+
+        let _result_tlv = handler.process_inner_request(&response_tlv).unwrap();
+
+        assert!(handler.is_complete());
+        assert_eq!(handler.get_result(), TeapResult::Failure);
+        assert_eq!(handler.get_identity(), Some("bob".to_string()));
+    }
+
+    #[test]
+    fn test_basic_password_auth_invalid_tlv_too_short() {
+        let mut handler = BasicPasswordAuthHandler::new("alice".to_string(), "secret".to_string());
+
+        // TLV with insufficient data
+        let response_tlv = TeapTlv::new(TlvType::BasicPasswordAuthResp, true, vec![0x00]);
+
+        let result = handler.process_inner_request(&response_tlv);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_basic_password_auth_invalid_username_length() {
+        let mut handler = BasicPasswordAuthHandler::new("alice".to_string(), "secret".to_string());
+
+        // Username length exceeds available data
+        let mut value = Vec::new();
+        value.extend_from_slice(&100u16.to_be_bytes()); // claims 100 bytes
+        value.extend_from_slice(b"alice"); // only 5 bytes
+
+        let response_tlv = TeapTlv::new(TlvType::BasicPasswordAuthResp, true, value);
+
+        let result = handler.process_inner_request(&response_tlv);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_basic_password_auth_empty_credentials() {
+        let mut handler = BasicPasswordAuthHandler::new("".to_string(), "".to_string());
+
+        // Empty username and password
+        let mut value = Vec::new();
+        value.extend_from_slice(&0u16.to_be_bytes());
+        value.extend_from_slice(&0u16.to_be_bytes());
+
+        let response_tlv = TeapTlv::new(TlvType::BasicPasswordAuthResp, true, value);
+
+        let _result_tlv = handler.process_inner_request(&response_tlv).unwrap();
+
+        assert!(handler.is_complete());
+        assert_eq!(handler.get_result(), TeapResult::Success);
+        assert_eq!(handler.get_identity(), Some("".to_string()));
+    }
+
+    #[test]
+    fn test_basic_password_auth_request_creation() {
+        let request_tlv = BasicPasswordAuthHandler::create_password_request();
+
+        assert_eq!(request_tlv.tlv_type, TlvType::BasicPasswordAuthReq as u16);
+        assert!(request_tlv.mandatory);
+        assert_eq!(request_tlv.value.len(), 0); // Empty prompt
+    }
+
+    #[test]
+    fn test_inner_method_handler_trait() {
+        let handler: Box<dyn InnerMethodHandler> =
+            Box::new(BasicPasswordAuthHandler::new("alice".to_string(), "secret".to_string()));
+
+        // Test trait methods
+        assert!(!handler.is_complete());
+        assert_eq!(handler.get_result(), TeapResult::Failure);
+        assert_eq!(handler.get_identity(), None);
     }
 }
