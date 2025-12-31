@@ -122,7 +122,7 @@ impl Packet {
         cursor.read_exact(&mut len_buf)?;
         let length = u16::from_be_bytes(len_buf) as usize;
 
-        if length < Self::MIN_PACKET_SIZE || length > Self::MAX_PACKET_SIZE {
+        if !(Self::MIN_PACKET_SIZE..=Self::MAX_PACKET_SIZE).contains(&length) {
             return Err(PacketError::InvalidLength(length));
         }
 
