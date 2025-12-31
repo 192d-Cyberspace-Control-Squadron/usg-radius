@@ -626,8 +626,12 @@ mod tests {
 
     #[test]
     fn test_expand_env_vars() {
-        env::set_var("TEST_SECRET", "my_secret_value");
-        env::set_var("TEST_PORT", "1234");
+        // SAFETY: This test runs in isolation and sets/removes test-specific environment variables.
+        // The variables are cleaned up at the end of the test.
+        unsafe {
+            env::set_var("TEST_SECRET", "my_secret_value");
+            env::set_var("TEST_PORT", "1234");
+        }
 
         let result = expand_env_vars("${TEST_SECRET}").unwrap();
         assert_eq!(result, "my_secret_value");
@@ -638,8 +642,11 @@ mod tests {
         let result = expand_env_vars("port=${TEST_PORT}").unwrap();
         assert_eq!(result, "port=1234");
 
-        env::remove_var("TEST_SECRET");
-        env::remove_var("TEST_PORT");
+        // SAFETY: Cleaning up test-specific environment variables
+        unsafe {
+            env::remove_var("TEST_SECRET");
+            env::remove_var("TEST_PORT");
+        }
     }
 
     #[test]

@@ -258,7 +258,11 @@ fn test_env_var_expansion() {
     use tempfile::NamedTempFile;
 
     // Set test environment variable
-    env::set_var("TEST_RADIUS_SECRET", "env_secret_value");
+    // SAFETY: This test runs in isolation and sets/removes test-specific environment variables.
+    // The variables are cleaned up at the end of the test.
+    unsafe {
+        env::set_var("TEST_RADIUS_SECRET", "env_secret_value");
+    }
 
     // Create temporary config file with env var
     let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
@@ -281,7 +285,10 @@ fn test_env_var_expansion() {
     assert_eq!(config.secret, "env_secret_value");
 
     // Clean up
-    env::remove_var("TEST_RADIUS_SECRET");
+    // SAFETY: Cleaning up test-specific environment variable
+    unsafe {
+        env::remove_var("TEST_RADIUS_SECRET");
+    }
 }
 
 #[test]
