@@ -151,6 +151,13 @@ pub struct Config {
     #[serde(default)]
     pub accounting_database_url: Option<String>,
 
+    /// Accounting data retention period in days (optional)
+    /// When specified, accounting records older than this will be deleted.
+    /// Applies to both file-based and database accounting.
+    /// Example: 90 (keep 90 days of history)
+    #[serde(default)]
+    pub accounting_retention_days: Option<u32>,
+
     /// Strict RFC 2865 compliance mode (default: true)
     /// When enabled, enforces strict validation of attribute values and types.
     /// Set to false for lenient mode if compatibility with non-compliant clients is needed.
@@ -219,6 +226,7 @@ impl Default for Config {
             audit_log_path: None,
             accounting_log_path: None,
             accounting_database_url: None,
+            accounting_retention_days: None,
             strict_rfc_compliance: true,
             request_cache_ttl: None,
             request_cache_max_entries: None,
@@ -385,6 +393,7 @@ impl Config {
             accounting_database_url: Some(
                 "postgresql://radius:password@localhost/radius".to_string(),
             ),
+            accounting_retention_days: Some(90),
             strict_rfc_compliance: true,
             request_cache_ttl: Some(60),
             request_cache_max_entries: Some(10000),

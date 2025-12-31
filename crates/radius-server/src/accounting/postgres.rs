@@ -120,6 +120,45 @@ impl PostgresAccountingHandler {
         Ok(())
     }
 
+    /// Clean up old accounting data based on retention period
+    ///
+    /// # Arguments
+    /// * `retention_days` - Number of days to retain data (older data will be deleted)
+    ///
+    /// # Returns
+    /// Tuple of (sessions_deleted, events_deleted)
+    pub async fn cleanup_old_data(&self, retention_days: u32) -> Result<(u64, u64), sqlx::Error> {
+        let cutoff_timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64
+            - (retention_days as i64 * 86400); // days to seconds
+
+        // Delete old completed sessions (not active, older than retention period)
+        let sessions_result = sqlx::query(
+            r#"
+            DELETE FROM radius_sessions
+            WHERE is_active = false AND stop_time < $1
+            "#,
+        )
+        .bind(cutoff_timestamp)
+        .execute(&self.pool)
+        .await?;
+
+        // Delete old accounting events (older than retention period)
+        let events_result = sqlx::query(
+            r#"
+            DELETE FROM radius_accounting_events
+            WHERE timestamp < $1
+            "#,
+        )
+        .bind(cutoff_timestamp)
+        .execute(&self.pool)
+        .await?;
+
+        Ok((sessions_result.rows_affected(), events_result.rows_affected()))
+    }
+
     /// Log an accounting event to the events table
     async fn log_event(
         &self,
