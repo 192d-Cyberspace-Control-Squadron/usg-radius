@@ -75,6 +75,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 ### Security Enhancements
 
 #### Client Validation & Authorization ✅ COMPLETED
+
 - [x] Implement client IP address validation
 - [x] Per-client shared secrets
 - [x] Client database with enable/disable flags
@@ -84,6 +85,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 **Status**: ✅ Complete (except NAS-Identifier)
 
 #### Request Security ✅ COMPLETED
+
 - [x] Duplicate request detection (cache recent requests)
 - [x] Identifier tracking and validation
 - [x] Request timeout handling (via cache TTL)
@@ -93,6 +95,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 **Status**: ✅ Complete
 
 #### Attribute Validation ✅ COMPLETED
+
 - [x] Required attribute enforcement (User-Name must be present)
 - [x] Enumerated value validation (Service-Type 1-13)
 - [x] Attribute type-specific validation
@@ -104,6 +107,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 ### Operational Improvements
 
 #### Logging & Monitoring ✅ COMPLETE
+
 - [x] Replace println! with proper logging (tracing crate)
 - [x] Structured logging with levels (trace, debug, info, warn, error)
 - [x] Configurable log levels via config file or environment variable
@@ -114,6 +118,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 **Status**: ✅ Complete (log rotation delegated to system tools like logrotate)
 
 #### Rate Limiting & DoS Protection ✅ COMPLETED
+
 - [x] Per-client request rate limiting
 - [x] Global request rate limiting
 - [x] Configurable limits (per-client and global RPS/burst)
@@ -123,6 +128,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 **Status**: ✅ Core features complete
 
 ### Configuration
+
 - [x] Validate client CIDR networks
 - [x] Environment variable support for secrets
 - [x] Configuration file validation on startup
@@ -203,6 +209,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 **Priority**: HIGH
 
 ### Accounting Protocol
+
 - [ ] Accounting-Request (Code 4) handling
 - [ ] Accounting-Response (Code 5) generation
 - [ ] Acct-Status-Type validation (Start, Stop, Interim-Update)
@@ -211,6 +218,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 **Estimated Effort**: 2 weeks
 
 ### Session Tracking
+
 - [ ] Session database (in-memory initially)
 - [ ] Session start/stop tracking
 - [ ] Interim updates
@@ -220,6 +228,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 **Estimated Effort**: 2 weeks
 
 ### Accounting Storage
+
 - [ ] Pluggable accounting backend trait
 - [ ] File-based accounting logs
 - [ ] Database accounting (PostgreSQL, MySQL)
@@ -228,6 +237,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 **Estimated Effort**: 2 weeks
 
 ### Usage Metrics
+
 - [ ] Bytes in/out tracking
 - [ ] Packets in/out tracking
 - [ ] Session duration tracking
@@ -245,6 +255,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 **Priority**: MEDIUM-HIGH
 
 ### EAP Framework
+
 - [ ] EAP-Message attribute (Type 79) handling
 - [ ] EAP state machine
 - [ ] EAP session management
@@ -253,15 +264,18 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 **Estimated Effort**: 3 weeks
 
 ### EAP Methods
+
 - [ ] EAP-MD5 (basic, for testing)
 - [ ] EAP-TLS (certificate-based)
 - [ ] EAP-TTLS (tunneled TLS)
+- [ ] EAP-TEAP (certificate-based)
 - [ ] PEAP (Protected EAP)
 - [ ] EAP-MSCHAPv2
 
 **Estimated Effort**: 6 weeks (1-2 weeks per method)
 
 ### Certificate Management
+
 - [ ] Certificate validation
 - [ ] CA certificate chain verification
 - [ ] Certificate revocation (CRL/OCSP)
@@ -381,6 +395,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 **Priority**: MEDIUM
 
 ### Proxy Core
+
 - [ ] Proxy-State handling
 - [ ] Request forwarding
 - [ ] Response routing
@@ -390,6 +405,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 **Estimated Effort**: 3 weeks
 
 ### Routing
+
 - [ ] Realm-based routing (@domain)
 - [ ] Attribute-based routing
 - [ ] Load balancing across servers
@@ -399,6 +415,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 **Estimated Effort**: 2 weeks
 
 ### Proxy Pools
+
 - [ ] Server pool configuration
 - [ ] Pool health monitoring
 - [ ] Automatic server removal/addition
@@ -416,6 +433,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 **Priority**: MEDIUM
 
 ### TLS Support (RFC 6614)
+
 - [ ] TLS 1.2+ support
 - [ ] Certificate-based authentication
 - [ ] RADIUS over TLS (RadSec)
@@ -425,6 +443,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 **Estimated Effort**: 4 weeks
 
 ### Certificate Management
+
 - [ ] Dynamic certificate loading
 - [ ] Certificate rotation
 - [ ] Mutual TLS authentication
@@ -442,6 +461,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 **Priority**: LOW-MEDIUM
 
 ### CoA Support (RFC 5176)
+
 - [ ] CoA-Request packet handling
 - [ ] CoA-ACK/NAK generation
 - [ ] Disconnect-Request handling
@@ -451,6 +471,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 **Estimated Effort**: 3 weeks
 
 ### Dynamic Authorization
+
 - [ ] Session attribute updates
 - [ ] QoS changes
 - [ ] Bandwidth modification
@@ -468,6 +489,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 **Priority**: HIGH
 
 ### Final Hardening
+
 - [ ] Security audit
 - [ ] Performance testing at scale
 - [ ] Stress testing
@@ -477,6 +499,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 **Estimated Effort**: 4 weeks
 
 ### Documentation
+
 - [ ] Complete API documentation
 - [ ] Deployment guides
 - [ ] Integration examples (Cisco, Juniper, etc.)
@@ -486,6 +509,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 **Estimated Effort**: 2 weeks
 
 ### Packaging
+
 - [ ] Debian/Ubuntu packages
 - [ ] RPM packages (RHEL/CentOS)
 - [ ] Docker images
@@ -495,6 +519,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 **Estimated Effort**: 2 weeks
 
 ### Compliance
+
 - [ ] Full RFC 2865 compliance
 - [ ] Full RFC 2866 compliance
 - [ ] Full RFC 2869 compliance
@@ -510,6 +535,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 ## Future Considerations (Post 1.0)
 
 ### Additional Crates
+
 - [ ] `radius-client` - RADIUS client library
 - [ ] `radius-proxy` - Standalone proxy server
 - [ ] `radius-tools` - CLI tools (radtest, radclient, etc.)
@@ -531,6 +557,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 - [ ] Geographic distribution
 
 ### Integration
+
 - [ ] Kubernetes operator
 - [ ] Terraform provider
 - [ ] Ansible role
@@ -541,18 +568,21 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 ## Development Priorities
 
 ### Critical Path (Must Have for Production)
+
 1. v0.2.0 - Security & Hardening
 2. v0.3.0 - Authentication Methods
 3. v0.4.0 - Accounting
 
 ### Important (Should Have)
-4. v0.5.0 - EAP Support
-5. v0.6.0 - Database Integration
+
+1. v0.5.0 - EAP Support
+2. v0.6.0 - Database Integration
 
 ### Nice to Have
-6. v0.7.0 - Proxy
-7. v0.8.0 - RadSec
-8. v0.9.0 - CoA
+
+1. v0.7.0 - Proxy
+2. v0.8.0 - RadSec
+3. v0.9.0 - CoA
 
 ---
 
@@ -561,6 +591,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 We welcome community contributions! Priority areas:
 
 **High Priority**:
+
 - Client validation implementation
 - Rate limiting
 - CHAP support
@@ -568,12 +599,14 @@ We welcome community contributions! Priority areas:
 - Accounting support
 
 **Medium Priority**:
+
 - Database backends
 - LDAP integration
 - EAP methods
 - Performance optimizations
 
 **Documentation**:
+
 - Deployment guides
 - Integration examples
 - Troubleshooting guides
@@ -603,13 +636,15 @@ We welcome community contributions! Priority areas:
 ## Getting Involved
 
 ### How to Contribute
+
 1. Check the [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for known gaps
 2. Look for issues labeled "good first issue" or "help wanted"
 3. Read [CONTRIBUTING.md](CONTRIBUTING.md)
 4. Submit a pull request!
 
 ### Contact
-- **GitHub Issues**: https://github.com/192d-Cyberspace-Control-Squadron/usg-radius/issues
+
+- **GitHub Issues**: <https://github.com/192d-Cyberspace-Control-Squadron/usg-radius/issues>
 - **Author**: John Edward Willman V <john.willman.1@us.af.mil>
 
 ---

@@ -36,6 +36,7 @@
 //! let bytes = packet.encode().unwrap();
 //! ```
 
+pub mod accounting;
 pub mod attributes;
 pub mod auth;
 pub mod chap;
@@ -43,6 +44,9 @@ pub mod message_auth;
 pub mod packet;
 pub mod validation;
 
+pub use accounting::{
+    AcctAuthentic, AcctStatusType, AcctTerminateCause, AccountingError,
+};
 pub use attributes::{Attribute, AttributeType};
 pub use auth::{
     calculate_response_authenticator, decrypt_user_password, encrypt_user_password,
