@@ -59,7 +59,6 @@ This document outlines the development roadmap for the USG RADIUS project, organ
 ### Known Limitations
 
 - ⚠️ No EAP support (planned for v0.5.0)
-- ⚠️ No accounting support (planned for v0.4.0)
 - ⚠️ No hot reload (requires server restart for config changes)
 
 See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
@@ -367,11 +366,11 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 - [x] EAP type enumeration (Identity, Notification, NAK, MD5, TLS, TTLS, PEAP, MSCHAPv2, TEAP)
 - [x] EAP state machine with authentication flow states
 - [x] EAP session management with timeout and cleanup
+- [x] EAP-Message RADIUS integration helpers (RFC 3579)
 - [ ] EAP packet fragmentation (RFC 3748)
-- [ ] EAP-Message RADIUS integration helpers
 
-**Status**: ✅ Core packet handling and session management complete (Dec 2024)
-**Estimated Effort Remaining**: 1 week
+**Status**: ✅ Core packet handling, session management, and RADIUS integration complete (Dec 2024)
+**Estimated Effort Remaining**: < 1 week
 
 ### EAP Methods
 
@@ -424,6 +423,14 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
   - Session statistics and monitoring
   - 25 dedicated test suites for state machine and sessions
 
+- **EAP-Message RADIUS Integration** (RFC 3579):
+  - `eap_to_radius_attributes()` - Convert EAP packet to RADIUS EAP-Message attribute(s)
+  - `eap_from_radius_packet()` - Extract and reassemble EAP packet from RADIUS packet
+  - `add_eap_to_radius_packet()` - Convenience function for adding EAP to RADIUS
+  - Automatic fragmentation across multiple attributes (253 byte chunks)
+  - Reassembly of fragmented EAP packets
+  - 8 comprehensive integration tests (single/multi-attribute, round-trip, mixed attributes)
+
 - **EAP-MD5 Implementation** (radius-proto/eap/eap_md5):
   - Challenge-response authentication
   - MD5 hash computation
@@ -432,7 +439,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
   - Authentication verification
   - 4 dedicated test suites including full authentication flow
 
-**Total v0.5.0 Actual Effort**: ~2 weeks so far (EAP framework + EAP-MD5 + state machine + sessions)
+**Total v0.5.0 Actual Effort**: ~2 weeks so far (EAP framework + EAP-MD5 + state machine + sessions + RADIUS integration)
 **Total v0.5.0 Estimated Remaining**: ~9 weeks
 
 ---
@@ -451,7 +458,6 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 - [x] Bcrypt password hashing
 - [x] Custom SQL queries
 - [x] PostgreSQL schema and migration examples
-- [ ] MySQL/MariaDB authentication backend
 - [ ] Additional password hashing algorithms (argon2, pbkdf2)
 
 **Status**: ✅ PostgreSQL complete, MySQL pending
@@ -513,7 +519,6 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 ### Additional Backend Support
 
-- [ ] MySQL/MariaDB authentication backend
 - [ ] Redis caching backend
 - [ ] REST API authentication backend
 - [ ] Multi-backend fallback chains
@@ -769,9 +774,9 @@ We welcome community contributions! Priority areas:
 | Version | Quarter | Focus | Weeks |
 | --------- | --------- | ------- | ------- |
 | v0.1.0 | Now | Core Protocol | ✅ Done |
-| v0.2.0 | Q1 2025 | Security & Production | 6-8 |
-| v0.3.0 | Q2 2025 | Auth Methods | 6 |
-| v0.4.0 | Q3 2025 | Accounting | 7 |
+| v0.2.0 | Q1 2025 | Security & Production | ✅ Done |
+| v0.3.0 | Q2 2025 | Auth Methods | ✅ Done |
+| v0.4.0 | Q3 2025 | Accounting | ✅ Done |
 | v0.5.0 | Q4 2025 | EAP Support | 11 |
 | v0.6.0 | Q1 2026 | Enterprise Features | 11 |
 | v0.7.0 | Q2 2026 | Proxy | 7 |

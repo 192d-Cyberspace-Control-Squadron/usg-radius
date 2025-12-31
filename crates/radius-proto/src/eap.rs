@@ -15,6 +15,8 @@
 //! +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 //! ```
 
+use crate::attributes::{Attribute, AttributeType};
+use crate::packet::Packet;
 use thiserror::Error;
 
 /// EAP packet code (first byte of EAP packet)
@@ -295,6 +297,9 @@ pub enum EapError {
 
     #[error("Invalid response format")]
     InvalidResponseFormat,
+
+    #[error("Encoding error: {0}")]
+    EncodingError(String),
 }
 
 /// EAP-MD5 Challenge implementation (RFC 3748 Section 5.4)
@@ -768,6 +773,132 @@ pub struct SessionStats {
     pub success: usize,
     pub failure: usize,
     pub timeout: usize,
+}
+
+// =============================================================================
+// RADIUS Integration Helpers (RFC 3579)
+// =============================================================================
+
+/// Convert an EAP packet to RADIUS EAP-Message attribute(s)
+///
+/// Per RFC 3579, EAP packets are encapsulated in EAP-Message attributes (Type 79).
+/// If the EAP packet is larger than 253 bytes, it MUST be split across multiple
+/// EAP-Message attributes.
+///
+/// # Arguments
+/// * `eap_packet` - The EAP packet to encapsulate
+///
+/// # Returns
+/// Vector of EAP-Message attributes. May contain multiple attributes if the
+/// EAP packet exceeds the maximum attribute value length (253 bytes).
+///
+/// # Example
+/// ```
+/// use radius_proto::eap::{EapPacket, EapCode, eap_to_radius_attributes};
+///
+/// let eap = EapPacket::new(EapCode::Request, 1, None, vec![]);
+/// let attributes = eap_to_radius_attributes(&eap).unwrap();
+/// assert_eq!(attributes.len(), 1);
+/// assert_eq!(attributes[0].attr_type, 79); // EAP-Message
+/// ```
+pub fn eap_to_radius_attributes(eap_packet: &EapPacket) -> Result<Vec<Attribute>, EapError> {
+    let eap_bytes = eap_packet.to_bytes();
+    let mut attributes = Vec::new();
+
+    // Maximum EAP-Message attribute value length is 253 bytes
+    const MAX_ATTR_VALUE_LEN: usize = Attribute::MAX_VALUE_LENGTH;
+
+    // Split EAP packet into chunks if necessary
+    let mut offset = 0;
+    while offset < eap_bytes.len() {
+        let chunk_len = std::cmp::min(MAX_ATTR_VALUE_LEN, eap_bytes.len() - offset);
+        let chunk = eap_bytes[offset..offset + chunk_len].to_vec();
+
+        let attr = Attribute::new(AttributeType::EapMessage as u8, chunk)
+            .map_err(|e| EapError::EncodingError(format!("Failed to create EAP-Message attribute: {}", e)))?;
+
+        attributes.push(attr);
+        offset += chunk_len;
+    }
+
+    Ok(attributes)
+}
+
+/// Extract EAP packet from RADIUS packet
+///
+/// Per RFC 3579, EAP packets may be fragmented across multiple EAP-Message
+/// attributes. This function reassembles all EAP-Message attributes into a
+/// single EAP packet.
+///
+/// # Arguments
+/// * `radius_packet` - The RADIUS packet containing EAP-Message attribute(s)
+///
+/// # Returns
+/// The reassembled EAP packet, or None if no EAP-Message attributes found
+///
+/// # Example
+/// ```
+/// use radius_proto::eap::eap_from_radius_packet;
+/// use radius_proto::{Packet, Code, Attribute};
+///
+/// let mut packet = Packet::new(Code::AccessRequest, 1, [0u8; 16]);
+/// // ... add EAP-Message attributes ...
+///
+/// if let Some(eap) = eap_from_radius_packet(&packet).unwrap() {
+///     println!("EAP Code: {:?}", eap.code);
+/// }
+/// ```
+pub fn eap_from_radius_packet(radius_packet: &Packet) -> Result<Option<EapPacket>, EapError> {
+    // Collect all EAP-Message attributes (Type 79)
+    let eap_message_type = AttributeType::EapMessage as u8;
+    let mut eap_bytes = Vec::new();
+
+    for attr in &radius_packet.attributes {
+        if attr.attr_type == eap_message_type {
+            eap_bytes.extend_from_slice(&attr.value);
+        }
+    }
+
+    // No EAP-Message attributes found
+    if eap_bytes.is_empty() {
+        return Ok(None);
+    }
+
+    // Decode the reassembled EAP packet
+    let eap_packet = EapPacket::from_bytes(&eap_bytes)?;
+    Ok(Some(eap_packet))
+}
+
+/// Add an EAP packet to a RADIUS packet as EAP-Message attribute(s)
+///
+/// This is a convenience function that combines `eap_to_radius_attributes`
+/// and adding the attributes to a RADIUS packet.
+///
+/// # Arguments
+/// * `radius_packet` - The RADIUS packet to add EAP-Message attributes to
+/// * `eap_packet` - The EAP packet to encapsulate
+///
+/// # Example
+/// ```
+/// use radius_proto::{Packet, Code};
+/// use radius_proto::eap::{EapPacket, EapCode, add_eap_to_radius_packet};
+///
+/// let mut radius = Packet::new(Code::AccessChallenge, 1, [0u8; 16]);
+/// let eap = EapPacket::new(EapCode::Request, 1, None, vec![]);
+///
+/// add_eap_to_radius_packet(&mut radius, &eap).unwrap();
+/// ```
+pub fn add_eap_to_radius_packet(
+    radius_packet: &mut Packet,
+    eap_packet: &EapPacket,
+) -> Result<(), EapError> {
+    let eap_attributes = eap_to_radius_attributes(eap_packet)?;
+
+    for attr in eap_attributes {
+        radius_packet.add_attribute(attr);
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1389,5 +1520,200 @@ mod tests {
         assert_eq!(session.identity, Some("alice@example.com".to_string()));
         assert_eq!(session.eap_method, Some(EapType::Md5Challenge));
         assert!(session.state.is_terminal());
+    }
+
+    // =========================================================================
+    // RADIUS Integration Helper Tests
+    // =========================================================================
+
+    #[test]
+    fn test_eap_to_radius_attributes_small_packet() {
+        // Small EAP packet that fits in one attribute
+        let eap = EapPacket::new(EapCode::Request, 1, Some(EapType::Identity), vec![]);
+        let attributes = eap_to_radius_attributes(&eap).unwrap();
+
+        assert_eq!(attributes.len(), 1);
+        assert_eq!(attributes[0].attr_type, AttributeType::EapMessage as u8);
+
+        // Verify the attribute contains the encoded EAP packet
+        let expected_eap_bytes = eap.to_bytes();
+        assert_eq!(attributes[0].value, expected_eap_bytes);
+    }
+
+    #[test]
+    fn test_eap_to_radius_attributes_large_packet() {
+        // Create a large EAP packet that requires multiple attributes
+        // Each EAP-Message attribute can hold max 253 bytes
+        let large_data = vec![0x42; 500]; // 500 bytes of data
+        let eap = EapPacket::new(EapCode::Request, 1, Some(EapType::Md5Challenge), large_data);
+        let attributes = eap_to_radius_attributes(&eap).unwrap();
+
+        // Should be split across multiple attributes
+        assert!(attributes.len() > 1);
+
+        // All attributes should be EAP-Message type
+        for attr in &attributes {
+            assert_eq!(attr.attr_type, AttributeType::EapMessage as u8);
+        }
+
+        // Reassemble and verify
+        let mut reassembled = Vec::new();
+        for attr in &attributes {
+            reassembled.extend_from_slice(&attr.value);
+        }
+
+        let expected_eap_bytes = eap.to_bytes();
+        assert_eq!(reassembled, expected_eap_bytes);
+    }
+
+    #[test]
+    fn test_eap_from_radius_packet_single_attribute() {
+        use crate::packet::Code;
+
+        let eap = EapPacket::new(EapCode::Response, 5, Some(EapType::Identity), b"alice".to_vec());
+        let eap_bytes = eap.to_bytes();
+
+        // Create RADIUS packet with EAP-Message attribute
+        let mut radius = Packet::new(Code::AccessRequest, 1, [0u8; 16]);
+        let eap_attr = Attribute::new(AttributeType::EapMessage as u8, eap_bytes.clone()).unwrap();
+        radius.add_attribute(eap_attr);
+
+        // Extract EAP packet
+        let extracted = eap_from_radius_packet(&radius).unwrap();
+        assert!(extracted.is_some());
+
+        let extracted_eap = extracted.unwrap();
+        assert_eq!(extracted_eap.code, EapCode::Response);
+        assert_eq!(extracted_eap.identifier, 5);
+        assert_eq!(extracted_eap.eap_type, Some(EapType::Identity));
+        assert_eq!(extracted_eap.data, b"alice");
+    }
+
+    #[test]
+    fn test_eap_from_radius_packet_multiple_attributes() {
+        use crate::packet::Code;
+
+        // Create a large EAP packet
+        let large_data = vec![0xAA; 400];
+        let eap = EapPacket::new(EapCode::Request, 10, Some(EapType::Md5Challenge), large_data.clone());
+
+        // Convert to RADIUS attributes (will be split)
+        let eap_attributes = eap_to_radius_attributes(&eap).unwrap();
+        assert!(eap_attributes.len() > 1);
+
+        // Create RADIUS packet with fragmented EAP-Message attributes
+        let mut radius = Packet::new(Code::AccessChallenge, 10, [0u8; 16]);
+        for attr in eap_attributes {
+            radius.add_attribute(attr);
+        }
+
+        // Extract and verify
+        let extracted = eap_from_radius_packet(&radius).unwrap();
+        assert!(extracted.is_some());
+
+        let extracted_eap = extracted.unwrap();
+        assert_eq!(extracted_eap.code, EapCode::Request);
+        assert_eq!(extracted_eap.identifier, 10);
+        assert_eq!(extracted_eap.eap_type, Some(EapType::Md5Challenge));
+        assert_eq!(extracted_eap.data, large_data);
+    }
+
+    #[test]
+    fn test_eap_from_radius_packet_no_eap_message() {
+        use crate::packet::Code;
+
+        // RADIUS packet without EAP-Message attributes
+        let mut radius = Packet::new(Code::AccessRequest, 1, [0u8; 16]);
+        radius.add_attribute(Attribute::string(AttributeType::UserName as u8, "alice").unwrap());
+
+        let extracted = eap_from_radius_packet(&radius).unwrap();
+        assert!(extracted.is_none());
+    }
+
+    #[test]
+    fn test_add_eap_to_radius_packet() {
+        use crate::packet::Code;
+
+        let mut radius = Packet::new(Code::AccessChallenge, 2, [0u8; 16]);
+        let eap = EapPacket::new(EapCode::Request, 2, Some(EapType::Md5Challenge), vec![1, 2, 3, 4]);
+
+        // Initially no attributes
+        assert_eq!(radius.attributes.len(), 0);
+
+        // Add EAP packet
+        add_eap_to_radius_packet(&mut radius, &eap).unwrap();
+
+        // Should have EAP-Message attribute(s)
+        assert!(radius.attributes.len() > 0);
+
+        // All added attributes should be EAP-Message
+        for attr in &radius.attributes {
+            assert_eq!(attr.attr_type, AttributeType::EapMessage as u8);
+        }
+
+        // Verify we can extract it back
+        let extracted = eap_from_radius_packet(&radius).unwrap().unwrap();
+        assert_eq!(extracted.code, eap.code);
+        assert_eq!(extracted.identifier, eap.identifier);
+        assert_eq!(extracted.eap_type, eap.eap_type);
+        assert_eq!(extracted.data, eap.data);
+    }
+
+    #[test]
+    fn test_radius_integration_round_trip() {
+        use crate::packet::Code;
+
+        // Test various EAP packet types
+        let test_cases = vec![
+            EapPacket::new(EapCode::Request, 1, Some(EapType::Identity), vec![]),
+            EapPacket::new(EapCode::Response, 2, Some(EapType::Identity), b"user@example.com".to_vec()),
+            EapPacket::new(EapCode::Request, 3, Some(EapType::Md5Challenge), vec![0x11; 16]),
+            EapPacket::new(EapCode::Success, 4, None, vec![]),
+            EapPacket::new(EapCode::Failure, 5, None, vec![]),
+        ];
+
+        for original_eap in test_cases {
+            let mut radius = Packet::new(Code::AccessRequest, 1, [0u8; 16]);
+
+            // Add EAP to RADIUS
+            add_eap_to_radius_packet(&mut radius, &original_eap).unwrap();
+
+            // Extract EAP from RADIUS
+            let extracted_eap = eap_from_radius_packet(&radius).unwrap().unwrap();
+
+            // Verify round-trip
+            assert_eq!(extracted_eap.code, original_eap.code);
+            assert_eq!(extracted_eap.identifier, original_eap.identifier);
+            assert_eq!(extracted_eap.eap_type, original_eap.eap_type);
+            assert_eq!(extracted_eap.data, original_eap.data);
+        }
+    }
+
+    #[test]
+    fn test_radius_integration_with_other_attributes() {
+        use crate::packet::Code;
+
+        // RADIUS packet with both EAP-Message and other attributes
+        let mut radius = Packet::new(Code::AccessRequest, 7, [0u8; 16]);
+
+        // Add non-EAP attributes
+        radius.add_attribute(Attribute::string(AttributeType::UserName as u8, "bob").unwrap());
+        radius.add_attribute(Attribute::string(AttributeType::NasIdentifier as u8, "nas1").unwrap());
+
+        // Add EAP packet
+        let eap = EapPacket::new(EapCode::Response, 7, Some(EapType::Identity), b"bob@example.com".to_vec());
+        add_eap_to_radius_packet(&mut radius, &eap).unwrap();
+
+        // Add more attributes after EAP
+        radius.add_attribute(Attribute::integer(AttributeType::NasPort as u8, 1234).unwrap());
+
+        // Should have all attributes (2 before + EAP + 1 after = at least 4)
+        assert!(radius.attributes.len() >= 4);
+
+        // Should still be able to extract EAP correctly
+        let extracted = eap_from_radius_packet(&radius).unwrap().unwrap();
+        assert_eq!(extracted.code, EapCode::Response);
+        assert_eq!(extracted.identifier, 7);
+        assert_eq!(extracted.data, b"bob@example.com");
     }
 }

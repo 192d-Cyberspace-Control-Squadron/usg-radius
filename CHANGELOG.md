@@ -39,6 +39,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Session statistics and monitoring (SessionStats)
   - 25 dedicated test suites for state machine and sessions
 
+- **EAP-Message RADIUS Integration** (RFC 3579):
+  - `eap_to_radius_attributes()` - Convert EAP packet to RADIUS EAP-Message attribute(s)
+  - `eap_from_radius_packet()` - Extract and reassemble EAP packet from RADIUS packet
+  - `add_eap_to_radius_packet()` - Convenience function for adding EAP to RADIUS
+  - Automatic fragmentation support (splits large EAP packets across 253-byte chunks)
+  - Automatic reassembly of fragmented EAP packets from multiple attributes
+  - Full bidirectional conversion between EAP and RADIUS formats
+  - 8 comprehensive integration tests covering:
+    - Single-attribute EAP messages
+    - Multi-attribute fragmented messages
+    - Round-trip encoding/decoding
+    - Mixed RADIUS packets (EAP + other attributes)
+
 - **EAP-MD5 Challenge Implementation**:
   - Challenge generation and parsing
   - Response computation and verification
