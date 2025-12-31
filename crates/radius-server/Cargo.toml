@@ -23,6 +23,7 @@ ipnetwork.workspace = true
 dashmap.workspace = true
 chrono.workspace = true
 clap.workspace = true
+ldap3.workspace = true
 
 [dev-dependencies]
 hex.workspace = true

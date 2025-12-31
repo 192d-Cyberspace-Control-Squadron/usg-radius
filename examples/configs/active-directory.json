@@ -1,0 +1,50 @@
+{
+  "listen_address": "::",
+  "listen_port": 1812,
+  "secret": "${RADIUS_SECRET}",
+  "strict_rfc_compliance": true,
+
+  "log_level": "info",
+  "audit_log_path": "/var/log/radius/audit.log",
+
+  "clients": [
+    {
+      "name": "Wireless Access Points",
+      "address": "192.168.10.0/24",
+      "secret": "${AP_SECRET}",
+      "enabled": true
+    },
+    {
+      "name": "Network Switches",
+      "address": "192.168.20.0/24",
+      "secret": "${SWITCH_SECRET}",
+      "enabled": true
+    },
+    {
+      "name": "VPN Concentrator",
+      "address": "10.1.1.1",
+      "secret": "${VPN_SECRET}",
+      "enabled": true
+    }
+  ],
+
+  "ldap": {
+    "url": "ldaps://dc1.corp.example.com:636",
+    "base_dn": "dc=corp,dc=example,dc=com",
+    "bind_dn": "CN=RADIUS Service,OU=Service Accounts,DC=corp,DC=example,DC=com",
+    "bind_password": "${AD_BIND_PASSWORD}",
+    "search_filter": "(sAMAccountName={username})",
+    "attributes": ["dn", "cn", "sAMAccountName", "memberOf", "userPrincipalName"],
+    "timeout": 15,
+    "starttls": false,
+    "verify_tls": true
+  },
+
+  "request_cache_ttl": 300,
+  "request_cache_max_entries": 50000,
+
+  "rate_limit_per_client_rps": 500,
+  "rate_limit_per_client_burst": 1000,
+  "rate_limit_global_rps": 5000,
+  "rate_limit_global_burst": 10000
+}

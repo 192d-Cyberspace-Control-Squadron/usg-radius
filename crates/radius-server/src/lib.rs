@@ -46,11 +46,13 @@
 pub mod audit;
 pub mod cache;
 pub mod config;
+pub mod ldap_auth;
 pub mod ratelimit;
 pub mod server;
 
 pub use audit::{AuditEntry, AuditEventType, AuditLogger};
 pub use cache::{RequestCache, RequestFingerprint};
 pub use config::{Client, Config, ConfigError, User};
+pub use ldap_auth::{LdapAuthHandler, LdapConfig, LdapError};
 pub use ratelimit::{RateLimitConfig, RateLimiter};
 pub use server::{AuthHandler, RadiusServer, ServerConfig, ServerError, SimpleAuthHandler};

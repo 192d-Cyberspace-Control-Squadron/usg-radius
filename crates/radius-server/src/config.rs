@@ -165,6 +165,10 @@ pub struct Config {
     /// Rate limit: global burst capacity (default: 2000)
     #[serde(default)]
     pub rate_limit_global_burst: Option<u32>,
+
+    /// LDAP configuration for LDAP/AD authentication
+    #[serde(default)]
+    pub ldap: Option<crate::ldap_auth::LdapConfig>,
 }
 
 fn default_listen_address() -> String {
@@ -201,6 +205,7 @@ impl Default for Config {
             rate_limit_per_client_burst: None,
             rate_limit_global_rps: None,
             rate_limit_global_burst: None,
+            ldap: None,
         }
     }
 }
@@ -359,6 +364,7 @@ impl Config {
             rate_limit_per_client_burst: Some(200),
             rate_limit_global_rps: Some(1000),
             rate_limit_global_burst: Some(2000),
+            ldap: None,
         }
     }
 }
