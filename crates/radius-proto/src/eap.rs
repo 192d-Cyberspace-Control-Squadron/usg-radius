@@ -1387,29 +1387,79 @@ pub mod eap_tls {
 
         /// Extract keys after successful handshake
         ///
-        /// This extracts the TLS master secret and random values needed
-        /// for MSK/EMSK derivation per RFC 5216.
+        /// Uses RFC 5705 Keying Material Exporter to derive MSK and EMSK
+        /// directly from the TLS connection per RFC 5216 Section 2.3.
         ///
-        /// Note: rustls doesn't expose master_secret directly, so this is
-        /// a placeholder for the actual implementation which would need
-        /// to use rustls internals or a custom crypto provider.
+        /// This is the production implementation using rustls 0.23's built-in
+        /// `export_keying_material()` method, which implements RFC 5705
+        /// "Keying Material Exporters for Transport Layer Security (TLS)".
+        ///
+        /// # RFC 5216 Compliance
+        ///
+        /// Per RFC 5216 Section 2.3, EAP-TLS derives the MSK and EMSK using:
+        /// - **Label**: "client EAP encryption" (22 bytes, ASCII)
+        /// - **Context**: None (empty context value)
+        /// - **Length**: 128 bytes (64 MSK + 64 EMSK)
+        ///
+        /// The RFC 5705 exporter provides cryptographically secure key derivation
+        /// that binds the keys to the specific TLS session, preventing key reuse
+        /// across different sessions or connections.
+        ///
+        /// # Security Notes
+        ///
+        /// - MSK is used for deriving WPA/WPA2 PTK (Pairwise Transient Key)
+        /// - EMSK is reserved for future use (e.g., fast re-authentication)
+        /// - Keys are derived from TLS master secret + session parameters
+        /// - Unique per TLS session (bound to handshake parameters)
+        ///
+        /// # Returns
+        ///
+        /// - `Ok(())` - Keys successfully extracted and stored in context
+        /// - `Err(EapError::InvalidState)` - Handshake not complete or no connection
+        /// - `Err(EapError::TlsError)` - Failed to export keying material
+        ///
+        /// # Example
+        ///
+        /// ```no_run
+        /// # use radius_proto::eap::eap_tls::EapTlsServer;
+        /// # use std::sync::Arc;
+        /// # let config = Arc::new(rustls::ServerConfig::builder().with_no_client_auth().with_cert_resolver(Arc::new(rustls::server::ResolvesServerCertUsingSni::new())));
+        /// # let mut server = EapTlsServer::new(config);
+        /// // After TLS handshake completes...
+        /// server.extract_keys()?;
+        /// let msk = server.get_msk().expect("MSK should be available");
+        /// let emsk = server.get_emsk().expect("EMSK should be available");
+        /// # Ok::<(), radius_proto::eap::EapError>(())
+        /// ```
         pub fn extract_keys(&mut self) -> Result<(), EapError> {
             if !self.is_handshake_complete() {
                 return Err(EapError::InvalidState);
             }
 
-            // TODO: Extract actual values from rustls
-            // This requires accessing rustls internals or using a custom
-            // crypto provider that exposes these values.
+            let conn = self.connection.as_ref()
+                .ok_or(EapError::InvalidState)?;
 
-            // For now, set placeholder values to demonstrate the API
-            // In production, these would be extracted from the TLS connection
-            self.context.client_random = Some([0u8; 32]);
-            self.context.server_random = Some([0u8; 32]);
-            self.context.master_secret = Some(vec![0u8; 48]);
+            // RFC 5216 Section 2.3: Use RFC 5705 keying material exporter
+            // Label: "client EAP encryption"
+            // Context: None (empty)
+            // Output: 128 bytes (64 MSK + 64 EMSK)
+            let label = b"client EAP encryption";
+            let mut keying_material = vec![0u8; 128];
 
-            // Derive MSK and EMSK
-            self.context.derive_session_keys()?;
+            conn.export_keying_material(
+                keying_material.as_mut_slice(),
+                label,
+                None // No context value per RFC 5216
+            ).map_err(|e| EapError::TlsError(format!("Failed to export keying material: {:?}", e)))?;
+
+            // Split into MSK (first 64 bytes) and EMSK (last 64 bytes)
+            let msk: [u8; 64] = keying_material[0..64].try_into()
+                .map_err(|_| EapError::InvalidState)?;
+            let emsk: [u8; 64] = keying_material[64..128].try_into()
+                .map_err(|_| EapError::InvalidState)?;
+
+            self.context.msk = Some(msk);
+            self.context.emsk = Some(emsk);
 
             Ok(())
         }

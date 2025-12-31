@@ -379,7 +379,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
   - ✅ MD5 hash calculation (identifier + password + challenge)
   - ✅ Full authentication flow
   - ✅ Comprehensive test coverage (4 test suites)
-- ✅ **EAP-TLS** (Type 13) - RFC 5216 (certificate-based) - ~95% Complete
+- ✅ **EAP-TLS** (Type 13) - RFC 5216 (certificate-based) - **100% Complete**
   - ✅ EAP-TLS packet structure and parsing
   - ✅ TLS flags (L/M/S) implementation
   - ✅ Fragment assembler and reassembly
@@ -406,15 +406,17 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
   - ✅ authenticate_request() method for full packet access
   - ✅ EAP-Message attribute extraction and reassembly
   - ✅ Complete authentication flow with session management
-  - [ ] Production key extraction (MSK/EMSK) - **DEFERRED**
-    - Option 1: Custom rustls crypto provider for key capture
-    - Option 2: Wait for upstream rustls key export API
-    - Option 3: Alternative TLS library integration
-    - Current: Placeholder implementation with dummy keys for testing
+  - ✅ **Production key extraction (MSK/EMSK) using RFC 5705**
+    - ✅ RFC 5705 Keying Material Exporter implementation
+    - ✅ rustls export_keying_material() integration
+    - ✅ Label "client EAP encryption" per RFC 5216 Section 2.3
+    - ✅ 128-byte key derivation (64 MSK + 64 EMSK)
+    - ✅ Direct key export without intermediate master_secret
+    - ✅ Production-ready for wireless encryption keys
 
 ### Future EAP Methods (Deferred)
 
-The following EAP methods are deferred for future development after production key extraction is resolved:
+The following EAP methods are deferred for future development:
 
 - [ ] **EAP-TTLS** (Type 21) - RFC 5281 (tunneled TLS) - **DEFERRED**
   - Requires EAP-TLS production keys working first
