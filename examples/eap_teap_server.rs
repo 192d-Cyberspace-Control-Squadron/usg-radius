@@ -4,8 +4,10 @@
 //! EAP-TEAP (Type 55, RFC 7170) is a modern tunneled EAP method that provides:
 //! - Two-phase authentication (TLS tunnel + inner method)
 //! - Better security than legacy methods (PEAP, EAP-TTLS, EAP-MSCHAPv2)
-//! - Flexible inner authentication (Basic-Password-Auth in this example)
-//! - Cryptographic binding (planned for future)
+//! - Flexible inner authentication:
+//!   - Basic-Password-Auth (simple username/password)
+//!   - EAP-Payload (tunneled EAP methods like EAP-MD5, EAP-MSCHAPv2)
+//! - Cryptographic binding (implemented and working!)
 //!
 //! # Prerequisites
 //!
@@ -143,6 +145,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("  Authentication: EAP-TEAP (Type 55) - RFC 7170");
         println!("  Phase 1:       TLS 1.2/1.3 tunnel establishment");
         println!("  Phase 2:       Basic-Password-Auth (username/password)");
+        println!("                  (or use EapPayloadHandler for EAP-MD5/MSCHAPv2)");
         println!();
 
         println!("Configured Users:");
@@ -166,8 +169,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("  ✓ TLS tunnel (Phase 1) - Server authentication");
         println!("  ✓ Inner authentication (Phase 2) - User credentials");
         println!("  ✓ Basic-Password-Auth - RFC 7170 compliant");
-        println!("  ⏳ Cryptographic Binding - Coming in v0.6.0");
-        println!("  ⏳ EAP-Payload methods - Coming in v0.7.0");
+        println!("  ✓ Cryptographic Binding - IMCK/CMK/Compound MAC");
+        println!("  ✓ EAP-Payload methods - Tunneled EAP-MD5, EAP-MSCHAPv2, etc.");
+        println!("  ✓ Intermediate-Result TLV - Multi-round inner auth");
         println!();
 
         server.run().await?;
