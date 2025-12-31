@@ -56,8 +56,8 @@ pub use chap::{
     ChapChallenge, ChapError, ChapResponse, compute_chap_response, verify_chap_response,
 };
 pub use eap::{
-    add_eap_to_radius_packet, eap_from_radius_packet, eap_to_radius_attributes, EapCode, EapError,
-    EapPacket, EapSession, EapSessionManager, EapState, EapType, SessionStats,
+    EapCode, EapError, EapPacket, EapSession, EapSessionManager, EapState, EapType, SessionStats,
+    add_eap_to_radius_packet, eap_from_radius_packet, eap_to_radius_attributes,
 };
 pub use message_auth::{calculate_message_authenticator, verify_message_authenticator};
 pub use packet::{Code, Packet, PacketError};

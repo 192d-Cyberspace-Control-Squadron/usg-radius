@@ -15,7 +15,7 @@ use crate::server::{AuthHandler, AuthResult};
 
 #[cfg(feature = "tls")]
 use radius_proto::eap::eap_tls::{
-    build_server_config, EapTlsPacket, EapTlsServer, TlsCertificateConfig,
+    EapTlsPacket, EapTlsServer, TlsCertificateConfig, build_server_config,
 };
 
 #[cfg(feature = "tls")]
@@ -207,11 +207,7 @@ impl EapAuthHandler {
     }
 
     /// Handle EAP-Identity exchange
-    fn handle_identity(
-        &self,
-        username: &str,
-        session_id: &str,
-    ) -> AuthResult {
+    fn handle_identity(&self, username: &str, session_id: &str) -> AuthResult {
         let mut manager = self.session_manager.write().unwrap();
 
         if let Some(session) = manager.get_session_mut(session_id) {
@@ -295,7 +291,8 @@ impl EapAuthHandler {
         let configs = self.tls_configs.read().unwrap();
         let tls_config = configs.get("teap_").or_else(|| {
             // Fallback to checking for teap_<realm> configs
-            configs.keys()
+            configs
+                .keys()
                 .find(|k| k.starts_with("teap_"))
                 .and_then(|k| configs.get(k))
         });
@@ -303,15 +300,16 @@ impl EapAuthHandler {
         if let Some(config) = tls_config {
             // Create inner authentication handler for Phase 2
             // Get user credentials from inner handler
-            let password = self.inner_handler.get_user_password(username)
+            let password = self
+                .inner_handler
+                .get_user_password(username)
                 .unwrap_or_else(|| String::from(""));
 
-            let inner_method = Box::new(
-                radius_proto::eap::eap_teap::BasicPasswordAuthHandler::new(
+            let inner_method =
+                Box::new(radius_proto::eap::eap_teap::BasicPasswordAuthHandler::new(
                     username.to_string(),
                     password,
-                )
-            );
+                ));
 
             // Create EAP-TEAP server for this session
             let teap_server = radius_proto::eap::eap_teap::EapTeapServer::with_inner_method(
@@ -384,12 +382,15 @@ impl EapAuthHandler {
                         };
 
                         // Fragment if needed and create EAP-TLS packets
-                        let fragments = radius_proto::eap::eap_tls::fragment_tls_message(&response_data, 1020);
+                        let fragments =
+                            radius_proto::eap::eap_tls::fragment_tls_message(&response_data, 1020);
 
                         if let Some(first_fragment) = fragments.first() {
                             let eap_packet = first_fragment.to_eap_request(identifier);
 
-                            if let Ok(eap_attrs) = radius_proto::eap::eap_to_radius_attributes(&eap_packet) {
+                            if let Ok(eap_attrs) =
+                                radius_proto::eap::eap_to_radius_attributes(&eap_packet)
+                            {
                                 return AuthResult::Challenge {
                                     message: None,
                                     state: session_id.as_bytes().to_vec(),
@@ -404,11 +405,12 @@ impl EapAuthHandler {
                             // Extract keys
                             if tls_server.extract_keys().is_ok() {
                                 // Verify client certificate if mutual TLS
-                                let identity_verified = if let Some(_peer_certs) = tls_server.get_peer_certificates() {
-                                    tls_server.verify_peer_identity(username).unwrap_or(false)
-                                } else {
-                                    true // Server-only auth
-                                };
+                                let identity_verified =
+                                    if let Some(_peer_certs) = tls_server.get_peer_certificates() {
+                                        tls_server.verify_peer_identity(username).unwrap_or(false)
+                                    } else {
+                                        true // Server-only auth
+                                    };
 
                                 if identity_verified {
                                     // Success!
@@ -424,7 +426,9 @@ impl EapAuthHandler {
 
                                     let success_packet = EapPacket::success(identifier);
 
-                                    if let Ok(_eap_attrs) = radius_proto::eap::eap_to_radius_attributes(&success_packet) {
+                                    if let Ok(_eap_attrs) =
+                                        radius_proto::eap::eap_to_radius_attributes(&success_packet)
+                                    {
                                         // Could add MS-MPPE keys here from MSK
                                         return AuthResult::Accept;
                                     }
@@ -471,7 +475,8 @@ impl EapAuthHandler {
                         };
 
                         // Fragment if needed and create EAP-TEAP packets
-                        let fragments = radius_proto::eap::eap_tls::fragment_tls_message(&response_data, 1020);
+                        let fragments =
+                            radius_proto::eap::eap_tls::fragment_tls_message(&response_data, 1020);
 
                         if let Some(first_fragment) = fragments.first() {
                             // Create EAP packet with TEAP type
@@ -483,7 +488,9 @@ impl EapAuthHandler {
                                 eap_data,
                             );
 
-                            if let Ok(eap_attrs) = radius_proto::eap::eap_to_radius_attributes(&eap_packet) {
+                            if let Ok(eap_attrs) =
+                                radius_proto::eap::eap_to_radius_attributes(&eap_packet)
+                            {
                                 return AuthResult::Challenge {
                                     message: None,
                                     state: session_id.as_bytes().to_vec(),
@@ -508,7 +515,9 @@ impl EapAuthHandler {
 
                             let success_packet = EapPacket::success(identifier);
 
-                            if let Ok(_eap_attrs) = radius_proto::eap::eap_to_radius_attributes(&success_packet) {
+                            if let Ok(_eap_attrs) =
+                                radius_proto::eap::eap_to_radius_attributes(&success_packet)
+                            {
                                 // Could add MS-MPPE keys here from MSK
                                 return AuthResult::Accept;
                             }
@@ -552,11 +561,7 @@ impl AuthHandler for EapAuthHandler {
         AuthResult::Reject
     }
 
-    fn authenticate_request(
-        &self,
-        request: &Packet,
-        _secret: &[u8],
-    ) -> AuthResult {
+    fn authenticate_request(&self, request: &Packet, _secret: &[u8]) -> AuthResult {
         // Extract username
         let username = request
             .find_attribute(1) // UserName
@@ -641,7 +646,14 @@ mod tests {
 
         // Handler should be created successfully
         // Verify no sessions exist by trying to get a non-existent session
-        assert!(eap_handler.session_manager.read().unwrap().get_session("nonexistent").is_none());
+        assert!(
+            eap_handler
+                .session_manager
+                .read()
+                .unwrap()
+                .get_session("nonexistent")
+                .is_none()
+        );
     }
 
     #[test]

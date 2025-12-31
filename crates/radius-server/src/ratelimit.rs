@@ -79,10 +79,10 @@ pub struct RateLimitConfig {
 impl Default for RateLimitConfig {
     fn default() -> Self {
         RateLimitConfig {
-            per_client_rps: 100,   // 100 requests/sec per client
-            per_client_burst: 200, // Allow bursts up to 200
-            global_rps: 1000,      // 1000 requests/sec globally
-            global_burst: 2000,    // Allow bursts up to 2000
+            per_client_rps: 100,             // 100 requests/sec per client
+            per_client_burst: 200,           // Allow bursts up to 200
+            global_rps: 1000,                // 1000 requests/sec globally
+            global_burst: 2000,              // Allow bursts up to 2000
             max_concurrent_connections: 100, // 100 concurrent connections per client
             max_bandwidth_bps: 1_048_576,    // 1 MB/s per client
         }
@@ -267,7 +267,8 @@ impl RateLimiter {
             return true;
         }
 
-        let mut entry = self.connection_trackers
+        let mut entry = self
+            .connection_trackers
             .entry(client_ip)
             .or_insert_with(ConnectionTracker::new);
 
@@ -303,7 +304,8 @@ impl RateLimiter {
             return true;
         }
 
-        let mut entry = self.bandwidth_trackers
+        let mut entry = self
+            .bandwidth_trackers
             .entry(client_ip)
             .or_insert_with(|| BandwidthTracker::new(self.config.max_bandwidth_bps));
 

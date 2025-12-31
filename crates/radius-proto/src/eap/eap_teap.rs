@@ -35,8 +35,8 @@
 //! // Process client messages...
 //! ```
 
-use super::eap_tls::{EapTlsPacket, EapTlsServer};
 use super::EapError;
+use super::eap_tls::{EapTlsPacket, EapTlsServer};
 use std::sync::Arc;
 
 /// TEAP TLV Type (RFC 7170 Section 4.2)
@@ -750,8 +750,7 @@ impl BasicPasswordAuthHandler {
         let mut offset = 0;
 
         // Parse username length (2 bytes)
-        let username_len =
-            u16::from_be_bytes([tlv.value[offset], tlv.value[offset + 1]]) as usize;
+        let username_len = u16::from_be_bytes([tlv.value[offset], tlv.value[offset + 1]]) as usize;
         offset += 2;
 
         if offset + username_len > tlv.value.len() {
@@ -768,8 +767,7 @@ impl BasicPasswordAuthHandler {
         }
 
         // Parse password length (2 bytes)
-        let password_len =
-            u16::from_be_bytes([tlv.value[offset], tlv.value[offset + 1]]) as usize;
+        let password_len = u16::from_be_bytes([tlv.value[offset], tlv.value[offset + 1]]) as usize;
         offset += 2;
 
         if offset + password_len > tlv.value.len() {
@@ -941,8 +939,7 @@ mod tests {
         // Reserved bit (0x4000) should cause error
         let data = vec![
             0xC0, 0x03, // Type with both M and R bits set
-            0x00, 0x02,
-            0x00, 0x01,
+            0x00, 0x02, 0x00, 0x01,
         ];
         assert!(TeapTlv::from_bytes(&data).is_err());
     }
@@ -1180,8 +1177,10 @@ mod tests {
 
     #[test]
     fn test_inner_method_handler_trait() {
-        let handler: Box<dyn InnerMethodHandler> =
-            Box::new(BasicPasswordAuthHandler::new("alice".to_string(), "secret".to_string()));
+        let handler: Box<dyn InnerMethodHandler> = Box::new(BasicPasswordAuthHandler::new(
+            "alice".to_string(),
+            "secret".to_string(),
+        ));
 
         // Test trait methods
         assert!(!handler.is_complete());

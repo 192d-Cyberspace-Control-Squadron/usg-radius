@@ -139,11 +139,7 @@ pub trait AuthHandler: Send + Sync {
     ///
     /// # Returns
     /// AuthResult indicating Accept, Reject, or Challenge
-    fn authenticate_request(
-        &self,
-        request: &Packet,
-        secret: &[u8],
-    ) -> AuthResult {
+    fn authenticate_request(&self, request: &Packet, secret: &[u8]) -> AuthResult {
         // Extract username
         let username = request
             .find_attribute(AttributeType::UserName as u8)

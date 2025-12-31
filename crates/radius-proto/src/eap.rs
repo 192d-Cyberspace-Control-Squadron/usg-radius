@@ -881,12 +881,14 @@ pub mod eap_tls {
 
         while output.len() < output_len {
             // A(i) = HMAC(secret, A(i-1))
-            let mut mac = HmacSha256::new_from_slice(secret).expect("HMAC can take key of any size");
+            let mut mac =
+                HmacSha256::new_from_slice(secret).expect("HMAC can take key of any size");
             mac.update(&a);
             a = mac.finalize().into_bytes().to_vec();
 
             // HMAC(secret, A(i) + seed)
-            let mut mac = HmacSha256::new_from_slice(secret).expect("HMAC can take key of any size");
+            let mut mac =
+                HmacSha256::new_from_slice(secret).expect("HMAC can take key of any size");
             mac.update(&a);
             mac.update(&label_seed);
             let result = mac.finalize().into_bytes();
@@ -977,7 +979,10 @@ pub mod eap_tls {
         /// Process an incoming EAP-TLS packet
         ///
         /// Returns Some(complete_tls_data) when all fragments are received
-        pub fn process_incoming(&mut self, packet: &EapTlsPacket) -> Result<Option<Vec<u8>>, EapError> {
+        pub fn process_incoming(
+            &mut self,
+            packet: &EapTlsPacket,
+        ) -> Result<Option<Vec<u8>>, EapError> {
             // Handle Start packet
             if packet.flags.start() {
                 self.handshake_state = TlsHandshakeState::Started;
@@ -991,12 +996,9 @@ pub mod eap_tls {
 
         /// Derive and store MSK/EMSK from TLS handshake
         pub fn derive_session_keys(&mut self) -> Result<(), EapError> {
-            let master_secret = self.master_secret.as_ref()
-                .ok_or(EapError::InvalidState)?;
-            let client_random = self.client_random.as_ref()
-                .ok_or(EapError::InvalidState)?;
-            let server_random = self.server_random.as_ref()
-                .ok_or(EapError::InvalidState)?;
+            let master_secret = self.master_secret.as_ref().ok_or(EapError::InvalidState)?;
+            let client_random = self.client_random.as_ref().ok_or(EapError::InvalidState)?;
+            let server_random = self.server_random.as_ref().ok_or(EapError::InvalidState)?;
 
             let (msk, emsk) = derive_keys(master_secret, client_random, server_random);
             self.msk = Some(msk);
@@ -1085,19 +1087,23 @@ pub mod eap_tls {
         use std::fs::File;
         use std::io::BufReader;
 
-        let file = File::open(path)
-            .map_err(|e| EapError::IoError(format!("Failed to open certificate file '{}': {}", path, e)))?;
+        let file = File::open(path).map_err(|e| {
+            EapError::IoError(format!("Failed to open certificate file '{}': {}", path, e))
+        })?;
 
         let mut reader = BufReader::new(file);
 
         let certs = rustls_pemfile::certs(&mut reader)
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| EapError::CertificateError(format!("Failed to parse certificates: {}", e)))?;
+            .map_err(|e| {
+                EapError::CertificateError(format!("Failed to parse certificates: {}", e))
+            })?;
 
         if certs.is_empty() {
-            return Err(EapError::CertificateError(
-                format!("No certificates found in '{}'", path)
-            ));
+            return Err(EapError::CertificateError(format!(
+                "No certificates found in '{}'",
+                path
+            )));
         }
 
         // Convert to Vec<Vec<u8>>
@@ -1134,9 +1140,9 @@ pub mod eap_tls {
         // Try to read any private key (PKCS#8, RSA, EC, etc.)
         let key = rustls_pemfile::private_key(&mut reader)
             .map_err(|e| EapError::CertificateError(format!("Failed to parse private key: {}", e)))?
-            .ok_or_else(|| EapError::CertificateError(
-                format!("No private key found in '{}'", path)
-            ))?;
+            .ok_or_else(|| {
+                EapError::CertificateError(format!("No private key found in '{}'", path))
+            })?;
 
         Ok(key.secret_der().to_vec())
     }
@@ -1173,17 +1179,17 @@ pub mod eap_tls {
         let now_secs = now.as_secs() as i64;
 
         if now_secs < not_before {
-            return Err(EapError::CertificateError(
-                format!("Certificate is not yet valid (not before: {})",
-                    cert.validity().not_before)
-            ));
+            return Err(EapError::CertificateError(format!(
+                "Certificate is not yet valid (not before: {})",
+                cert.validity().not_before
+            )));
         }
 
         if now_secs > not_after {
-            return Err(EapError::CertificateError(
-                format!("Certificate has expired (not after: {})",
-                    cert.validity().not_after)
-            ));
+            return Err(EapError::CertificateError(format!(
+                "Certificate has expired (not after: {})",
+                cert.validity().not_after
+            )));
         }
 
         // TODO: Verify public key matches private key
@@ -1243,8 +1249,9 @@ pub mod eap_tls {
         // Validate server certificate before converting
         validate_cert_key_pair(&certs[0], &key_der)?;
 
-        let private_key = PrivateKeyDer::try_from(key_der)
-            .map_err(|e| EapError::CertificateError(format!("Invalid private key format: {:?}", e)))?;
+        let private_key = PrivateKeyDer::try_from(key_der).map_err(|e| {
+            EapError::CertificateError(format!("Invalid private key format: {:?}", e))
+        })?;
 
         // Build ServerConfig
         let config = ServerConfig::builder();
@@ -1262,20 +1269,23 @@ pub mod eap_tls {
                 // Create root certificate store
                 let mut root_store = rustls::RootCertStore::empty();
                 for ca_cert in ca_certs {
-                    root_store
-                        .add(ca_cert)
-                        .map_err(|e| EapError::CertificateError(format!("Failed to add CA certificate: {}", e)))?;
+                    root_store.add(ca_cert).map_err(|e| {
+                        EapError::CertificateError(format!("Failed to add CA certificate: {}", e))
+                    })?;
                 }
 
                 // Create client certificate verifier
                 let verifier = rustls::server::WebPkiClientVerifier::builder(root_store.into())
                     .build()
-                    .map_err(|e| EapError::TlsError(format!("Failed to build client verifier: {}", e)))?;
+                    .map_err(|e| {
+                        EapError::TlsError(format!("Failed to build client verifier: {}", e))
+                    })?;
 
                 config.with_client_cert_verifier(verifier)
             } else {
                 return Err(EapError::CertificateError(
-                    "Client certificate verification required but no CA certificate path provided".to_string()
+                    "Client certificate verification required but no CA certificate path provided"
+                        .to_string(),
                 ));
             }
         } else {
@@ -1348,8 +1358,7 @@ pub mod eap_tls {
             };
 
             // Get or create connection
-            let conn = self.connection.as_mut()
-                .ok_or(EapError::InvalidState)?;
+            let conn = self.connection.as_mut().ok_or(EapError::InvalidState)?;
 
             // Feed TLS data to rustls
             conn.read_tls(&mut std::io::Cursor::new(&tls_data))
@@ -1380,7 +1389,8 @@ pub mod eap_tls {
 
         /// Check if handshake is complete
         pub fn is_handshake_complete(&self) -> bool {
-            self.connection.as_ref()
+            self.connection
+                .as_ref()
                 .map(|c| !c.is_handshaking())
                 .unwrap_or(false)
         }
@@ -1436,8 +1446,7 @@ pub mod eap_tls {
                 return Err(EapError::InvalidState);
             }
 
-            let conn = self.connection.as_ref()
-                .ok_or(EapError::InvalidState)?;
+            let conn = self.connection.as_ref().ok_or(EapError::InvalidState)?;
 
             // RFC 5216 Section 2.3: Use RFC 5705 keying material exporter
             // Label: "client EAP encryption"
@@ -1449,13 +1458,18 @@ pub mod eap_tls {
             conn.export_keying_material(
                 keying_material.as_mut_slice(),
                 label,
-                None // No context value per RFC 5216
-            ).map_err(|e| EapError::TlsError(format!("Failed to export keying material: {:?}", e)))?;
+                None, // No context value per RFC 5216
+            )
+            .map_err(|e| {
+                EapError::TlsError(format!("Failed to export keying material: {:?}", e))
+            })?;
 
             // Split into MSK (first 64 bytes) and EMSK (last 64 bytes)
-            let msk: [u8; 64] = keying_material[0..64].try_into()
+            let msk: [u8; 64] = keying_material[0..64]
+                .try_into()
                 .map_err(|_| EapError::InvalidState)?;
-            let emsk: [u8; 64] = keying_material[64..128].try_into()
+            let emsk: [u8; 64] = keying_material[64..128]
+                .try_into()
                 .map_err(|_| EapError::InvalidState)?;
 
             self.context.msk = Some(msk);
@@ -1493,7 +1507,8 @@ pub mod eap_tls {
         /// * `Some(Vec<Vec<u8>>)` - Client certificate chain (DER encoded)
         /// * `None` - No client certificate or handshake not complete
         pub fn get_peer_certificates(&self) -> Option<Vec<Vec<u8>>> {
-            self.connection.as_ref()
+            self.connection
+                .as_ref()
                 .and_then(|conn| conn.peer_certificates())
                 .map(|certs| certs.iter().map(|c| c.as_ref().to_vec()).collect())
         }
@@ -1519,11 +1534,13 @@ pub mod eap_tls {
             };
 
             // Parse the first certificate (end-entity certificate)
-            let (_, cert) = X509Certificate::from_der(&peer_certs[0])
-                .map_err(|e| EapError::CertificateError(format!("Failed to parse peer certificate: {}", e)))?;
+            let (_, cert) = X509Certificate::from_der(&peer_certs[0]).map_err(|e| {
+                EapError::CertificateError(format!("Failed to parse peer certificate: {}", e))
+            })?;
 
             // Extract Subject CN
-            let subject_cn = cert.subject()
+            let subject_cn = cert
+                .subject()
                 .iter_common_name()
                 .next()
                 .and_then(|cn| cn.as_str().ok())
@@ -1915,8 +1932,9 @@ pub fn eap_to_radius_attributes(eap_packet: &EapPacket) -> Result<Vec<Attribute>
         let chunk_len = std::cmp::min(MAX_ATTR_VALUE_LEN, eap_bytes.len() - offset);
         let chunk = eap_bytes[offset..offset + chunk_len].to_vec();
 
-        let attr = Attribute::new(AttributeType::EapMessage as u8, chunk)
-            .map_err(|e| EapError::EncodingError(format!("Failed to create EAP-Message attribute: {}", e)))?;
+        let attr = Attribute::new(AttributeType::EapMessage as u8, chunk).map_err(|e| {
+            EapError::EncodingError(format!("Failed to create EAP-Message attribute: {}", e))
+        })?;
 
         attributes.push(attr);
         offset += chunk_len;
@@ -2671,7 +2689,12 @@ mod tests {
     fn test_eap_from_radius_packet_single_attribute() {
         use crate::packet::Code;
 
-        let eap = EapPacket::new(EapCode::Response, 5, Some(EapType::Identity), b"alice".to_vec());
+        let eap = EapPacket::new(
+            EapCode::Response,
+            5,
+            Some(EapType::Identity),
+            b"alice".to_vec(),
+        );
         let eap_bytes = eap.to_bytes();
 
         // Create RADIUS packet with EAP-Message attribute
@@ -2696,7 +2719,12 @@ mod tests {
 
         // Create a large EAP packet
         let large_data = vec![0xAA; 400];
-        let eap = EapPacket::new(EapCode::Request, 10, Some(EapType::Md5Challenge), large_data.clone());
+        let eap = EapPacket::new(
+            EapCode::Request,
+            10,
+            Some(EapType::Md5Challenge),
+            large_data.clone(),
+        );
 
         // Convert to RADIUS attributes (will be split)
         let eap_attributes = eap_to_radius_attributes(&eap).unwrap();
@@ -2736,7 +2764,12 @@ mod tests {
         use crate::packet::Code;
 
         let mut radius = Packet::new(Code::AccessChallenge, 2, [0u8; 16]);
-        let eap = EapPacket::new(EapCode::Request, 2, Some(EapType::Md5Challenge), vec![1, 2, 3, 4]);
+        let eap = EapPacket::new(
+            EapCode::Request,
+            2,
+            Some(EapType::Md5Challenge),
+            vec![1, 2, 3, 4],
+        );
 
         // Initially no attributes
         assert_eq!(radius.attributes.len(), 0);
@@ -2767,8 +2800,18 @@ mod tests {
         // Test various EAP packet types
         let test_cases = vec![
             EapPacket::new(EapCode::Request, 1, Some(EapType::Identity), vec![]),
-            EapPacket::new(EapCode::Response, 2, Some(EapType::Identity), b"user@example.com".to_vec()),
-            EapPacket::new(EapCode::Request, 3, Some(EapType::Md5Challenge), vec![0x11; 16]),
+            EapPacket::new(
+                EapCode::Response,
+                2,
+                Some(EapType::Identity),
+                b"user@example.com".to_vec(),
+            ),
+            EapPacket::new(
+                EapCode::Request,
+                3,
+                Some(EapType::Md5Challenge),
+                vec![0x11; 16],
+            ),
             EapPacket::new(EapCode::Success, 4, None, vec![]),
             EapPacket::new(EapCode::Failure, 5, None, vec![]),
         ];
@@ -2799,10 +2842,16 @@ mod tests {
 
         // Add non-EAP attributes
         radius.add_attribute(Attribute::string(AttributeType::UserName as u8, "bob").unwrap());
-        radius.add_attribute(Attribute::string(AttributeType::NasIdentifier as u8, "nas1").unwrap());
+        radius
+            .add_attribute(Attribute::string(AttributeType::NasIdentifier as u8, "nas1").unwrap());
 
         // Add EAP packet
-        let eap = EapPacket::new(EapCode::Response, 7, Some(EapType::Identity), b"bob@example.com".to_vec());
+        let eap = EapPacket::new(
+            EapCode::Response,
+            7,
+            Some(EapType::Identity),
+            b"bob@example.com".to_vec(),
+        );
         add_eap_to_radius_packet(&mut radius, &eap).unwrap();
 
         // Add more attributes after EAP
@@ -2899,11 +2948,8 @@ mod tests {
         #[test]
         fn test_eap_tls_packet_with_data() {
             let tls_data = vec![0x16, 0x03, 0x03, 0x00, 0x05]; // Fake TLS handshake record
-            let packet = EapTlsPacket::new(
-                TlsFlags::new(false, false, false),
-                None,
-                tls_data.clone(),
-            );
+            let packet =
+                EapTlsPacket::new(TlsFlags::new(false, false, false), None, tls_data.clone());
 
             let encoded = packet.to_eap_data();
             assert_eq!(encoded[0], 0x00); // No flags set
@@ -2985,29 +3031,18 @@ mod tests {
             let mut assembler = TlsFragmentAssembler::new();
 
             // First fragment with length and more fragments
-            let frag1 = EapTlsPacket::new(
-                TlsFlags::new(true, true, false),
-                Some(10),
-                vec![1, 2, 3, 4],
-            );
+            let frag1 =
+                EapTlsPacket::new(TlsFlags::new(true, true, false), Some(10), vec![1, 2, 3, 4]);
             let result = assembler.add_fragment(&frag1).unwrap();
             assert!(result.is_none()); // Not complete yet
 
             // Second fragment with more fragments
-            let frag2 = EapTlsPacket::new(
-                TlsFlags::new(false, true, false),
-                None,
-                vec![5, 6, 7],
-            );
+            let frag2 = EapTlsPacket::new(TlsFlags::new(false, true, false), None, vec![5, 6, 7]);
             let result = assembler.add_fragment(&frag2).unwrap();
             assert!(result.is_none()); // Still not complete
 
             // Last fragment
-            let frag3 = EapTlsPacket::new(
-                TlsFlags::new(false, false, false),
-                None,
-                vec![8, 9, 10],
-            );
+            let frag3 = EapTlsPacket::new(TlsFlags::new(false, false, false), None, vec![8, 9, 10]);
             let result = assembler.add_fragment(&frag3).unwrap();
             assert!(result.is_some()); // Complete!
 
@@ -3019,11 +3054,8 @@ mod tests {
         fn test_fragment_assembler_reset() {
             let mut assembler = TlsFragmentAssembler::new();
 
-            let frag1 = EapTlsPacket::new(
-                TlsFlags::new(true, true, false),
-                Some(10),
-                vec![1, 2, 3],
-            );
+            let frag1 =
+                EapTlsPacket::new(TlsFlags::new(true, true, false), Some(10), vec![1, 2, 3]);
             assembler.add_fragment(&frag1).unwrap();
 
             // Reset
@@ -3045,11 +3077,8 @@ mod tests {
             let mut assembler = TlsFragmentAssembler::new();
 
             // First fragment claims 10 bytes total
-            let frag1 = EapTlsPacket::new(
-                TlsFlags::new(true, true, false),
-                Some(10),
-                vec![1, 2, 3],
-            );
+            let frag1 =
+                EapTlsPacket::new(TlsFlags::new(true, true, false), Some(10), vec![1, 2, 3]);
             assembler.add_fragment(&frag1).unwrap();
 
             // Last fragment but total is only 8 bytes (not 10)
@@ -3269,11 +3298,8 @@ mod tests {
             let mut ctx = EapTlsContext::new();
 
             // First fragment
-            let frag1 = EapTlsPacket::new(
-                TlsFlags::new(true, true, false),
-                Some(10),
-                vec![1, 2, 3, 4],
-            );
+            let frag1 =
+                EapTlsPacket::new(TlsFlags::new(true, true, false), Some(10), vec![1, 2, 3, 4]);
             let result = ctx.process_incoming(&frag1).unwrap();
             assert!(result.is_none()); // Not complete yet
 
@@ -3379,8 +3405,8 @@ mod tests {
 
         #[test]
         fn test_eap_tls_server_creation() {
-            use std::sync::Arc;
             use rustls::ServerConfig;
+            use std::sync::Arc;
 
             // Create minimal server config
             let config = ServerConfig::builder()
@@ -3396,8 +3422,8 @@ mod tests {
 
         #[test]
         fn test_eap_tls_server_state_tracking() {
-            use std::sync::Arc;
             use rustls::ServerConfig;
+            use std::sync::Arc;
 
             let config = ServerConfig::builder()
                 .with_no_client_auth()
@@ -3418,8 +3444,8 @@ mod tests {
 
         #[test]
         fn test_eap_tls_server_key_extraction_requires_complete() {
-            use std::sync::Arc;
             use rustls::ServerConfig;
+            use std::sync::Arc;
 
             let config = ServerConfig::builder()
                 .with_no_client_auth()
@@ -3470,8 +3496,8 @@ mod tests {
             let config = TlsCertificateConfig::new(
                 "test_certs/server.pem".to_string(),
                 "test_certs/server-key.pem".to_string(),
-                None,  // No CA cert path
-                true,  // But requiring client cert
+                None, // No CA cert path
+                true, // But requiring client cert
             );
 
             // build_server_config should fail with this configuration
@@ -3482,8 +3508,8 @@ mod tests {
 
         #[test]
         fn test_eap_tls_server_peer_certificates_empty() {
-            use std::sync::Arc;
             use rustls::ServerConfig;
+            use std::sync::Arc;
 
             let config = ServerConfig::builder()
                 .with_no_client_auth()
@@ -3497,8 +3523,8 @@ mod tests {
 
         #[test]
         fn test_eap_tls_server_verify_peer_identity_no_cert() {
-            use std::sync::Arc;
             use rustls::ServerConfig;
+            use std::sync::Arc;
 
             let config = ServerConfig::builder()
                 .with_no_client_auth()
