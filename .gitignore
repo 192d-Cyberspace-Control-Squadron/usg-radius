@@ -23,3 +23,13 @@ target/
 
 # Configuration files (may contain secrets)
 config.json
+
+# Environment files (contain secrets)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Log files
+*.log
+/var/log/

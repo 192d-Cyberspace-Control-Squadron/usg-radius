@@ -1,0 +1,89 @@
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Target directory (build artifacts)
+target/
+**/target/
+
+# Documentation
+docs/
+*.md
+!README.md
+LICENSE
+
+# CI/CD
+.github/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+tests/
+
+# Examples (except Docker example)
+examples/
+!examples/configs/docker.json
+
+# Environment files
+.env
+.env.local
+.env.*
+!.env.example
+
+# Logs
+*.log
+/var/log/
+
+# Config files (user-specific)
+config.json
+config.local.json
+
+# Build artifacts
+*.o
+*.so
+*.a
+*.dylib
+*.dll
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Coverage reports
+coverage/
+*.lcov
+
+# Benchmark results
+benchmarks/
+
+# Lock files (we need Cargo.lock for reproducible builds)
+# Cargo.lock is intentionally NOT ignored
+
+# Node modules (if any)
+node_modules/
+
+# Python (if any helper scripts)
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/

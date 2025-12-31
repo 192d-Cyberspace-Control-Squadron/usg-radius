@@ -1,0 +1,68 @@
+{
+  "_comment": "USG RADIUS - Enterprise Configuration",
+  "_description": "High-performance production configuration for enterprise deployment (1000+ users)",
+  "_deployment_notes": [
+    "Deploy behind load balancer for high availability",
+    "Use external authentication backend (LDAP/AD) instead of users array",
+    "Configure monitoring and alerting for all security events",
+    "Implement log aggregation (ELK, Splunk, etc.)",
+    "Regular secret rotation schedule (quarterly recommended)",
+    "Separate RADIUS servers for different security zones"
+  ],
+
+  "listen_address": "::",
+  "listen_port": 1812,
+  "secret": "${RADIUS_DEFAULT_SECRET}",
+
+  "clients": [
+    {
+      "address": "10.10.0.0/16",
+      "secret": "${RADIUS_CAMPUS_WIRELESS_SECRET}",
+      "name": "Campus Wireless Controllers",
+      "enabled": true
+    },
+    {
+      "address": "10.20.0.0/16",
+      "secret": "${RADIUS_DATACENTER_SECRET}",
+      "name": "Data Center Network Devices",
+      "enabled": true
+    },
+    {
+      "address": "10.30.10.0/24",
+      "secret": "${RADIUS_VPN_CLUSTER_SECRET}",
+      "name": "VPN Gateway Cluster",
+      "enabled": true
+    },
+    {
+      "address": "10.40.0.0/16",
+      "secret": "${RADIUS_BRANCH_SECRET}",
+      "name": "Branch Office Networks",
+      "enabled": true
+    },
+    {
+      "address": "2001:db8:1000::/36",
+      "secret": "${RADIUS_IPV6_NETWORK_SECRET}",
+      "name": "IPv6 Network Infrastructure",
+      "enabled": true
+    },
+    {
+      "address": "10.99.99.0/24",
+      "secret": "${RADIUS_MONITORING_SECRET}",
+      "name": "Monitoring and Testing",
+      "enabled": true
+    }
+  ],
+
+  "users": [],
+
+  "verbose": false,
+  "log_level": "info",
+  "audit_log_path": "/var/log/radius/audit.log",
+  "strict_rfc_compliance": true,
+  "request_cache_ttl": 120,
+  "request_cache_max_entries": 100000,
+  "rate_limit_per_client_rps": 500,
+  "rate_limit_per_client_burst": 1000,
+  "rate_limit_global_rps": 10000,
+  "rate_limit_global_burst": 20000
+}

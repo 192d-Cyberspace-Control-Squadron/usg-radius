@@ -1,0 +1,44 @@
+{
+  "_comment": "USG RADIUS - Basic Home Lab / Testing Configuration",
+  "_description": "Minimal configuration for lab testing and development",
+  "_security_warning": "This configuration uses weak secrets - DO NOT use in production!",
+  "listen_address": "::",
+  "listen_port": 1812,
+  "secret": "testing123",
+  "clients": [
+    {
+      "address": "127.0.0.1",
+      "secret": "localhost_secret",
+      "name": "Localhost Testing",
+      "enabled": true
+    },
+    {
+      "address": "192.168.1.0/24",
+      "secret": "homelab_secret",
+      "name": "Home Network",
+      "enabled": true
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "password": "admin123",
+      "attributes": {}
+    },
+    {
+      "username": "test",
+      "password": "test123",
+      "attributes": {}
+    }
+  ],
+  "verbose": false,
+  "log_level": "debug",
+  "audit_log_path": null,
+  "strict_rfc_compliance": true,
+  "request_cache_ttl": 60,
+  "request_cache_max_entries": 1000,
+  "rate_limit_per_client_rps": 10,
+  "rate_limit_per_client_burst": 20,
+  "rate_limit_global_rps": 50,
+  "rate_limit_global_burst": 100
+}
