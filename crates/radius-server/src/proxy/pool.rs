@@ -78,9 +78,15 @@ impl HomeServerPool {
         unimplemented!("Phase 3: Pool implementation")
     }
 
-    /// Select next server based on strategy (stub)
+    /// Select next server based on strategy
+    ///
+    /// For Phase 2: Returns first available server with capacity
+    /// Phase 3 will implement full load balancing strategies
     pub fn select_server(&self) -> Option<Arc<HomeServer>> {
-        // TODO: Phase 3 implementation
-        None
+        // Find first available server with capacity
+        self.servers
+            .iter()
+            .find(|server| server.is_available() && server.has_capacity())
+            .map(|server| Arc::clone(server))
     }
 }

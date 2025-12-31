@@ -21,6 +21,7 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 ipnetwork.workspace = true
 dashmap.workspace = true
+regex.workspace = true
 chrono.workspace = true
 clap.workspace = true
 ldap3.workspace = true

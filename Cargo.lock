@@ -1824,6 +1824,7 @@ dependencies = [
  "ipnetwork",
  "ldap3",
  "radius-proto",
+ "regex",
  "rustls",
  "serde",
  "serde_json",
