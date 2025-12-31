@@ -3,7 +3,7 @@ use rand::Rng;
 
 /// Generate a random Request Authenticator (16 bytes) per RFC 2865 Section 3
 pub fn generate_request_authenticator() -> [u8; 16] {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut authenticator = [0u8; 16];
     rng.fill(&mut authenticator);
     authenticator
