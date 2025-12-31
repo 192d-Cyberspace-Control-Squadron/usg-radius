@@ -637,3 +637,6 @@ mod tests {
         assert!(handler.get_session("session1").await.is_none());
     }
 }
+
+// File-based accounting backend
+pub mod file;

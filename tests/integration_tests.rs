@@ -1901,3 +1901,175 @@ async fn test_accounting_query_by_user() {
     let user3_sessions = accounting_handler_impl.get_sessions_by_user("user3").await;
     assert_eq!(user3_sessions.len(), 0);
 }
+
+#[tokio::test]
+async fn test_file_accounting_handler() {
+    use radius_server::accounting::file::FileAccountingHandler;
+    use tempfile::TempDir;
+
+    let temp_dir = TempDir::new().unwrap();
+    let accounting_file = temp_dir.path().join("accounting.jsonl");
+
+    // Create test configuration
+    let mut config = Config::default();
+    config.listen_address = "127.0.0.1".to_string();
+    config.listen_port = 0;
+    config.secret = "testing123".to_string();
+
+    let mut auth_handler = SimpleAuthHandler::new();
+    auth_handler.add_user("fileuser", "testpass");
+
+    // Create file-based accounting handler
+    let accounting_handler = Arc::new(
+        FileAccountingHandler::new(accounting_file.clone())
+            .await
+            .expect("Failed to create FileAccountingHandler"),
+    );
+
+    // Create server config with accounting enabled
+    let server_config = ServerConfig::from_config(config, Arc::new(auth_handler))
+        .expect("Failed to create server config")
+        .with_accounting_handler(accounting_handler);
+
+    // Start server
+    let server = RadiusServer::new(server_config)
+        .await
+        .expect("Failed to create server");
+    let server_addr = server.local_addr().expect("Failed to get server address");
+
+    // Start server in background
+    tokio::spawn(async move {
+        let _ = server.run().await;
+    });
+
+    // Give server time to start
+    sleep(Duration::from_millis(100)).await;
+
+    let secret = b"testing123";
+
+    // Send accounting start with framed IP
+    let mut start_packet = create_accounting_request(
+        AcctStatusType::Start,
+        "file-session-123",
+        "fileuser",
+        1,
+        secret,
+    );
+    start_packet.add_attribute(
+        Attribute::new(
+            AttributeType::FramedIpAddress as u8,
+            vec![192, 168, 10, 50],
+        )
+        .unwrap(),
+    );
+    // Recalculate authenticator after adding framed IP
+    start_packet.authenticator = calculate_accounting_request_authenticator(&start_packet, secret);
+
+    send_radius_request(&start_packet, server_addr)
+        .await
+        .expect("Failed to send accounting start");
+
+    // Wait a bit and send interim update with usage data
+    sleep(Duration::from_millis(50)).await;
+
+    let mut interim_packet = create_accounting_request(
+        AcctStatusType::InterimUpdate,
+        "file-session-123",
+        "fileuser",
+        2,
+        secret,
+    );
+    interim_packet.add_attribute(
+        Attribute::new(AttributeType::AcctSessionTime as u8, vec![0, 0, 0, 30]).unwrap(),
+    );
+    interim_packet.add_attribute(
+        Attribute::new(AttributeType::AcctInputOctets as u8, vec![0, 0, 5, 0]).unwrap(),
+    );
+    interim_packet.add_attribute(
+        Attribute::new(AttributeType::AcctOutputOctets as u8, vec![0, 0, 10, 0]).unwrap(),
+    );
+    // Recalculate authenticator after adding attributes
+    interim_packet.authenticator =
+        calculate_accounting_request_authenticator(&interim_packet, secret);
+
+    send_radius_request(&interim_packet, server_addr)
+        .await
+        .expect("Failed to send interim update");
+
+    // Wait a bit and send stop packet with final usage data
+    sleep(Duration::from_millis(50)).await;
+
+    let mut stop_packet = create_accounting_request(
+        AcctStatusType::Stop,
+        "file-session-123",
+        "fileuser",
+        3,
+        secret,
+    );
+    stop_packet.add_attribute(
+        Attribute::new(AttributeType::AcctSessionTime as u8, vec![0, 0, 0, 60]).unwrap(),
+    );
+    stop_packet.add_attribute(
+        Attribute::new(AttributeType::AcctInputOctets as u8, vec![0, 0, 15, 0]).unwrap(),
+    );
+    stop_packet.add_attribute(
+        Attribute::new(AttributeType::AcctOutputOctets as u8, vec![0, 0, 30, 0]).unwrap(),
+    );
+    stop_packet.add_attribute(
+        Attribute::new(AttributeType::AcctTerminateCause as u8, vec![0, 0, 0, 1]).unwrap(),
+    );
+    // Recalculate authenticator after adding attributes
+    stop_packet.authenticator =
+        calculate_accounting_request_authenticator(&stop_packet, secret);
+
+    send_radius_request(&stop_packet, server_addr)
+        .await
+        .expect("Failed to send accounting stop");
+
+    // Wait for writes to complete
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    // Read and verify the accounting file
+    let content = tokio::fs::read_to_string(&accounting_file)
+        .await
+        .expect("Failed to read accounting file");
+
+    let lines: Vec<&str> = content.lines().collect();
+    assert_eq!(lines.len(), 3, "Expected 3 accounting records");
+
+    // Parse and verify each line is valid JSON
+    for line in &lines {
+        let json: serde_json::Value =
+            serde_json::from_str(line).expect("Failed to parse JSON line");
+        assert!(json.get("timestamp").is_some());
+        assert!(json.get("event").is_some());
+        assert!(json.get("nas_ip").is_some());
+    }
+
+    // Verify start event
+    let start_json: serde_json::Value =
+        serde_json::from_str(lines[0]).expect("Failed to parse start event");
+    assert_eq!(start_json["event"], "start");
+    assert_eq!(start_json["session_id"], "file-session-123");
+    assert_eq!(start_json["username"], "fileuser");
+    assert_eq!(start_json["framed_ip"], "192.168.10.50");
+
+    // Verify interim update event
+    let interim_json: serde_json::Value =
+        serde_json::from_str(lines[1]).expect("Failed to parse interim event");
+    assert_eq!(interim_json["event"], "interimupdate");
+    assert_eq!(interim_json["session_id"], "file-session-123");
+    assert_eq!(interim_json["session_time"], 30);
+    assert_eq!(interim_json["input_octets"], 1280);
+    assert_eq!(interim_json["output_octets"], 2560);
+
+    // Verify stop event
+    let stop_json: serde_json::Value =
+        serde_json::from_str(lines[2]).expect("Failed to parse stop event");
+    assert_eq!(stop_json["event"], "stop");
+    assert_eq!(stop_json["session_id"], "file-session-123");
+    assert_eq!(stop_json["session_time"], 60);
+    assert_eq!(stop_json["input_octets"], 3840);
+    assert_eq!(stop_json["output_octets"], 7680);
+    assert_eq!(stop_json["terminate_cause"], 1);
+}
