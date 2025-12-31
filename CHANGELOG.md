@@ -59,6 +59,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Full authentication flow support
   - 4 dedicated test suites including full authentication flow
 
+#### Implementation Notes
+
+- **RADIUS-level fragmentation**: Fully implemented for splitting large EAP packets across multiple RADIUS EAP-Message attributes (253-byte chunks per RFC 2865)
+- **EAP packet-level fragmentation**: Deferred to TLS-based EAP methods implementation (EAP-TLS, PEAP, etc.) where L/M/S flags are required for certificate exchanges
+- **Current EAP methods** (Identity, MD5-Challenge) do not require packet-level fragmentation as they fit within RADIUS attribute limits
+
 ## [0.4.0] - 2024-12-31
 
 ### Added - Accounting Protocol (RFC 2866)

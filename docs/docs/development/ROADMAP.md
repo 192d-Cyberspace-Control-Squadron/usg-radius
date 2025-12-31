@@ -74,31 +74,31 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 #### Client Validation & Authorization ✅ COMPLETED
 
-- [x] Implement client IP address validation
-- [x] Per-client shared secrets
-- [x] Client database with enable/disable flags
-- [x] Source IP verification against configuration
-- [x] NAS-Identifier validation
+- ✅ Implement client IP address validation
+- ✅ Per-client shared secrets
+- ✅ Client database with enable/disable flags
+- ✅ Source IP verification against configuration
+- ✅ NAS-Identifier validation
 
 **Status**: ✅ Complete
 
 #### Request Security ✅ COMPLETED
 
-- [x] Duplicate request detection (cache recent requests)
-- [x] Identifier tracking and validation
-- [x] Request timeout handling (via cache TTL)
-- [x] Replay attack prevention
-- [x] Request rate limiting per client
+- ✅ Duplicate request detection (cache recent requests)
+- ✅ Identifier tracking and validation
+- ✅ Request timeout handling (via cache TTL)
+- ✅ Replay attack prevention
+- ✅ Request rate limiting per client
 
 **Status**: ✅ Complete
 
 #### Attribute Validation ✅ COMPLETED
 
-- [x] Required attribute enforcement (User-Name must be present)
-- [x] Enumerated value validation (Service-Type 1-13)
-- [x] Attribute type-specific validation
-- [x] Malformed packet rejection
-- [x] Strict RFC compliance mode
+- ✅ Required attribute enforcement (User-Name must be present)
+- ✅ Enumerated value validation (Service-Type 1-13)
+- ✅ Attribute type-specific validation
+- ✅ Malformed packet rejection
+- ✅ Strict RFC compliance mode
 
 **Status**: ✅ Complete
 
@@ -106,20 +106,20 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 #### Logging & Monitoring ✅ COMPLETE
 
-- [x] Replace println! with proper logging (tracing crate)
-- [x] Structured logging with levels (trace, debug, info, warn, error)
-- [x] Configurable log levels via config file or environment variable
-- [x] Security event logging (rate limits, unauthorized clients, auth failures)
-- [x] Audit trail for authentication attempts (JSON format)
+- ✅ Replace println! with proper logging (tracing crate)
+- ✅ Structured logging with levels (trace, debug, info, warn, error)
+- ✅ Configurable log levels via config file or environment variable
+- ✅ Security event logging (rate limits, unauthorized clients, auth failures)
+- ✅ Audit trail for authentication attempts (JSON format)
 - [ ] Log rotation support (handled by external tools)
 
 **Status**: ✅ Complete (log rotation delegated to system tools like logrotate)
 
 #### Rate Limiting & DoS Protection ✅ COMPLETED
 
-- [x] Per-client request rate limiting
-- [x] Global request rate limiting
-- [x] Configurable limits (per-client and global RPS/burst)
+- ✅ Per-client request rate limiting
+- ✅ Global request rate limiting
+- ✅ Configurable limits (per-client and global RPS/burst)
 - [ ] Concurrent connection limits
 - [ ] Bandwidth throttling
 
@@ -127,9 +127,9 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 ### Configuration
 
-- [x] Validate client CIDR networks
-- [x] Environment variable support for secrets
-- [x] Configuration file validation on startup
+- ✅ Validate client CIDR networks
+- ✅ Environment variable support for secrets
+- ✅ Configuration file validation on startup
 - [ ] Hot reload configuration (SIGHUP) - deferred to future release
 
 **Status**: ✅ Complete (3/3 required features, hot reload marked as future enhancement)
@@ -146,47 +146,47 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 ### CHAP Support ✅ COMPLETED
 
-- [x] CHAP-Password attribute handling
-- [x] CHAP-Challenge generation
-- [x] CHAP algorithm implementation (MD5-based)
-- [x] CHAP authentication validation
-- [x] Tests and examples (6 integration tests)
-- [x] Support for Request Authenticator as challenge
-- [x] ChapResponse and ChapChallenge types
-- [x] Interleaved PAP/CHAP authentication
+- ✅ CHAP-Password attribute handling
+- ✅ CHAP-Challenge generation
+- ✅ CHAP algorithm implementation (MD5-based)
+- ✅ CHAP authentication validation
+- ✅ Tests and examples (6 integration tests)
+- ✅ Support for Request Authenticator as challenge
+- ✅ ChapResponse and ChapChallenge types
+- ✅ Interleaved PAP/CHAP authentication
 
 **Status**: ✅ Complete (Dec 2024)
 
 ### Access-Challenge ✅ COMPLETED
 
-- [x] Access-Challenge packet generation
-- [x] State attribute handling
-- [x] Multi-round authentication flow
-- [x] AuthResult enum (Accept, Reject, Challenge)
-- [x] authenticate_with_challenge() trait method
-- [x] Challenge attribute support (Reply-Message, State)
-- [x] Integration tests demonstrating 2FA flow
+- ✅ Access-Challenge packet generation
+- ✅ State attribute handling
+- ✅ Multi-round authentication flow
+- ✅ AuthResult enum (Accept, Reject, Challenge)
+- ✅ authenticate_with_challenge() trait method
+- ✅ Challenge attribute support (Reply-Message, State)
+- ✅ Integration tests demonstrating 2FA flow
 
 **Status**: ✅ Complete (Dec 2024)
 
 ### Message-Authenticator (RFC 2869) ✅ COMPLETED
 
-- [x] HMAC-MD5 calculation
-- [x] calculate_message_authenticator() function
-- [x] verify_message_authenticator() function
-- [x] Server-side validation enforcement in Access-Request handler
-- [x] Comprehensive test suite (10 tests: 7 unit + 3 integration)
-- [x] Support for packet integrity verification
-- [x] Backward compatibility with clients not using it (validation only when present)
+- ✅ HMAC-MD5 calculation
+- ✅ calculate_message_authenticator() function
+- ✅ verify_message_authenticator() function
+- ✅ Server-side validation enforcement in Access-Request handler
+- ✅ Comprehensive test suite (10 tests: 7 unit + 3 integration)
+- ✅ Support for packet integrity verification
+- ✅ Backward compatibility with clients not using it (validation only when present)
 
 **Status**: ✅ Complete (Dec 2024)
 
 ### Proxy-State Support ✅ COMPLETED
 
-- [x] Preserve Proxy-State attributes in responses
-- [x] Multiple Proxy-State attribute handling
-- [x] Automatic copying in Access-Accept, Access-Challenge, Access-Reject
-- [x] RFC 2865 Section 5.33 compliance
+- ✅ Preserve Proxy-State attributes in responses
+- ✅ Multiple Proxy-State attribute handling
+- ✅ Automatic copying in Access-Accept, Access-Challenge, Access-Reject
+- ✅ RFC 2865 Section 5.33 compliance
 
 **Status**: ✅ Complete (Dec 2024)
 
@@ -210,94 +210,94 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 ### Accounting Protocol ✅ COMPLETED
 
-- [x] Accounting-Request (Code 4) handling
-- [x] Accounting-Response (Code 5) generation
-- [x] Acct-Status-Type validation (Start, Stop, Interim-Update, Accounting-On/Off)
-- [x] Accounting packet processing
-- [x] Request Authenticator validation (RFC 2866 Section 3)
-- [x] Response Authenticator calculation
-- [x] NAS-related accounting (Accounting-On, Accounting-Off)
+- ✅ Accounting-Request (Code 4) handling
+- ✅ Accounting-Response (Code 5) generation
+- ✅ Acct-Status-Type validation (Start, Stop, Interim-Update, Accounting-On/Off)
+- ✅ Accounting packet processing
+- ✅ Request Authenticator validation (RFC 2866 Section 3)
+- ✅ Response Authenticator calculation
+- ✅ NAS-related accounting (Accounting-On, Accounting-Off)
 
 **Status**: ✅ Complete
 
 ### Session Tracking ✅ COMPLETED
 
-- [x] Session database (in-memory with DashMap)
-- [x] Session start/stop tracking
-- [x] Interim updates
-- [x] Session timeout handling (configurable)
-- [x] Concurrent session limits (per-user)
-- [x] Stale session cleanup
-- [x] Session query APIs (by user, by NAS, by ID)
-- [x] Session statistics (count, active sessions)
+- ✅ Session database (in-memory with DashMap)
+- ✅ Session start/stop tracking
+- ✅ Interim updates
+- ✅ Session timeout handling (configurable)
+- ✅ Concurrent session limits (per-user)
+- ✅ Stale session cleanup
+- ✅ Session query APIs (by user, by NAS, by ID)
+- ✅ Session statistics (count, active sessions)
 
 **Status**: ✅ Complete
 
 ### Accounting Storage
 
-- [x] Pluggable AccountingHandler trait (async)
-- [x] SimpleAccountingHandler (in-memory, for testing)
-- [x] File-based accounting logs (JSON Lines format)
-  - [x] FileAccountingHandler implementation
-  - [x] Async file I/O with Tokio
-  - [x] JSON Lines format (one record per line)
-  - [x] Auto-creates parent directories
-  - [x] Captures all event types and attributes
-- [x] Database accounting backends
-  - [x] PostgreSQL backend
-    - [x] PostgresAccountingHandler implementation
-    - [x] Schema design (radius_sessions, radius_accounting_events)
-    - [x] Connection pooling with sqlx
-    - [x] Automatic migrations
-    - [x] All accounting event types supported
-    - [x] Session query methods
+- ✅ Pluggable AccountingHandler trait (async)
+- ✅ SimpleAccountingHandler (in-memory, for testing)
+- ✅ File-based accounting logs (JSON Lines format)
+  - ✅ FileAccountingHandler implementation
+  - ✅ Async file I/O with Tokio
+  - ✅ JSON Lines format (one record per line)
+  - ✅ Auto-creates parent directories
+  - ✅ Captures all event types and attributes
+- ✅ Database accounting backends
+  - ✅ PostgreSQL backend
+    - ✅ PostgresAccountingHandler implementation
+    - ✅ Schema design (radius_sessions, radius_accounting_events)
+    - ✅ Connection pooling with sqlx
+    - ✅ Automatic migrations
+    - ✅ All accounting event types supported
+    - ✅ Session query methods
   - [ ] MySQL backend
-- [x] Accounting data retention policies
-  - [x] Configurable retention periods (accounting_retention_days)
-  - [x] Automated cleanup method for PostgreSQL backend
-  - [x] Deletes old sessions and events based on age
+- ✅ Accounting data retention policies
+  - ✅ Configurable retention periods (accounting_retention_days)
+  - ✅ Automated cleanup method for PostgreSQL backend
+  - ✅ Deletes old sessions and events based on age
 
 **Status**: 🚧 Partial (file and PostgreSQL backends complete, MySQL pending)
 
 ### Usage Metrics
 
-- [x] Bytes in/out tracking (Acct-Input-Octets, Acct-Output-Octets)
-- [x] Session duration tracking (Acct-Session-Time)
-- [x] Termination cause tracking (Acct-Terminate-Cause)
-- [x] Packets in/out tracking (32-bit counter support)
-- [x] 64-bit counter support (Acct-Input-Gigawords, Acct-Output-Gigawords)
-  - [x] RFC 2869 gigaword attributes (52, 53)
-  - [x] Automatic 64-bit value calculation in all handlers
-  - [x] Backward compatible (gigawords optional)
-- [x] Usage reports and aggregation queries
-  - [x] PostgreSQL aggregation methods
-  - [x] Total usage by user (input/output octets, session time, count)
-  - [x] Total usage by NAS (aggregated network statistics)
-  - [x] Top users by bandwidth (ranked list with usage metrics)
-  - [x] Session duration statistics (avg/min/max/total)
-  - [x] Daily usage aggregation (time-series data)
-  - [x] Hourly usage aggregation (granular breakdowns)
-  - [x] Active session counts and grouping
-  - [x] Comprehensive test coverage for all queries
-- [x] Export functionality
-  - [x] CSV export for user usage (bandwidth and session stats)
-  - [x] CSV export for session details (active and completed)
-  - [x] JSON usage reports with summary statistics
-  - [x] Automatic MB conversion and time formatting
-  - [x] Time range filtering support
-  - [x] Comprehensive test coverage for export methods
+- ✅ Bytes in/out tracking (Acct-Input-Octets, Acct-Output-Octets)
+- ✅ Session duration tracking (Acct-Session-Time)
+- ✅ Termination cause tracking (Acct-Terminate-Cause)
+- ✅ Packets in/out tracking (32-bit counter support)
+- ✅ 64-bit counter support (Acct-Input-Gigawords, Acct-Output-Gigawords)
+  - ✅ RFC 2869 gigaword attributes (52, 53)
+  - ✅ Automatic 64-bit value calculation in all handlers
+  - ✅ Backward compatible (gigawords optional)
+- ✅ Usage reports and aggregation queries
+  - ✅ PostgreSQL aggregation methods
+  - ✅ Total usage by user (input/output octets, session time, count)
+  - ✅ Total usage by NAS (aggregated network statistics)
+  - ✅ Top users by bandwidth (ranked list with usage metrics)
+  - ✅ Session duration statistics (avg/min/max/total)
+  - ✅ Daily usage aggregation (time-series data)
+  - ✅ Hourly usage aggregation (granular breakdowns)
+  - ✅ Active session counts and grouping
+  - ✅ Comprehensive test coverage for all queries
+- ✅ Export functionality
+  - ✅ CSV export for user usage (bandwidth and session stats)
+  - ✅ CSV export for session details (active and completed)
+  - ✅ JSON usage reports with summary statistics
+  - ✅ Automatic MB conversion and time formatting
+  - ✅ Time range filtering support
+  - ✅ Comprehensive test coverage for export methods
 
 **Status**: ✅ Complete
 
 ### Test Coverage
 
-- [x] Unit tests for accounting types (AcctStatusType, AcctTerminateCause, etc.)
-- [x] Unit tests for SimpleAccountingHandler
-- [x] Unit tests for FileAccountingHandler
-- [x] Integration tests for accounting protocol
-- [x] Integration tests for session management
-- [x] Integration tests for file-based accounting
-- [x] All 28 integration tests passing
+- ✅ Unit tests for accounting types (AcctStatusType, AcctTerminateCause, etc.)
+- ✅ Unit tests for SimpleAccountingHandler
+- ✅ Unit tests for FileAccountingHandler
+- ✅ Integration tests for accounting protocol
+- ✅ Integration tests for session management
+- ✅ Integration tests for file-based accounting
+- ✅ All 28 integration tests passing
 
 **Status**: ✅ Complete
 
@@ -358,28 +358,29 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 **Priority**: MEDIUM-HIGH
 **Status**: 🔄 In Progress (EAP Framework Started)
 
-### EAP Framework ⚡ IN PROGRESS
+### EAP Framework ✅ COMPLETE
 
-- [x] EAP-Message attribute (Type 79) handling
-- [x] EAP packet structure (Request, Response, Success, Failure)
-- [x] EAP packet encoding/decoding
-- [x] EAP type enumeration (Identity, Notification, NAK, MD5, TLS, TTLS, PEAP, MSCHAPv2, TEAP)
-- [x] EAP state machine with authentication flow states
-- [x] EAP session management with timeout and cleanup
-- [x] EAP-Message RADIUS integration helpers (RFC 3579)
-- [ ] EAP packet fragmentation (RFC 3748)
+- ✅ EAP-Message attribute (Type 79) handling
+- ✅ EAP packet structure (Request, Response, Success, Failure)
+- ✅ EAP packet encoding/decoding
+- ✅ EAP type enumeration (Identity, Notification, NAK, MD5, TLS, TTLS, PEAP, MSCHAPv2, TEAP)
+- ✅ EAP state machine with authentication flow states
+- ✅ EAP session management with timeout and cleanup
+- ✅ EAP-Message RADIUS integration helpers (RFC 3579)
+- ✅ RADIUS-level fragmentation (EAP packets split across multiple RADIUS attributes)
+- [ ] EAP packet-level fragmentation (Deferred to TLS-based EAP methods - EAP-TLS, PEAP, etc.)
 
-**Status**: ✅ Core packet handling, session management, and RADIUS integration complete (Dec 2024)
-**Estimated Effort Remaining**: < 1 week
+**Status**: ✅ Core framework complete (Dec 2024)
+**Note**: EAP packet-level fragmentation (L/M/S flags per RFC 3748) will be implemented alongside TLS-based EAP methods where it's required.
 
 ### EAP Methods
 
-- [x] **EAP-MD5 Challenge** (Type 4) - RFC 3748
-  - [x] Challenge generation and parsing
-  - [x] Response computation and verification
-  - [x] MD5 hash calculation (identifier + password + challenge)
-  - [x] Full authentication flow
-  - [x] Comprehensive test coverage (4 test suites)
+- ✅ **EAP-MD5 Challenge** (Type 4) - RFC 3748
+  - ✅ Challenge generation and parsing
+  - ✅ Response computation and verification
+  - ✅ MD5 hash calculation (identifier + password + challenge)
+  - ✅ Full authentication flow
+  - ✅ Comprehensive test coverage (4 test suites)
 - [ ] EAP-TLS (Type 13) - RFC 5216 (certificate-based)
 - [ ] EAP-TTLS (Type 21) - RFC 5281 (tunneled TLS)
 - [ ] PEAP (Type 25) - Protected EAP
@@ -401,12 +402,12 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 ### Completed Features
 
 - **EAP Protocol Module** (radius-proto/eap.rs):
-  - 1400+ lines of production-ready code
+  - 1700+ lines of production-ready code
   - EapCode enum (Request, Response, Success, Failure)
   - EapType enum (11 method types)
   - EapPacket structure with parsing/encoding
   - Full RFC 3748 compliance for packet format
-  - 38 comprehensive unit tests (100% pass rate)
+  - 46 comprehensive unit tests (100% pass rate)
 
 - **EAP State Machine**:
   - 9 authentication states (Initialize, IdentityRequested, IdentityReceived, MethodRequested, ChallengeRequested, ResponseReceived, Success, Failure, Timeout)
@@ -452,12 +453,12 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 ### Database Integration ✅ COMPLETED
 
-- [x] PostgreSQL authentication backend
-- [x] User attribute storage (via attributes_query)
-- [x] Connection pooling
-- [x] Bcrypt password hashing
-- [x] Custom SQL queries
-- [x] PostgreSQL schema and migration examples
+- ✅ PostgreSQL authentication backend
+- ✅ User attribute storage (via attributes_query)
+- ✅ Connection pooling
+- ✅ Bcrypt password hashing
+- ✅ Custom SQL queries
+- ✅ PostgreSQL schema and migration examples
 - [ ] Additional password hashing algorithms (argon2, pbkdf2)
 
 **Status**: ✅ PostgreSQL complete, MySQL pending
@@ -465,13 +466,13 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 ### LDAP/Active Directory ✅ COMPLETED
 
-- [x] LDAP authentication backend
-- [x] Active Directory integration
-- [x] LDAPS (LDAP over SSL/TLS) support
-- [x] Flexible search filters and attribute retrieval
-- [x] Service account binding
-- [x] Anonymous bind support
-- [x] Async/sync compatibility
+- ✅ LDAP authentication backend
+- ✅ Active Directory integration
+- ✅ LDAPS (LDAP over SSL/TLS) support
+- ✅ Flexible search filters and attribute retrieval
+- ✅ Service account binding
+- ✅ Anonymous bind support
+- ✅ Async/sync compatibility
 - [ ] Group membership queries and RADIUS attribute mapping
 - [ ] Connection pooling and failover
 
@@ -480,26 +481,26 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 ### Documentation ✅ COMPLETED
 
-- [x] Backend integration comparison guide
-- [x] PostgreSQL integration guide (500+ lines)
-- [x] LDAP/Active Directory integration guide
-- [x] Example configurations (LDAP, AD, PostgreSQL)
-- [x] Database schema examples
-- [x] Migration guides between backends
-- [x] Security best practices
-- [x] Performance tuning recommendations
-- [x] Troubleshooting guides
-- [x] Documentation reorganization into docs/docs/ structure
+- ✅ Backend integration comparison guide
+- ✅ PostgreSQL integration guide (500+ lines)
+- ✅ LDAP/Active Directory integration guide
+- ✅ Example configurations (LDAP, AD, PostgreSQL)
+- ✅ Database schema examples
+- ✅ Migration guides between backends
+- ✅ Security best practices
+- ✅ Performance tuning recommendations
+- ✅ Troubleshooting guides
+- ✅ Documentation reorganization into docs/docs/ structure
 
 **Status**: ✅ Complete
 **Completed**: Dec 2024
 
 ### Testing ✅ COMPLETED
 
-- [x] 8 LDAP unit tests
-- [x] 9 PostgreSQL unit tests
-- [x] Configuration serialization tests
-- [x] Password hashing tests
+- ✅ 8 LDAP unit tests
+- ✅ 9 PostgreSQL unit tests
+- ✅ Configuration serialization tests
+- ✅ Password hashing tests
 - [ ] Docker-based LDAP integration tests
 - [ ] Docker-based PostgreSQL integration tests
 - [ ] End-to-end authentication tests
@@ -530,7 +531,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 - [ ] Query optimization for database backends
 - [ ] LDAP connection pooling improvements
 - [ ] Request caching enhancements
-- [x] Performance benchmarking framework
+- ✅ Performance benchmarking framework
 - [ ] Memory optimization
 - [ ] CPU profiling and optimization
 
@@ -698,7 +699,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 ### Additional Features
 
-- [x] IPv6 support (dual-stack IPv4/IPv6 for all network operations)
+- ✅ IPv6 support (dual-stack IPv4/IPv6 for all network operations)
 - [ ] RADIUS/JSON REST API
 - [ ] WebSocket transport
 - [ ] gRPC management API
