@@ -28,10 +28,7 @@ impl RevocationConfig {
     }
 
     /// Create configuration for static CRL files (no HTTP fetching)
-    pub fn static_files(
-        crl_paths: Vec<String>,
-        fallback_behavior: FallbackBehavior,
-    ) -> Self {
+    pub fn static_files(crl_paths: Vec<String>, fallback_behavior: FallbackBehavior) -> Self {
         Self {
             check_mode: RevocationCheckMode::CrlOnly,
             fallback_behavior,
@@ -242,7 +239,10 @@ mod tests {
 
     #[test]
     fn test_crl_config_static_files() {
-        let paths = vec!["/path/to/crl1.pem".to_string(), "/path/to/crl2.pem".to_string()];
+        let paths = vec![
+            "/path/to/crl1.pem".to_string(),
+            "/path/to/crl2.pem".to_string(),
+        ];
         let config = CrlConfig::static_files(paths.clone());
 
         assert_eq!(config.static_crl_paths, paths);
@@ -283,10 +283,7 @@ mod tests {
 
     #[test]
     fn test_revocation_config_serialization() {
-        let config = RevocationConfig::crl_only(
-            CrlConfig::default(),
-            FallbackBehavior::FailClosed,
-        );
+        let config = RevocationConfig::crl_only(CrlConfig::default(), FallbackBehavior::FailClosed);
 
         let json = serde_json::to_string(&config).unwrap();
         let deserialized: RevocationConfig = serde_json::from_str(&json).unwrap();

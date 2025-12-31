@@ -42,12 +42,12 @@ use super::{
     config::{FallbackBehavior, RevocationCheckMode, RevocationConfig},
     crl::CrlInfo,
     error::RevocationError,
-    fetch::{extract_crl_distribution_points, CrlFetcher},
+    fetch::{CrlFetcher, extract_crl_distribution_points},
 };
 use pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::server::{
-    danger::{ClientCertVerified, ClientCertVerifier},
     WebPkiClientVerifier,
+    danger::{ClientCertVerified, ClientCertVerifier},
 };
 use rustls::{DigitallySignedStruct, DistinguishedName, Error as RustlsError};
 use std::sync::Arc;
@@ -107,11 +107,12 @@ impl RevocationCheckingVerifier {
         // Create WebPki verifier for standard validation
         // For now, we'll use a simple configuration
         // In production, this would be configured with trusted roots
-        let webpki_verifier = WebPkiClientVerifier::builder(Arc::new(rustls::RootCertStore::empty()))
-            .build()
-            .map_err(|e| {
-                RevocationError::ConfigError(format!("Failed to create WebPki verifier: {}", e))
-            })?;
+        let webpki_verifier =
+            WebPkiClientVerifier::builder(Arc::new(rustls::RootCertStore::empty()))
+                .build()
+                .map_err(|e| {
+                    RevocationError::ConfigError(format!("Failed to create WebPki verifier: {}", e))
+                })?;
 
         // Create CRL cache
         let crl_cache = CrlCache::new(config.crl_config.max_cache_entries);
@@ -371,8 +372,8 @@ mod tests {
     fn test_verifier_creation_with_mock() {
         let config = RevocationConfig::default();
         // Note: Using with_webpki_verifier for testing since new() requires roots
-        let mock_verifier = WebPkiClientVerifier::builder(Arc::new(rustls::RootCertStore::empty()))
-            .build();
+        let mock_verifier =
+            WebPkiClientVerifier::builder(Arc::new(rustls::RootCertStore::empty())).build();
 
         // This will fail without roots - that's expected
         assert!(mock_verifier.is_err());
@@ -384,19 +385,17 @@ mod tests {
         config.check_mode = RevocationCheckMode::Disabled;
 
         // Create verifier with mock
-        let mock_verifier = WebPkiClientVerifier::builder(Arc::new(rustls::RootCertStore::empty()))
-            .build();
+        let mock_verifier =
+            WebPkiClientVerifier::builder(Arc::new(rustls::RootCertStore::empty())).build();
 
         // Skip test if we can't create verifier (expected without roots)
         if mock_verifier.is_err() {
             return;
         }
 
-        let verifier = RevocationCheckingVerifier::with_webpki_verifier(
-            config,
-            mock_verifier.unwrap(),
-        )
-        .unwrap();
+        let verifier =
+            RevocationCheckingVerifier::with_webpki_verifier(config, mock_verifier.unwrap())
+                .unwrap();
 
         // Should always succeed when disabled
         let result = verifier.check_revocation(&[0x00, 0x01, 0x02]);
@@ -409,11 +408,12 @@ mod tests {
         config.fallback_behavior = FallbackBehavior::FailOpen;
 
         // Test handle_error directly without needing a full verifier
-        let mock_verifier = WebPkiClientVerifier::builder(Arc::new(rustls::RootCertStore::empty()))
-            .build();
+        let mock_verifier =
+            WebPkiClientVerifier::builder(Arc::new(rustls::RootCertStore::empty())).build();
 
         if let Ok(verifier_arc) = mock_verifier {
-            let verifier = RevocationCheckingVerifier::with_webpki_verifier(config, verifier_arc).unwrap();
+            let verifier =
+                RevocationCheckingVerifier::with_webpki_verifier(config, verifier_arc).unwrap();
             let error = RevocationError::FetchError("Test error".to_string());
             let result = verifier.handle_error(error);
             assert!(result.is_ok()); // Should succeed in fail-open mode
@@ -426,11 +426,12 @@ mod tests {
         let mut config = RevocationConfig::default();
         config.fallback_behavior = FallbackBehavior::FailClosed;
 
-        let mock_verifier = WebPkiClientVerifier::builder(Arc::new(rustls::RootCertStore::empty()))
-            .build();
+        let mock_verifier =
+            WebPkiClientVerifier::builder(Arc::new(rustls::RootCertStore::empty())).build();
 
         if let Ok(verifier_arc) = mock_verifier {
-            let verifier = RevocationCheckingVerifier::with_webpki_verifier(config, verifier_arc).unwrap();
+            let verifier =
+                RevocationCheckingVerifier::with_webpki_verifier(config, verifier_arc).unwrap();
             let error = RevocationError::FetchError("Test error".to_string());
             let result = verifier.handle_error(error);
             assert!(result.is_err()); // Should fail in fail-closed mode
@@ -441,11 +442,12 @@ mod tests {
     #[test]
     fn test_extract_serial_number_invalid_cert() {
         let config = RevocationConfig::default();
-        let mock_verifier = WebPkiClientVerifier::builder(Arc::new(rustls::RootCertStore::empty()))
-            .build();
+        let mock_verifier =
+            WebPkiClientVerifier::builder(Arc::new(rustls::RootCertStore::empty())).build();
 
         if let Ok(verifier_arc) = mock_verifier {
-            let verifier = RevocationCheckingVerifier::with_webpki_verifier(config, verifier_arc).unwrap();
+            let verifier =
+                RevocationCheckingVerifier::with_webpki_verifier(config, verifier_arc).unwrap();
 
             // Invalid DER data
             let result = verifier.extract_serial_number(&[0x00, 0x01, 0x02]);

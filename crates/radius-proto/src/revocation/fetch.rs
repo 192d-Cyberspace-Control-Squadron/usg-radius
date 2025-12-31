@@ -100,7 +100,9 @@ impl CrlFetcher {
         let client = Client::builder()
             .timeout(Duration::from_secs(timeout_secs))
             .build()
-            .map_err(|e| RevocationError::HttpError(format!("Failed to create HTTP client: {}", e)))?;
+            .map_err(|e| {
+                RevocationError::HttpError(format!("Failed to create HTTP client: {}", e))
+            })?;
 
         Ok(Self {
             client,
@@ -134,36 +136,36 @@ impl CrlFetcher {
     /// - `CrlTooLarge`: Response exceeds max_size limit
     pub fn fetch_crl(&self, url: &str) -> Result<Vec<u8>, RevocationError> {
         // Validate and parse URL
-        let parsed_url = Url::parse(url)
-            .map_err(|e| RevocationError::InvalidUrl(format!("{}: {}", url, e)))?;
+        let parsed_url =
+            Url::parse(url).map_err(|e| RevocationError::InvalidUrl(format!("{}: {}", url, e)))?;
 
         // Ensure HTTP or HTTPS
         match parsed_url.scheme() {
-            "http" | "https" => {},
+            "http" | "https" => {}
             scheme => {
-                return Err(RevocationError::InvalidUrl(
-                    format!("Unsupported URL scheme '{}' (must be http or https)", scheme)
-                ));
+                return Err(RevocationError::InvalidUrl(format!(
+                    "Unsupported URL scheme '{}' (must be http or https)",
+                    scheme
+                )));
             }
         }
 
         // Send HTTP GET request
-        let response = self.client
-            .get(url)
-            .send()
-            .map_err(|e| {
-                if e.is_timeout() {
-                    RevocationError::HttpTimeout(self.timeout_secs)
-                } else {
-                    RevocationError::HttpError(format!("GET {} failed: {}", url, e))
-                }
-            })?;
+        let response = self.client.get(url).send().map_err(|e| {
+            if e.is_timeout() {
+                RevocationError::HttpTimeout(self.timeout_secs)
+            } else {
+                RevocationError::HttpError(format!("GET {} failed: {}", url, e))
+            }
+        })?;
 
         // Check HTTP status
         if !response.status().is_success() {
-            return Err(RevocationError::HttpError(
-                format!("HTTP {} from {}", response.status(), url)
-            ));
+            return Err(RevocationError::HttpError(format!(
+                "HTTP {} from {}",
+                response.status(),
+                url
+            )));
         }
 
         // Check Content-Length header if present
@@ -177,7 +179,8 @@ impl CrlFetcher {
         }
 
         // Read response body with size limit
-        let bytes = response.bytes()
+        let bytes = response
+            .bytes()
             .map_err(|e| RevocationError::HttpError(format!("Failed to read response: {}", e)))?;
 
         // Check actual size
@@ -212,14 +215,17 @@ pub fn extract_crl_distribution_points(cert_der: &[u8]) -> Result<Vec<String>, R
     use x509_parser::prelude::*;
 
     // Parse certificate
-    let (_, cert) = parse_x509_certificate(cert_der)
-        .map_err(|e| RevocationError::CertificateError(format!("Failed to parse certificate: {}", e)))?;
+    let (_, cert) = parse_x509_certificate(cert_der).map_err(|e| {
+        RevocationError::CertificateError(format!("Failed to parse certificate: {}", e))
+    })?;
 
     let mut distribution_points = Vec::new();
 
     // Find CRL Distribution Points extension (OID 2.5.29.31)
     // Note: get_extension_unique returns Result<Option<...>, X509Error>
-    if let Ok(Some(ext)) = cert.get_extension_unique(&oid_registry::OID_X509_EXT_CRL_DISTRIBUTION_POINTS) {
+    if let Ok(Some(ext)) =
+        cert.get_extension_unique(&oid_registry::OID_X509_EXT_CRL_DISTRIBUTION_POINTS)
+    {
         // Parse CRL Distribution Points
         // x509-parser provides a dedicated parser for this extension
         use x509_parser::extensions::ParsedExtension;
@@ -242,7 +248,7 @@ pub fn extract_crl_distribution_points(cert_der: &[u8]) -> Result<Vec<String>, R
 
     if distribution_points.is_empty() {
         Err(RevocationError::DistributionPointError(
-            "No CRL distribution points found in certificate".to_string()
+            "No CRL distribution points found in certificate".to_string(),
         ))
     } else {
         Ok(distribution_points)
@@ -307,8 +313,8 @@ mod tests {
         if let Err(e) = result {
             // Could be timeout or other error depending on network
             assert!(
-                matches!(e, RevocationError::HttpTimeout(_)) ||
-                matches!(e, RevocationError::HttpError(_))
+                matches!(e, RevocationError::HttpTimeout(_))
+                    || matches!(e, RevocationError::HttpError(_))
             );
         }
     }
@@ -337,8 +343,8 @@ mod tests {
         if let Err(e) = result {
             // Might fail on Content-Length check or actual read
             assert!(
-                matches!(e, RevocationError::CrlTooLarge(_, _)) ||
-                matches!(e, RevocationError::HttpError(_))
+                matches!(e, RevocationError::CrlTooLarge(_, _))
+                    || matches!(e, RevocationError::HttpError(_))
             );
         }
     }

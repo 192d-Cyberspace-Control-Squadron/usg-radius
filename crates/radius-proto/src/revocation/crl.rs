@@ -89,9 +89,8 @@ impl CrlInfo {
     /// loading static CRL files.
     pub fn parse_der(crl_der: &[u8]) -> Result<Self, RevocationError> {
         // Parse the CRL using x509-parser
-        let (_, crl) = parse_x509_crl(crl_der).map_err(|e| {
-            RevocationError::ParseError(format!("Failed to parse CRL DER: {}", e))
-        })?;
+        let (_, crl) = parse_x509_crl(crl_der)
+            .map_err(|e| RevocationError::ParseError(format!("Failed to parse CRL DER: {}", e)))?;
 
         // Extract issuer
         let issuer = crl.issuer().to_string();
@@ -105,10 +104,7 @@ impl CrlInfo {
         let next_update = crl.next_update().and_then(|t| asn1_time_to_chrono(&t));
 
         // Extract signature algorithm
-        let signature_algorithm = crl
-            .signature_algorithm
-            .algorithm
-            .to_id_string();
+        let signature_algorithm = crl.signature_algorithm.algorithm.to_id_string();
 
         // Extract CRL number extension (if present)
         let crl_number = None; // Simplified for Phase 1.2
@@ -188,7 +184,10 @@ impl CrlInfo {
     /// * `Ok(())` - CRL is current
     /// * `Err(RevocationError::CrlExpired)` - CRL has expired
     /// * `Err(RevocationError::CrlNotYetValid)` - CRL is future-dated
-    pub fn validate_current(&self, now: chrono::DateTime<chrono::Utc>) -> Result<(), RevocationError> {
+    pub fn validate_current(
+        &self,
+        now: chrono::DateTime<chrono::Utc>,
+    ) -> Result<(), RevocationError> {
         // Check thisUpdate <= now
         if self.this_update > now {
             return Err(RevocationError::CrlNotYetValid(

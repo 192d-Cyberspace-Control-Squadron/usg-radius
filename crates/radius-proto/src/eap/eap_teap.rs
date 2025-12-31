@@ -373,7 +373,9 @@ impl TeapResult {
 
     /// Parse Result TLV value
     pub fn from_result_tlv(tlv: &TeapTlv) -> Result<Self, EapError> {
-        if tlv.tlv_type != TlvType::Result as u16 && tlv.tlv_type != TlvType::IntermediateResult as u16 {
+        if tlv.tlv_type != TlvType::Result as u16
+            && tlv.tlv_type != TlvType::IntermediateResult as u16
+        {
             return Err(EapError::InvalidResponseFormat);
         }
         if tlv.value.len() < 2 {
@@ -657,8 +659,7 @@ impl CryptoBinding {
     /// Where BUFFER is the Crypto-Binding TLV with MAC field zeroed out,
     /// plus all previous TLVs in the conversation.
     pub fn calculate_compound_mac(cmk: &[u8], buffer: &[u8]) -> Vec<u8> {
-        let mut mac = Hmac::<Sha256>::new_from_slice(cmk)
-            .expect("HMAC can take key of any size");
+        let mut mac = Hmac::<Sha256>::new_from_slice(cmk).expect("HMAC can take key of any size");
 
         mac.update(buffer);
 
@@ -1048,13 +1049,15 @@ impl EapTeapServer {
     ///
     /// RFC 7170 Section 5.3: Verify the client's Crypto-Binding response
     /// to ensure the inner and outer authentication are properly bound.
-    fn process_crypto_binding_response(&mut self, tlv: &TeapTlv) -> Result<Option<Vec<u8>>, EapError> {
+    fn process_crypto_binding_response(
+        &mut self,
+        tlv: &TeapTlv,
+    ) -> Result<Option<Vec<u8>>, EapError> {
         // Parse Crypto-Binding TLV
         let cb_response = CryptoBindingTlv::from_tlv(tlv)?;
 
         // Verify we have a crypto-binding context
-        let crypto_binding = self.crypto_binding.as_mut()
-            .ok_or(EapError::InvalidState)?;
+        let crypto_binding = self.crypto_binding.as_mut().ok_or(EapError::InvalidState)?;
 
         // Verify sub-type is RESPONSE
         if cb_response.sub_type != CryptoBindingTlv::SUBTYPE_RESPONSE {
@@ -1398,7 +1401,10 @@ impl EapPayloadHandler {
     }
 
     /// Process EAP-Identity response
-    fn process_identity_response(&mut self, eap_packet: &super::EapPacket) -> Result<TeapTlv, EapError> {
+    fn process_identity_response(
+        &mut self,
+        eap_packet: &super::EapPacket,
+    ) -> Result<TeapTlv, EapError> {
         // Extract identity from EAP data
         if let Ok(identity) = String::from_utf8(eap_packet.data.clone()) {
             self.authenticated_identity = Some(identity.clone());
@@ -2108,7 +2114,7 @@ mod tests {
             version: CryptoBindingTlv::VERSION,
             received_version: CryptoBindingTlv::VERSION,
             sub_type: CryptoBindingTlv::SUBTYPE_RESPONSE,
-            nonce: [0u8; 32], // Client nonce
+            nonce: [0u8; 32],            // Client nonce
             compound_mac: vec![0u8; 32], // Will be recalculated in real scenario
         };
 
@@ -2124,7 +2130,9 @@ mod tests {
             ..cb_response
         };
 
-        let result4 = server.process_phase2_tlvs(&[cb_response_with_mac.to_tlv()]).unwrap();
+        let result4 = server
+            .process_phase2_tlvs(&[cb_response_with_mac.to_tlv()])
+            .unwrap();
         assert!(result4.is_some());
         assert_eq!(server.phase, TeapPhase::Complete);
 
@@ -2285,10 +2293,16 @@ mod tests {
         // Wrong MAC should not verify
         let mut wrong_mac = mac.clone();
         wrong_mac[0] ^= 0x01; // Flip one bit
-        assert!(!CryptoBinding::verify_compound_mac(&cmk, buffer, &wrong_mac));
+        assert!(!CryptoBinding::verify_compound_mac(
+            &cmk, buffer, &wrong_mac
+        ));
 
         // Wrong buffer should not verify
-        assert!(!CryptoBinding::verify_compound_mac(&cmk, b"wrong buffer", &mac));
+        assert!(!CryptoBinding::verify_compound_mac(
+            &cmk,
+            b"wrong buffer",
+            &mac
+        ));
     }
 
     #[test]
@@ -2536,7 +2550,10 @@ mod tests {
         let parsed_packet = payload.parse_eap_packet().unwrap();
         assert_eq!(parsed_packet.code, super::super::EapCode::Request);
         assert_eq!(parsed_packet.identifier, 1);
-        assert_eq!(parsed_packet.eap_type, Some(super::super::EapType::Identity));
+        assert_eq!(
+            parsed_packet.eap_type,
+            Some(super::super::EapType::Identity)
+        );
     }
 
     #[test]
@@ -2604,7 +2621,10 @@ mod tests {
         let eap_packet = eap_payload.parse_eap_packet().unwrap();
 
         assert_eq!(eap_packet.code, super::super::EapCode::Request);
-        assert_eq!(eap_packet.eap_type, Some(super::super::EapType::Md5Challenge));
+        assert_eq!(
+            eap_packet.eap_type,
+            Some(super::super::EapType::Md5Challenge)
+        );
         assert_eq!(eap_packet.data.len(), 17); // 1 byte size + 16 bytes challenge
     }
 
@@ -2748,7 +2768,10 @@ mod tests {
         let eap_payload3 = EapPayloadTlv::from_tlv(&tlvs3[0]).unwrap();
         let eap_packet3 = eap_payload3.parse_eap_packet().unwrap();
         assert_eq!(eap_packet3.code, super::super::EapCode::Request);
-        assert_eq!(eap_packet3.eap_type, Some(super::super::EapType::Md5Challenge));
+        assert_eq!(
+            eap_packet3.eap_type,
+            Some(super::super::EapType::Md5Challenge)
+        );
 
         // Step 4: EAP-MD5 Challenge response -> Crypto-Binding request
         let mut md5_response_data = Vec::new();
@@ -2778,8 +2801,10 @@ mod tests {
 
     #[test]
     fn test_eap_payload_inner_method_handler_trait() {
-        let handler: Box<dyn InnerMethodHandler> =
-            Box::new(EapPayloadHandler::new("alice".to_string(), "password".to_string()));
+        let handler: Box<dyn InnerMethodHandler> = Box::new(EapPayloadHandler::new(
+            "alice".to_string(),
+            "password".to_string(),
+        ));
 
         // Test trait methods
         assert!(!handler.is_complete());
