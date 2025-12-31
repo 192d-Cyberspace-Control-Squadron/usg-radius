@@ -49,7 +49,8 @@
 pub mod config;
 pub mod error;
 
-// CRL, caching, and fetching modules will be added in subsequent phases
+// CRL, caching, and fetching modules (in development)
+// These modules are feature-gated and will be completed in Phase 1.2-1.4
 #[cfg(feature = "revocation")]
 pub(crate) mod crl;
 #[cfg(feature = "revocation")]
