@@ -287,19 +287,19 @@ fn validate_service_type(attr: &Attribute, mode: ValidationMode) -> Result<(), V
     // RFC 2865 defines values 1-13
     let valid = matches!(
         value,
-        1  // Login
-        | 2  // Framed
-        | 3  // Callback Login
-        | 4  // Callback Framed
-        | 5  // Outbound
-        | 6  // Administrative
-        | 7  // NAS Prompt
-        | 8  // Authenticate Only
-        | 9  // Callback NAS Prompt
-        | 10 // Call Check
-        | 11 // Callback Administrative
-        | 12 // Voice (RFC 2865 extension)
-        | 13 // Fax (RFC 2865 extension)
+        1..=13 // 1 Login
+               // 2 Framed
+               // 3 Callback Login
+               // 4 Callback Framed
+               // 5 Outbound
+               // 6 Administrative
+               // 7 NAS Prompt
+               // 8 Authenticate Only
+               // 9 Callback NAS Prompt
+               // 10 Call Check
+               // 11 Callback Administrative
+               // 12 Voice (RFC 2865 extension)
+               // 13 Fax (RFC 2865 extension)
     );
 
     if !valid && mode == ValidationMode::Strict {
@@ -320,13 +320,13 @@ fn validate_framed_protocol(attr: &Attribute, mode: ValidationMode) -> Result<()
     // RFC 2865 defines values 1-7
     let valid = matches!(
         value,
-        1  // PPP
-        | 2  // SLIP
-        | 3  // AppleTalk Remote Access Protocol (ARAP)
-        | 4  // Gandalf proprietary SingleLink/MultiLink protocol
-        | 5  // Xylogics proprietary IPX/SLIP
-        | 6  // X.75 Synchronous
-        | 7 // GPRS PDP Context
+        1..=7 // 1 PPP
+              // 2 SLIP
+              // 3 AppleTalk Remote Access Protocol (ARAP)
+              // 4 Gandalf proprietary SingleLink/MultiLink protocol
+              // 5 Xylogics proprietary IPX/SLIP
+              // 6 X.75 Synchronous
+              // 7 GPRS PDP Context
     );
 
     if !valid && mode == ValidationMode::Strict {
@@ -346,10 +346,10 @@ fn validate_framed_routing(attr: &Attribute, mode: ValidationMode) -> Result<(),
 
     let valid = matches!(
         value,
-        0 // None
-        | 1 // Send routing packets
-        | 2 // Listen for routing packets
-        | 3 // Send and Listen
+        0..=3 // 0 None
+              // 1 Send routing packets
+              // 2 Listen for routing packets
+              // 3 Send and Listen
     );
 
     if !valid && mode == ValidationMode::Strict {
@@ -372,10 +372,10 @@ fn validate_framed_compression(
 
     let valid = matches!(
         value,
-        0 // None
-        | 1 // VJ TCP/IP header compression
-        | 2 // IPX header compression
-        | 3 // Stac-LZS compression
+        0..=3 // 0 None
+              // 1 VJ TCP/IP header compression
+              // 2 IPX header compression
+              // 3 Stac-LZS compression
     );
 
     if !valid && mode == ValidationMode::Strict {
@@ -395,14 +395,14 @@ fn validate_login_service(attr: &Attribute, mode: ValidationMode) -> Result<(), 
 
     let valid = matches!(
         value,
-        0 // Telnet
-        | 1 // Rlogin
-        | 2 // TCP Clear
-        | 3 // PortMaster (proprietary)
-        | 4 // LAT
-        | 5 // X25-PAD
-        | 6 // X25-T3POS
-        | 8 // TCP Clear Quiet (suppresses any NAS-generated connect string)
+        0..=8 // 0 Telnet
+              // 1 Rlogin
+              // 2 TCP Clear
+              // 3 PortMaster (proprietary)
+              // 4 LAT
+              // 5 X25-PAD
+              // 6 X25-T3POS
+              // 8 TCP Clear Quiet (suppresses any NAS-generated connect string)
     );
 
     if !valid && mode == ValidationMode::Strict {
