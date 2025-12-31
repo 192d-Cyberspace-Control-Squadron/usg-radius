@@ -100,6 +100,12 @@ pub enum AttributeType {
     AcctMultiSessionId = 50,
     /// Acct-Link-Count (51) - RFC 2866
     AcctLinkCount = 51,
+    /// Acct-Input-Gigawords (52) - RFC 2869
+    /// High 32 bits of 64-bit Acct-Input-Octets counter
+    AcctInputGigawords = 52,
+    /// Acct-Output-Gigawords (53) - RFC 2869
+    /// High 32 bits of 64-bit Acct-Output-Octets counter
+    AcctOutputGigawords = 53,
     /// CHAP-Challenge (60) - RFC 2865
     ChapChallenge = 60,
     /// NAS-Port-Type (61) - RFC 2865
@@ -164,6 +170,8 @@ impl AttributeType {
             49 => Some(AttributeType::AcctTerminateCause),
             50 => Some(AttributeType::AcctMultiSessionId),
             51 => Some(AttributeType::AcctLinkCount),
+            52 => Some(AttributeType::AcctInputGigawords),
+            53 => Some(AttributeType::AcctOutputGigawords),
             60 => Some(AttributeType::ChapChallenge),
             61 => Some(AttributeType::NasPortType),
             62 => Some(AttributeType::PortLimit),

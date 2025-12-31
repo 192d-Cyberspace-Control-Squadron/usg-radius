@@ -133,7 +133,8 @@ impl FileAccountingHandler {
                 }
             });
 
-        let input_octets = packet
+        // Extract input octets with 64-bit support (RFC 2869)
+        let input_octets_low = packet
             .find_attribute(AttributeType::AcctInputOctets as u8)
             .and_then(|attr| {
                 if attr.value.len() >= 4 {
@@ -142,13 +143,34 @@ impl FileAccountingHandler {
                         attr.value[1],
                         attr.value[2],
                         attr.value[3],
-                    ]) as u64)
+                    ]))
                 } else {
                     None
                 }
             });
 
-        let output_octets = packet
+        let input_octets_high = packet
+            .find_attribute(AttributeType::AcctInputGigawords as u8)
+            .and_then(|attr| {
+                if attr.value.len() >= 4 {
+                    Some(u32::from_be_bytes([
+                        attr.value[0],
+                        attr.value[1],
+                        attr.value[2],
+                        attr.value[3],
+                    ]))
+                } else {
+                    None
+                }
+            });
+
+        let input_octets = input_octets_low.map(|low| {
+            let high = input_octets_high.unwrap_or(0) as u64;
+            (high << 32) | (low as u64)
+        });
+
+        // Extract output octets with 64-bit support (RFC 2869)
+        let output_octets_low = packet
             .find_attribute(AttributeType::AcctOutputOctets as u8)
             .and_then(|attr| {
                 if attr.value.len() >= 4 {
@@ -157,11 +179,31 @@ impl FileAccountingHandler {
                         attr.value[1],
                         attr.value[2],
                         attr.value[3],
-                    ]) as u64)
+                    ]))
                 } else {
                     None
                 }
             });
+
+        let output_octets_high = packet
+            .find_attribute(AttributeType::AcctOutputGigawords as u8)
+            .and_then(|attr| {
+                if attr.value.len() >= 4 {
+                    Some(u32::from_be_bytes([
+                        attr.value[0],
+                        attr.value[1],
+                        attr.value[2],
+                        attr.value[3],
+                    ]))
+                } else {
+                    None
+                }
+            });
+
+        let output_octets = output_octets_low.map(|low| {
+            let high = output_octets_high.unwrap_or(0) as u64;
+            (high << 32) | (low as u64)
+        });
 
         let terminate_cause = packet
             .find_attribute(AttributeType::AcctTerminateCause as u8)
