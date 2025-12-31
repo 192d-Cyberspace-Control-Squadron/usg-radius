@@ -595,6 +595,13 @@ impl RadiusServer {
                     response.add_attribute(attr);
                 }
 
+                // Copy Proxy-State attributes from request to response (RFC 2865 Section 5.33)
+                for attr in request.attributes.iter() {
+                    if attr.attr_type == AttributeType::ProxyState as u8 {
+                        response.add_attribute(attr.clone());
+                    }
+                }
+
                 // Calculate and set Response Authenticator using client-specific secret
                 let response_auth =
                     calculate_response_authenticator(&response, &request.authenticator, secret);
@@ -642,6 +649,13 @@ impl RadiusServer {
                     response.add_attribute(attr);
                 }
 
+                // Copy Proxy-State attributes from request to response (RFC 2865 Section 5.33)
+                for attr in request.attributes.iter() {
+                    if attr.attr_type == AttributeType::ProxyState as u8 {
+                        response.add_attribute(attr.clone());
+                    }
+                }
+
                 // Calculate and set Response Authenticator using client-specific secret
                 let response_auth =
                     calculate_response_authenticator(&response, &request.authenticator, secret);
@@ -682,6 +696,13 @@ impl RadiusServer {
                 // Add attributes from auth handler
                 for attr in config.auth_handler.get_reject_attributes(&username) {
                     response.add_attribute(attr);
+                }
+
+                // Copy Proxy-State attributes from request to response (RFC 2865 Section 5.33)
+                for attr in request.attributes.iter() {
+                    if attr.attr_type == AttributeType::ProxyState as u8 {
+                        response.add_attribute(attr.clone());
+                    }
                 }
 
                 // Calculate and set Response Authenticator using client-specific secret

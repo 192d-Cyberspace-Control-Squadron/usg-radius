@@ -39,6 +39,7 @@
 pub mod attributes;
 pub mod auth;
 pub mod chap;
+pub mod message_auth;
 pub mod packet;
 pub mod validation;
 
@@ -50,5 +51,6 @@ pub use auth::{
 pub use chap::{
     compute_chap_response, verify_chap_response, ChapChallenge, ChapError, ChapResponse,
 };
+pub use message_auth::{calculate_message_authenticator, verify_message_authenticator};
 pub use packet::{Code, Packet, PacketError};
 pub use validation::{validate_packet, ValidationError, ValidationMode};

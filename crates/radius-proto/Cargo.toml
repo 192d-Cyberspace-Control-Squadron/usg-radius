@@ -8,6 +8,8 @@ repository.workspace = true
 description = "RADIUS protocol implementation (RFC 2865, 2866, 2869, 5997)"
 
 [dependencies]
+hmac.workspace = true
+md5-digest.workspace = true
 md5.workspace = true
 rand.workspace = true
 thiserror.workspace = true
