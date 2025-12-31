@@ -91,7 +91,7 @@ impl Attribute {
         cursor.read_exact(&mut len_buf)?;
         let length = len_buf[0] as usize;
 
-        if length < Self::MIN_LENGTH || length > Self::MAX_LENGTH {
+        if !(Self::MIN_LENGTH..=Self::MAX_LENGTH).contains(&length) {
             return Err(PacketError::AttributeError(format!(
                 "Invalid attribute length: {}",
                 length
