@@ -743,10 +743,10 @@ pub mod eap_tls {
             // Check if we have all fragments
             if !packet.flags.more_fragments() {
                 // Validate length if it was specified
-                if let Some(expected) = self.expected_length {
-                    if self.fragments.len() != expected as usize {
-                        return Err(EapError::InvalidLength(self.fragments.len()));
-                    }
+                if let Some(expected) = self.expected_length
+                    && self.fragments.len() != expected as usize
+                {
+                    return Err(EapError::InvalidLength(self.fragments.len()));
                 }
 
                 // Return complete data
