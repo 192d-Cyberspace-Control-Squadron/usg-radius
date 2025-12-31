@@ -411,13 +411,33 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
     - Option 2: Wait for upstream rustls key export API
     - Option 3: Alternative TLS library integration
     - Current: Placeholder implementation with dummy keys for testing
-- [ ] EAP-TTLS (Type 21) - RFC 5281 (tunneled TLS)
-- [ ] PEAP (Type 25) - Protected EAP
-- [ ] EAP-MSCHAPv2 (Type 26)
-- [ ] EAP-TEAP (Type 55) - RFC 7170
 
-**Status**: 🔄 EAP-TLS framework started (Dec 2025), EAP-MD5 complete
-**Estimated Effort**: 4-5 weeks remaining (TLS handshake integration + other methods)
+### Future EAP Methods (Deferred)
+
+The following EAP methods are deferred for future development after production key extraction is resolved:
+
+- [ ] **EAP-TTLS** (Type 21) - RFC 5281 (tunneled TLS) - **DEFERRED**
+  - Requires EAP-TLS production keys working first
+  - Builds tunnel over TLS for inner authentication
+  - Estimated: 3-4 weeks after EAP-TLS keys complete
+
+- [ ] **PEAP** (Type 25) - Protected EAP - **DEFERRED**
+  - Similar to EAP-TTLS, requires working TLS foundation
+  - Microsoft/Cisco implementation differences
+  - Estimated: 3-4 weeks after EAP-TLS keys complete
+
+- [ ] **EAP-MSCHAPv2** (Type 26) - **DEFERRED**
+  - Often used as inner method for PEAP
+  - Challenge-response authentication
+  - Estimated: 1-2 weeks
+
+- [ ] **EAP-TEAP** (Type 55) - RFC 7170 - **DEFERRED**
+  - Tunnel Extensible Authentication Protocol
+  - Modern replacement for PEAP
+  - Estimated: 4-5 weeks
+
+**Status**: ✅ EAP-TLS ~95% complete (Dec 2025), EAP-MD5 complete
+**Future Work**: Complete production key extraction, then implement tunneled methods
 
 ### Certificate Management
 
