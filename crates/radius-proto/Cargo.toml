@@ -12,9 +12,16 @@ hmac.workspace = true
 md5-digest.workspace = true
 md5.workspace = true
 rand.workspace = true
+sha2.workspace = true
 thiserror.workspace = true
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
+
+# TLS dependencies (for EAP-TLS, EAP-TTLS, PEAP)
+rustls = { workspace = true, optional = true }
+rustls-pemfile = { workspace = true, optional = true }
+x509-parser = { workspace = true, optional = true }
+pki-types = { workspace = true, optional = true }
 
 [dev-dependencies]
 hex.workspace = true
@@ -22,3 +29,4 @@ hex.workspace = true
 [features]
 default = []
 serde = ["dep:serde", "dep:serde_json"]
+tls = ["dep:rustls", "dep:rustls-pemfile", "dep:x509-parser", "dep:pki-types"]

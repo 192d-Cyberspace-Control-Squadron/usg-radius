@@ -4,7 +4,7 @@ This document outlines the development roadmap for the USG RADIUS project, organ
 
 ## Current Status: v0.3.0 (Authentication Methods)
 
-**Release Date**: December 2024
+**Release Date**: December 2025
 **Status**: ✅ Complete - Multi-method authentication ready
 
 ### Completed Features (v0.1.0 + v0.2.0 + v0.3.0)
@@ -65,7 +65,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 ---
 
-## v0.2.0 - Security & Production Hardening (Q1 2025)
+## v0.2.0 - Security & Production Hardening (Q4 2025)
 
 **Goal**: Make the server production-ready for basic deployments
 **Priority**: CRITICAL
@@ -138,11 +138,11 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 ---
 
-## v0.3.0 - Authentication Methods (Q2 2025)
+## v0.3.0 - Authentication Methods (Q4 2025)
 
 **Goal**: Support modern authentication methods
 **Priority**: HIGH
-**Status**: ✅ Complete (Dec 2024)
+**Status**: ✅ Complete (Dec 2025)
 
 ### CHAP Support ✅ COMPLETED
 
@@ -155,7 +155,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 - ✅ ChapResponse and ChapChallenge types
 - ✅ Interleaved PAP/CHAP authentication
 
-**Status**: ✅ Complete (Dec 2024)
+**Status**: ✅ Complete (Dec 2025)
 
 ### Access-Challenge ✅ COMPLETED
 
@@ -167,7 +167,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 - ✅ Challenge attribute support (Reply-Message, State)
 - ✅ Integration tests demonstrating 2FA flow
 
-**Status**: ✅ Complete (Dec 2024)
+**Status**: ✅ Complete (Dec 2025)
 
 ### Message-Authenticator (RFC 2869) ✅ COMPLETED
 
@@ -179,7 +179,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 - ✅ Support for packet integrity verification
 - ✅ Backward compatibility with clients not using it (validation only when present)
 
-**Status**: ✅ Complete (Dec 2024)
+**Status**: ✅ Complete (Dec 2025)
 
 ### Proxy-State Support ✅ COMPLETED
 
@@ -188,7 +188,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 - ✅ Automatic copying in Access-Accept, Access-Challenge, Access-Reject
 - ✅ RFC 2865 Section 5.33 compliance
 
-**Status**: ✅ Complete (Dec 2024)
+**Status**: ✅ Complete (Dec 2025)
 
 **Completed Features**:
 
@@ -202,7 +202,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 ---
 
-## v0.4.0 - Accounting & Session Management (Q3 2025)
+## v0.4.0 - Accounting & Session Management (Q4 2025)
 
 **Goal**: Add RADIUS Accounting support (RFC 2866)
 **Priority**: HIGH
@@ -370,7 +370,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 - ✅ RADIUS-level fragmentation (EAP packets split across multiple RADIUS attributes)
 - [ ] EAP packet-level fragmentation (Deferred to TLS-based EAP methods - EAP-TLS, PEAP, etc.)
 
-**Status**: ✅ Core framework complete (Dec 2024)
+**Status**: ✅ Core framework complete (Dec 2025)
 **Note**: EAP packet-level fragmentation (L/M/S flags per RFC 3748) will be implemented alongside TLS-based EAP methods where it's required.
 
 ### EAP Methods
@@ -381,23 +381,50 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
   - ✅ MD5 hash calculation (identifier + password + challenge)
   - ✅ Full authentication flow
   - ✅ Comprehensive test coverage (4 test suites)
-- [ ] EAP-TLS (Type 13) - RFC 5216 (certificate-based)
+- 🔄 **EAP-TLS** (Type 13) - RFC 5216 (certificate-based)
+  - ✅ EAP-TLS packet structure and parsing
+  - ✅ TLS flags (L/M/S) implementation
+  - ✅ Fragment assembler and reassembly
+  - ✅ Message fragmentation (large TLS records)
+  - ✅ MSK/EMSK key derivation (RFC 5216 Section 2.3)
+  - ✅ TLS 1.2 PRF using SHA-256
+  - ✅ TLS handshake state machine
+  - ✅ EapTlsContext for session management
+  - ✅ Fragment queue and outgoing buffer management
+  - ✅ TlsCertificateConfig structure
+  - ✅ Certificate/key loading with rustls-pemfile
+  - ✅ X.509 certificate validation (validity period)
+  - ✅ TLS-specific error types (TlsError, CertificateError, IoError)
+  - ✅ Comprehensive test coverage (38 test suites)
+  - ✅ Complete documentation with examples
+  - ✅ Actual TLS handshake using rustls (EapTlsServer)
+  - ✅ rustls ServerConnection wrapper with message processing
+  - ✅ EapTlsAuthHandler trait for RADIUS integration
+  - ✅ X.509 certificate chain verification
+  - ✅ CA certificate loading and validation
+  - ✅ Client certificate support (mutual TLS)
+  - ✅ Client certificate identity verification
+  - [ ] Integration with RADIUS server (add to AuthHandler)
+  - [ ] Production key extraction (MSK/EMSK from rustls internals)
 - [ ] EAP-TTLS (Type 21) - RFC 5281 (tunneled TLS)
 - [ ] PEAP (Type 25) - Protected EAP
 - [ ] EAP-MSCHAPv2 (Type 26)
 - [ ] EAP-TEAP (Type 55) - RFC 7170
 
-**Status**: ✅ EAP-MD5 complete for testing (Dec 2024)
-**Estimated Effort**: 6 weeks remaining (1-2 weeks per method)
+**Status**: 🔄 EAP-TLS framework started (Dec 2025), EAP-MD5 complete
+**Estimated Effort**: 4-5 weeks remaining (TLS handshake integration + other methods)
 
 ### Certificate Management
 
-- [ ] Certificate validation
-- [ ] CA certificate chain verification
+- ✅ Certificate validation
+- ✅ CA certificate chain verification
+- ✅ Certificate expiry checking
+- ✅ Certificate/key pair validation
+- ✅ PEM file loading (certificates and keys)
+- ✅ X.509 DER parsing and validation
 - [ ] Certificate revocation (CRL/OCSP)
-- [ ] Certificate expiry checking
 
-**Estimated Effort**: 2 weeks
+**Status**: 🔄 Mostly Complete (CRL/OCSP pending)
 
 ### Completed Features
 
@@ -445,7 +472,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 ---
 
-## v0.6.0 - Enterprise Features (Q1 2025)
+## v0.6.0 - Enterprise Features (Q1 2026)
 
 **Goal**: Enterprise-grade features
 **Priority**: MEDIUM
@@ -462,7 +489,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 - [ ] Additional password hashing algorithms (argon2, pbkdf2)
 
 **Status**: ✅ PostgreSQL complete, MySQL pending
-**Completed**: Dec 2024
+**Completed**: Dec 2025
 
 ### LDAP/Active Directory ✅ COMPLETED
 
@@ -477,7 +504,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 - [ ] Connection pooling and failover
 
 **Status**: ✅ Core features complete, advanced features pending
-**Completed**: Dec 2024
+**Completed**: Dec 2025
 
 ### Documentation ✅ COMPLETED
 
@@ -493,7 +520,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 - ✅ Documentation reorganization into docs/docs/ structure
 
 **Status**: ✅ Complete
-**Completed**: Dec 2024
+**Completed**: Dec 2025
 
 ### Testing ✅ COMPLETED
 
@@ -506,7 +533,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 - [ ] End-to-end authentication tests
 
 **Status**: 🔄 Unit tests complete, integration tests pending
-**Completed**: Dec 2024 (partial)
+**Completed**: Dec 2025 (partial)
 
 ### High Availability
 
@@ -775,9 +802,9 @@ We welcome community contributions! Priority areas:
 | Version | Quarter | Focus | Weeks |
 | --------- | --------- | ------- | ------- |
 | v0.1.0 | Now | Core Protocol | ✅ Done |
-| v0.2.0 | Q1 2025 | Security & Production | ✅ Done |
-| v0.3.0 | Q2 2025 | Auth Methods | ✅ Done |
-| v0.4.0 | Q3 2025 | Accounting | ✅ Done |
+| v0.2.0 | Q4 2025 | Security & Production | ✅ Done |
+| v0.3.0 | Q4 2025 | Auth Methods | ✅ Done |
+| v0.4.0 | Q4 2025 | Accounting | ✅ Done |
 | v0.5.0 | Q4 2025 | EAP Support | 11 |
 | v0.6.0 | Q1 2026 | Enterprise Features | 11 |
 | v0.7.0 | Q2 2026 | Proxy | 7 |
