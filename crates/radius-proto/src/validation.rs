@@ -17,7 +17,7 @@
 //!   - Allows invalid enumerated values for compatibility
 
 use crate::attributes::{Attribute, AttributeType};
-use crate::packet::{Code, Packet, PacketError};
+use crate::packet::{Code, Packet};
 
 /// Validation mode for RADIUS packets
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -93,7 +93,7 @@ pub fn validate_packet(packet: &Packet, mode: ValidationMode) -> Result<(), Vali
 }
 
 /// Validate Access-Request packet
-fn validate_access_request(packet: &Packet, mode: ValidationMode) -> Result<(), ValidationError> {
+fn validate_access_request(packet: &Packet, _mode: ValidationMode) -> Result<(), ValidationError> {
     // RFC 2865 Section 4.1: User-Name is REQUIRED
     if packet.find_attribute(AttributeType::UserName as u8).is_none() {
         return Err(ValidationError::with_attribute(

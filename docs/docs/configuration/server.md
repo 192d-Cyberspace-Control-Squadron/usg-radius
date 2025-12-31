@@ -95,6 +95,7 @@ The default shared secret for client authentication.
 - **Default**: `"testing123"`
 - **Minimum length**: 1 character
 - **Recommended length**: 16+ characters
+- **Environment Variables**: Supported via `${VAR_NAME}` syntax
 
 **Example:**
 
@@ -104,12 +105,27 @@ The default shared secret for client authentication.
 }
 ```
 
+**Environment Variable Example:**
+
+```json
+{
+  "secret": "${RADIUS_SECRET}"
+}
+```
+
+```bash
+# Set environment variable
+export RADIUS_SECRET="MyVerySecureSecret2024!"
+usg_radius
+```
+
 !!! danger "Security Critical"
     - Use a strong, random secret (16+ characters)
     - Include uppercase, lowercase, numbers, and symbols
     - Never use default secrets in production
     - Rotate secrets regularly
     - Use different secrets per client (see Clients configuration)
+    - Store secrets in environment variables for containerized deployments
 
 ### verbose
 
@@ -455,16 +471,52 @@ Error: Invalid listen address: 999.999.999.999
 
 ## Environment Variables
 
-!!! info "Future Feature"
-    Environment variable support for secrets is planned for a future release.
+Environment variable expansion is supported for all secret fields using `${VAR_NAME}` syntax.
 
-Planned syntax:
+**Supported Fields:**
+
+- `secret` (default shared secret)
+- `clients[].secret` (per-client secrets)
+
+**Syntax:**
 
 ```json
 {
-  "secret": "${RADIUS_SECRET}"
+  "secret": "${RADIUS_SECRET}",
+  "clients": [
+    {
+      "address": "192.168.1.0/24",
+      "secret": "${CLIENT_NETWORK_SECRET}",
+      "name": "Internal Network"
+    }
+  ]
 }
 ```
+
+**Usage:**
+
+```bash
+# Set environment variables
+export RADIUS_SECRET="MyVerySecureSecret2024!"
+export CLIENT_NETWORK_SECRET="NetworkSecret123!"
+
+# Start server (variables are expanded on startup)
+usg_radius
+```
+
+**Error Handling:**
+
+If an environment variable is referenced but not set, the server will fail to start:
+
+```plain
+Error: Environment variable not found: RADIUS_SECRET
+```
+
+!!! tip "Best Practices"
+    - Use environment variables in containerized deployments (Docker, Kubernetes)
+    - Never commit `.env` files with real secrets to version control
+    - Validate environment variables are set before starting the server
+    - Use secret management systems (HashiCorp Vault, AWS Secrets Manager) in production
 
 ## Reloading Configuration
 

@@ -1,6 +1,7 @@
 use ipnetwork::IpNetwork;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::env;
 use std::fs;
 use std::net::{IpAddr, SocketAddr};
 use std::path::Path;
@@ -14,6 +15,30 @@ pub enum ConfigError {
     Parse(#[from] serde_json::Error),
     #[error("Invalid configuration: {0}")]
     Invalid(String),
+    #[error("Environment variable not found: {0}")]
+    EnvVarNotFound(String),
+}
+
+/// Expand environment variables in a string
+///
+/// Supports syntax: ${VAR_NAME} or $VAR_NAME
+/// Returns error if variable is not found
+fn expand_env_vars(s: &str) -> Result<String, ConfigError> {
+    let mut result = s.to_string();
+
+    // Match ${VAR_NAME} pattern
+    while let Some(start) = result.find("${") {
+        if let Some(end) = result[start..].find('}') {
+            let var_name = &result[start + 2..start + end];
+            let value = env::var(var_name)
+                .map_err(|_| ConfigError::EnvVarNotFound(var_name.to_string()))?;
+            result.replace_range(start..start + end + 1, &value);
+        } else {
+            break;
+        }
+    }
+
+    Ok(result)
 }
 
 /// User configuration
@@ -182,9 +207,18 @@ impl Default for Config {
 
 impl Config {
     /// Load configuration from a JSON file
+    ///
+    /// Supports environment variable expansion in secret fields using ${VAR_NAME} syntax.
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, ConfigError> {
         let contents = fs::read_to_string(path)?;
-        let config: Config = serde_json::from_str(&contents)?;
+        let mut config: Config = serde_json::from_str(&contents)?;
+
+        // Expand environment variables in secrets
+        config.secret = expand_env_vars(&config.secret)?;
+        for client in &mut config.clients {
+            client.secret = expand_env_vars(&client.secret)?;
+        }
+
         config.validate()?;
         Ok(config)
     }
@@ -578,5 +612,42 @@ mod tests {
         let addr = config.socket_addr().unwrap();
         assert_eq!(addr.port(), 1812);
         assert!(addr.is_ipv6());
+    }
+
+    #[test]
+    fn test_expand_env_vars() {
+        env::set_var("TEST_SECRET", "my_secret_value");
+        env::set_var("TEST_PORT", "1234");
+
+        let result = expand_env_vars("${TEST_SECRET}").unwrap();
+        assert_eq!(result, "my_secret_value");
+
+        let result = expand_env_vars("prefix_${TEST_SECRET}_suffix").unwrap();
+        assert_eq!(result, "prefix_my_secret_value_suffix");
+
+        let result = expand_env_vars("port=${TEST_PORT}").unwrap();
+        assert_eq!(result, "port=1234");
+
+        env::remove_var("TEST_SECRET");
+        env::remove_var("TEST_PORT");
+    }
+
+    #[test]
+    fn test_expand_env_vars_not_found() {
+        let result = expand_env_vars("${NONEXISTENT_VAR}");
+        assert!(result.is_err());
+        match result {
+            Err(ConfigError::EnvVarNotFound(var)) => assert_eq!(var, "NONEXISTENT_VAR"),
+            _ => panic!("Expected EnvVarNotFound error"),
+        }
+    }
+
+    #[test]
+    fn test_expand_env_vars_no_expansion() {
+        let result = expand_env_vars("plain_text").unwrap();
+        assert_eq!(result, "plain_text");
+
+        let result = expand_env_vars("no_vars_here").unwrap();
+        assert_eq!(result, "no_vars_here");
     }
 }

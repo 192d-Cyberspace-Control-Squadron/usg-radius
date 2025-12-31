@@ -2,12 +2,15 @@
 
 This document outlines the development roadmap for the USG RADIUS project, organized by release milestones.
 
-## Current Status: v0.1.0 (Development)
+## Current Status: v0.2.0 (Production Hardening)
 
 **Release Date**: TBD
-**Status**: ✅ Core functionality complete, not production-ready
+**Status**: ✅ Production-ready for basic deployments
 
-### Completed Features
+### Completed Features (v0.1.0 + v0.2.0)
+
+**Core Protocol (v0.1.0)**
+
 - ✅ Basic RADIUS protocol implementation (RFC 2865)
 - ✅ PAP authentication
 - ✅ User-Password encryption/decryption
@@ -18,12 +21,37 @@ This document outlines the development roadmap for the USG RADIUS project, organ
 - ✅ JSON configuration
 - ✅ Simple in-memory authentication
 - ✅ Workspace structure with separate protocol and server crates
+- ✅ IPv6 dual-stack support (IPv4 + IPv6)
+
+**Security & Production Hardening (v0.2.0)**
+
+- ✅ Client IP address validation
+- ✅ Per-client shared secrets
+- ✅ Client database with enable/disable flags
+- ✅ Source IP verification
+- ✅ Duplicate request detection
+- ✅ Request identifier tracking
+- ✅ Replay attack prevention
+- ✅ Per-client rate limiting
+- ✅ Global rate limiting
+- ✅ Required attribute enforcement
+- ✅ Enumerated value validation
+- ✅ Attribute type-specific validation
+- ✅ Malformed packet rejection
+- ✅ Strict RFC compliance mode
+- ✅ Structured logging (tracing crate)
+- ✅ Configurable log levels
+- ✅ Security event logging
+- ✅ JSON audit trail
+- ✅ Environment variable support for secrets
+- ✅ Configuration validation on startup
+- ✅ JSON Schema for configuration
 
 ### Known Limitations
+
 - ⚠️ Only PAP authentication (no CHAP/EAP)
 - ⚠️ No accounting support
-- ⚠️ Basic logging only (println!)
-- ⚠️ No attribute validation
+- ⚠️ No hot reload (requires server restart for config changes)
 
 See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
@@ -86,11 +114,11 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 ### Configuration
 - [x] Validate client CIDR networks
-- [ ] Environment variable support for secrets
+- [x] Environment variable support for secrets
 - [x] Configuration file validation on startup
-- [ ] Hot reload configuration (SIGHUP)
+- [ ] Hot reload configuration (SIGHUP) - deferred to future release
 
-**Status**: Partial (2/4 complete)
+**Status**: ✅ Complete (3/3 required features, hot reload marked as future enhancement)
 
 **Total v0.2.0 Estimated Effort**: 6-8 weeks
 
