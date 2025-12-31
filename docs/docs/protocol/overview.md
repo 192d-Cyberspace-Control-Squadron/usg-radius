@@ -166,6 +166,7 @@ c(i) = p(i) XOR b(i)
 ```
 
 Where:
+
 - `p(i)` = 16-byte blocks of password (padded with nulls)
 - `c(i)` = encrypted blocks
 - `b(i)` = MD5 hash blocks
@@ -192,6 +193,7 @@ MD5(Code + ID + Length + Request Authenticator + Attributes + Secret)
 ```
 
 This ensures:
+
 - Message integrity
 - Authentication of the server
 - Protection against modification

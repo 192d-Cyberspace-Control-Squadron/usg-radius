@@ -1236,10 +1236,7 @@ pub mod eap_tls {
 
         // Load server certificates
         let cert_ders = load_certificates_from_pem(&cert_config.server_cert_path)?;
-        let certs: Vec<CertificateDer> = cert_ders
-            .into_iter()
-            .map(|der| CertificateDer::from(der))
-            .collect();
+        let certs: Vec<CertificateDer> = cert_ders.into_iter().map(CertificateDer::from).collect();
 
         // Load server private key
         let key_der = load_private_key_from_pem(&cert_config.server_key_path)?;
@@ -1259,10 +1256,8 @@ pub mod eap_tls {
             // Load CA certificates for client verification
             if let Some(ca_path) = &cert_config.ca_cert_path {
                 let ca_cert_ders = load_certificates_from_pem(ca_path)?;
-                let ca_certs: Vec<CertificateDer> = ca_cert_ders
-                    .into_iter()
-                    .map(|der| CertificateDer::from(der))
-                    .collect();
+                let ca_certs: Vec<CertificateDer> =
+                    ca_cert_ders.into_iter().map(CertificateDer::from).collect();
 
                 // Create root certificate store
                 let mut root_store = rustls::RootCertStore::empty();
@@ -1768,6 +1763,7 @@ pub struct EapSessionManager {
     /// Default session timeout in seconds
     default_timeout: u64,
     /// Maximum authentication attempts per session
+    #[allow(dead_code)]
     max_attempts: u32,
 }
 

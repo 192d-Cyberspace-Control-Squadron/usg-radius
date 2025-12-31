@@ -111,7 +111,7 @@ USG RADIUS follows a modular architecture:
 
 <div class="grid cards" markdown>
 
--   :material-rocket-launch:{ .lg .middle } __Getting Started__
+- :material-rocket-launch:{ .lg .middle } **Getting Started**
 
     ---
 
@@ -119,7 +119,7 @@ USG RADIUS follows a modular architecture:
 
     [:octicons-arrow-right-24: Get Started](getting-started/installation.md)
 
--   :material-file-document:{ .lg .middle } __Protocol Reference__
+- :material-file-document:{ .lg .middle } **Protocol Reference**
 
     ---
 
@@ -127,7 +127,7 @@ USG RADIUS follows a modular architecture:
 
     [:octicons-arrow-right-24: Protocol](protocol/overview.md)
 
--   :material-code-braces:{ .lg .middle } __API Reference__
+- :material-code-braces:{ .lg .middle } **API Reference**
 
     ---
 
@@ -135,7 +135,7 @@ USG RADIUS follows a modular architecture:
 
     [:octicons-arrow-right-24: API](api/overview.md)
 
--   :material-cog:{ .lg .middle } __Configuration__
+- :material-cog:{ .lg .middle } **Configuration**
 
     ---
 
@@ -143,7 +143,7 @@ USG RADIUS follows a modular architecture:
 
     [:octicons-arrow-right-24: Configure](configuration/server.md)
 
--   :material-database:{ .lg .middle } **Authentication Backends**
+- :material-database:{ .lg .middle } **Authentication Backends**
 
     ---
 
@@ -151,7 +151,7 @@ USG RADIUS follows a modular architecture:
 
     [:octicons-arrow-right-24: Backends](backends/BACKEND_INTEGRATIONS.md)
 
--   :material-shield-lock:{ .lg .middle } __Security__
+- :material-shield-lock:{ .lg .middle } **Security**
 
     ---
 
@@ -159,7 +159,7 @@ USG RADIUS follows a modular architecture:
 
     [:octicons-arrow-right-24: Security](security/overview.md)
 
--   :material-information:{ .lg .middle } __Examples__
+- :material-information:{ .lg .middle } **Examples**
 
     ---
 

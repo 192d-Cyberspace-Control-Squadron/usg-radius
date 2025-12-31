@@ -107,10 +107,7 @@ impl FileAccountingHandler {
             file.write_all(line.as_bytes()).await?;
             file.flush().await?;
         } else {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "File not open",
-            ));
+            return Err(std::io::Error::other("File not open"));
         }
 
         Ok(())

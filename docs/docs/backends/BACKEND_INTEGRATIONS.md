@@ -30,6 +30,7 @@ USG RADIUS supports multiple authentication backends, allowing you to choose the
 ### Overview
 
 Store user credentials directly in the configuration file. Best for:
+
 - Development and testing
 - Small deployments (< 50 users)
 - Static user lists
@@ -80,6 +81,7 @@ Store user credentials directly in the configuration file. Best for:
 ### Overview
 
 Authenticate against LDAP or Active Directory servers. Best for:
+
 - Enterprise environments
 - Centralized user management
 - Single Sign-On (SSO) integration
@@ -88,6 +90,7 @@ Authenticate against LDAP or Active Directory servers. Best for:
 ### Configuration
 
 **OpenLDAP:**
+
 ```json
 {
   "ldap": {
@@ -104,6 +107,7 @@ Authenticate against LDAP or Active Directory servers. Best for:
 ```
 
 **Active Directory:**
+
 ```json
 {
   "ldap": {
@@ -150,6 +154,7 @@ See [LDAP_INTEGRATION.md](LDAP_INTEGRATION.md) for detailed configuration and tr
 ### Overview
 
 Store user credentials in a PostgreSQL database. Best for:
+
 - Custom user schemas
 - Complex attribute requirements
 - Integration with existing databases
@@ -219,22 +224,27 @@ Do you need custom schemas or attributes?
 ### By Environment Type
 
 **Development/Testing:**
+
 - **Recommended**: File-Based
 - **Alternative**: PostgreSQL (for testing DB integration)
 
 **Small Business (< 100 users):**
+
 - **Recommended**: File-Based or LDAP (if already using AD)
 - **Alternative**: PostgreSQL
 
 **Enterprise (100-1000 users):**
+
 - **Recommended**: LDAP/Active Directory
 - **Alternative**: PostgreSQL
 
 **Large Scale (1000+ users):**
+
 - **Recommended**: LDAP/AD or PostgreSQL
 - **Alternative**: Hybrid (LDAP + PostgreSQL)
 
 **SaaS/Multi-Tenant:**
+
 - **Recommended**: PostgreSQL
 - **Alternative**: Multiple LDAP instances
 
@@ -301,11 +311,13 @@ Consider if you need to migrate or can keep LDAP. If migrating:
 ## Performance Considerations
 
 ### File-Based
+
 - **Pros**: No external dependencies, instant lookups
 - **Cons**: Config reloads required, limited scalability
 - **Best for**: < 100 users
 
 ### LDAP/AD
+
 - **Pros**: Centralized, efficient for large user bases
 - **Cons**: Network latency, LDAP server dependency
 - **Considerations**:
@@ -315,6 +327,7 @@ Consider if you need to migrate or can keep LDAP. If migrating:
 - **Best for**: 100-10,000+ users
 
 ### PostgreSQL
+
 - **Pros**: Scalable, connection pooling, query optimization
 - **Cons**: Database dependency, query complexity
 - **Considerations**:
@@ -378,6 +391,7 @@ Future feature - example of desired functionality:
 
 **Problem**: Authentication fails with all backends
 **Solution**:
+
 - Check RADIUS secret matches
 - Verify client IP is authorized
 - Enable debug logging: `"log_level": "debug"`

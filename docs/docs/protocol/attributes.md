@@ -309,6 +309,7 @@ Phone number or identifier called by user.
 - **Direction**: Request
 
 For WiFi: AP MAC address and SSID:
+
 ```
 "00-11-22-33-44-55:MyNetwork"
 ```
@@ -322,6 +323,7 @@ Phone number or identifier of user.
 - **Direction**: Request
 
 For WiFi: Client MAC address:
+
 ```
 "AA-BB-CC-DD-EE-FF"
 ```
@@ -337,6 +339,7 @@ Vendor-specific attributes.
 - **Direction**: Both
 
 Format:
+
 ```
  0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1

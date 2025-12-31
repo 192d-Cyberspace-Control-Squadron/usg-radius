@@ -26,11 +26,11 @@ async fn test_ldap_connection() {
         verify_tls: false,
     };
 
-    let handler = LdapAuthHandler::new(config);
+    let _handler = LdapAuthHandler::new(config);
 
     // Test that we can create the handler without errors
     // The actual connection happens on first authentication attempt
-    assert!(true, "LDAP handler created successfully");
+    // Test passes if we reach this point without panicking
 }
 
 #[tokio::test]

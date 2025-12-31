@@ -183,6 +183,12 @@ pub struct SimpleAuthHandler {
     users: std::collections::HashMap<String, String>,
 }
 
+impl Default for SimpleAuthHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SimpleAuthHandler {
     pub fn new() -> Self {
         SimpleAuthHandler {
@@ -560,36 +566,35 @@ impl RadiusServer {
             .config
             .as_ref()
             .and_then(|c| c.find_client(source_ip))
+            && let Some(expected_nas_id) = &client_config.nas_identifier
         {
-            if let Some(expected_nas_id) = &client_config.nas_identifier {
-                match &nas_identifier {
-                    Some(actual_nas_id) => {
-                        if actual_nas_id != expected_nas_id {
-                            warn!(
-                                client_ip = %source_ip,
-                                request_id = request.identifier,
-                                expected = %expected_nas_id,
-                                actual = %actual_nas_id,
-                                "NAS-Identifier mismatch"
-                            );
-                            return Err(ServerError::Validation(format!(
-                                "NAS-Identifier mismatch: expected '{}', got '{}'",
-                                expected_nas_id, actual_nas_id
-                            )));
-                        }
-                    }
-                    None => {
+            match &nas_identifier {
+                Some(actual_nas_id) => {
+                    if actual_nas_id != expected_nas_id {
                         warn!(
                             client_ip = %source_ip,
                             request_id = request.identifier,
                             expected = %expected_nas_id,
-                            "Missing required NAS-Identifier"
+                            actual = %actual_nas_id,
+                            "NAS-Identifier mismatch"
                         );
                         return Err(ServerError::Validation(format!(
-                            "Missing required NAS-Identifier: expected '{}'",
-                            expected_nas_id
+                            "NAS-Identifier mismatch: expected '{}', got '{}'",
+                            expected_nas_id, actual_nas_id
                         )));
                     }
+                }
+                None => {
+                    warn!(
+                        client_ip = %source_ip,
+                        request_id = request.identifier,
+                        expected = %expected_nas_id,
+                        "Missing required NAS-Identifier"
+                    );
+                    return Err(ServerError::Validation(format!(
+                        "Missing required NAS-Identifier: expected '{}'",
+                        expected_nas_id
+                    )));
                 }
             }
         }

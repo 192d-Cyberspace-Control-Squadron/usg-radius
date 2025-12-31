@@ -1,4 +1,4 @@
-use crate::packet::packet::PacketError;
+use crate::packet::PacketError;
 use std::io::{Cursor, Read, Write};
 
 /// RADIUS Attribute structure as defined in RFC 2865 Section 5

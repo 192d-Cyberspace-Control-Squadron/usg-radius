@@ -70,7 +70,9 @@ crates/radius-proto/src/
 **Files**: `revocation/mod.rs`, `revocation/config.rs`, `revocation/error.rs`
 
 **Tasks**:
+
 1. Create `RevocationConfig` struct:
+
    ```rust
    pub struct RevocationConfig {
        pub check_mode: RevocationCheckMode,
@@ -98,6 +100,7 @@ crates/radius-proto/src/
    ```
 
 2. Create `RevocationError` enum:
+
    ```rust
    #[derive(Debug, thiserror::Error)]
    pub enum RevocationError {
@@ -132,7 +135,9 @@ crates/radius-proto/src/
 **File**: `revocation/crl.rs`
 
 **Tasks**:
+
 1. Implement CRL parsing using `x509-parser`:
+
    ```rust
    pub struct CrlInfo {
        pub issuer: String,
@@ -150,6 +155,7 @@ crates/radius-proto/src/
    ```
 
 2. Implement serial number checking:
+
    ```rust
    pub fn is_certificate_revoked(
        cert_serial: &[u8],
@@ -160,6 +166,7 @@ crates/radius-proto/src/
    ```
 
 3. Implement CRL validation:
+
    ```rust
    pub fn validate_crl(
        crl_info: &CrlInfo,
@@ -172,6 +179,7 @@ crates/radius-proto/src/
    ```
 
 **Tests**:
+
 - Parse valid CRL
 - Parse CRL with multiple revoked certs
 - Detect expired CRL
@@ -186,7 +194,9 @@ crates/radius-proto/src/
 **File**: `revocation/cache.rs`
 
 **Tasks**:
+
 1. Implement `CrlCache` using DashMap:
+
    ```rust
    pub struct CrlCache {
        cache: Arc<DashMap<String, CachedCrl>>,  // Key: CRL distribution point URL
@@ -217,6 +227,7 @@ crates/radius-proto/src/
    - Background task to periodically cleanup expired entries
 
 **Tests**:
+
 - Insert and retrieve CRL from cache
 - TTL expiration detection
 - Max entries enforcement (LRU eviction)
@@ -231,13 +242,16 @@ crates/radius-proto/src/
 **File**: `revocation/fetch.rs`
 
 **Tasks**:
+
 1. Add `reqwest` dependency (async HTTP client):
+
    ```toml
    reqwest = { version = "0.12", features = ["blocking"], optional = true }
    url = { version = "2.5", optional = true }
    ```
 
 2. Implement HTTP fetching:
+
    ```rust
    pub struct CrlFetcher {
        client: reqwest::blocking::Client,
@@ -263,6 +277,7 @@ crates/radius-proto/src/
    ```
 
 3. Extract CRL distribution points from certificates:
+
    ```rust
    pub fn extract_crl_distribution_points(
        cert: &x509_parser::certificate::X509Certificate
@@ -273,6 +288,7 @@ crates/radius-proto/src/
    ```
 
 **Tests**:
+
 - Mock HTTP server returning valid CRL
 - HTTP timeout handling
 - HTTP error handling (404, 500)
@@ -288,7 +304,9 @@ crates/radius-proto/src/
 **File**: `revocation/mod.rs` + modifications to `eap.rs`
 
 **Tasks**:
+
 1. Implement `RevocationCheckingVerifier`:
+
    ```rust
    pub struct RevocationCheckingVerifier {
        inner: Arc<dyn rustls::server::ClientCertVerifier>,
@@ -331,6 +349,7 @@ crates/radius-proto/src/
    ```
 
 2. Modify `build_server_config()` in `eap.rs`:
+
    ```rust
    #[cfg(feature = "revocation")]
    pub fn build_server_config_with_revocation(
@@ -344,11 +363,13 @@ crates/radius-proto/src/
    ```
 
 3. Add to `TlsCertificateConfig`:
+
    ```rust
    pub revocation_config: Option<RevocationConfig>,
    ```
 
 **Tests**:
+
 - Verify revoked certificate is rejected
 - Verify valid certificate is accepted
 - Verify fallback behavior (fail-open vs fail-closed)
@@ -363,7 +384,9 @@ crates/radius-proto/src/
 **File**: `crates/radius-proto/tests/revocation_integration.rs`
 
 **Tasks**:
+
 1. Generate test PKI:
+
    ```bash
    # CA certificate
    # Server certificate
@@ -390,11 +413,13 @@ crates/radius-proto/src/
 **Goal**: Comprehensive documentation for CRL configuration and usage.
 
 **Files**:
+
 - `docs/docs/protocol/CRL.md`
 - `docs/docs/examples/crl-example.md`
 - `docs/docs/development/ROADMAP.md` (update)
 
 **Content**:
+
 1. CRL configuration guide
 2. Security best practices
 3. Troubleshooting common issues
@@ -406,7 +431,8 @@ crates/radius-proto/src/
 
 ## Dependencies to Add
 
-### Workspace `Cargo.toml`:
+### Workspace `Cargo.toml`
+
 ```toml
 [workspace.dependencies]
 # HTTP client for CRL fetching
@@ -414,7 +440,8 @@ reqwest = { version = "0.12", features = ["blocking"] }
 url = "2.5"
 ```
 
-### `radius-proto/Cargo.toml`:
+### `radius-proto/Cargo.toml`
+
 ```toml
 [dependencies]
 reqwest = { workspace = true, optional = true }
@@ -431,6 +458,7 @@ revocation = ["tls", "dep:reqwest", "dep:url"]
 ## Testing Strategy
 
 ### Unit Tests (~30 tests)
+
 - CRL parsing (valid, invalid, expired)
 - Serial number checking
 - Cache operations (insert, get, expiry, eviction)
@@ -438,12 +466,14 @@ revocation = ["tls", "dep:reqwest", "dep:url"]
 - Configuration validation
 
 ### Integration Tests (~10 tests)
+
 - End-to-end revocation checking
 - Fail-open vs fail-closed behavior
 - Cache performance
 - Real PKI with revoked certs
 
 ### Performance Tests
+
 - CRL cache hit rate
 - CRL fetch latency impact
 - Memory usage with large CRLs
@@ -452,7 +482,8 @@ revocation = ["tls", "dep:reqwest", "dep:url"]
 
 ## Success Criteria
 
-### Week 3 Deliverables:
+### Week 3 Deliverables
+
 - ✅ CRL parsing and validation working
 - ✅ HTTP fetching with timeouts
 - ✅ Caching with TTL
@@ -460,7 +491,8 @@ revocation = ["tls", "dep:reqwest", "dep:url"]
 - ✅ 40+ tests passing
 - ✅ Example configurations documented
 
-### Production Readiness Checklist:
+### Production Readiness Checklist
+
 - ✅ Handles CRLs up to 10 MB
 - ✅ Cache prevents repeated fetches (< 1% duplicate requests)
 - ✅ Fetch timeouts prevent DoS (5s default)
@@ -489,6 +521,7 @@ revocation = ["tls", "dep:reqwest", "dep:url"]
 ## Future Enhancements (Phase 2: OCSP)
 
 After CRL Phase 1 is complete, Phase 2 will add OCSP support:
+
 - OCSP request building
 - OCSP response parsing
 - OCSP stapling support

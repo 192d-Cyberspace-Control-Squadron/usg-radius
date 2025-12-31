@@ -30,6 +30,7 @@ RADIUS uses MD5, which has known weaknesses:
 - **Deprecated**: Considered cryptographically broken for many uses
 
 **However**, for RADIUS:
+
 - ✅ MD5 use is acceptable for password encryption (XOR with hash)
 - ✅ Request/Response Authenticator use is acceptable
 - ⚠️ Not suitable for password hashing (use bcrypt/argon2)
@@ -92,10 +93,12 @@ a3f9c2e1b5d8f0a6c9e4b2d7f1a5c8e3b6d9f2a5c8e1
 
 1. **Unique Secrets**: Different secret per client/network
 2. **Secure Storage**:
+
    ```bash
    chmod 600 config.json
    chown radius:radius config.json
    ```
+
 3. **No Version Control**: Add to `.gitignore`
 4. **Regular Rotation**: Change every 90-180 days
 5. **Secure Distribution**: Use encrypted channels
@@ -104,6 +107,7 @@ a3f9c2e1b5d8f0a6c9e4b2d7f1a5c8e3b6d9f2a5c8e1
 ### Secret Rotation Procedure
 
 1. **Generate new secret**:
+
    ```bash
    NEW_SECRET=$(openssl rand -base64 32)
    echo "New secret: $NEW_SECRET"
@@ -133,6 +137,7 @@ a3f9c2e1b5d8f0a6c9e4b2d7f1a5c8e3b6d9f2a5c8e1
 ```
 
 **Problems:**
+
 - Usernames visible
 - Attributes visible
 - Vulnerable to MITM
@@ -148,6 +153,7 @@ a3f9c2e1b5d8f0a6c9e4b2d7f1a5c8e3b6d9f2a5c8e1
 ```
 
 **Benefits:**
+
 - All traffic encrypted
 - Mutual authentication
 - Perfect Forward Secrecy (with right config)
@@ -244,6 +250,7 @@ fn validate_password(password: &str, policy: &PasswordPolicy) -> bool {
 ```
 
 Recommended policy:
+
 - Minimum 12 characters
 - Mix of upper/lower/numbers/symbols
 - No dictionary words
@@ -479,6 +486,7 @@ Monitor for security events:
 1. **Detection**: Automated alerting for suspicious activity
 
 2. **Investigation**:
+
    ```bash
    # Check recent auth failures
    grep "REJECT" /var/log/radius.log | tail -100
@@ -504,6 +512,7 @@ Monitor for security events:
 Different industries have different requirements:
 
 **PCI DSS (Payment Card Industry):**
+
 - Strong password policies
 - Multi-factor authentication
 - Encrypted transmission
@@ -511,12 +520,14 @@ Different industries have different requirements:
 - Regular security audits
 
 **HIPAA (Healthcare):**
+
 - Access controls
 - Audit logging
 - Encryption in transit
 - Risk assessments
 
 **NIST Guidelines:**
+
 - Follow NIST SP 800-63B for authentication
 - Use strong cryptography
 - Implement account lockout

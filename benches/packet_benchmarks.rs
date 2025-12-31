@@ -71,7 +71,7 @@ fn bench_packet_decode(c: &mut Criterion) {
 fn bench_password_encryption(c: &mut Criterion) {
     let mut group = c.benchmark_group("password_encryption");
 
-    let passwords = vec![
+    let passwords = [
         ("short", "test"),
         ("medium", "testpassword123"),
         ("long", "this_is_a_very_long_password_to_test_performance"),
@@ -101,7 +101,7 @@ fn bench_password_encryption(c: &mut Criterion) {
 fn bench_password_decryption(c: &mut Criterion) {
     let mut group = c.benchmark_group("password_decryption");
 
-    let passwords = vec![
+    let passwords = [
         ("short", "test"),
         ("medium", "testpassword123"),
         ("long", "this_is_a_very_long_password_to_test_performance"),

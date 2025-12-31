@@ -175,6 +175,7 @@ let config = CrlConfig {
 ```
 
 Typical CRL sizes:
+
 - **Small CA**: 10-100 KB (hundreds of revocations)
 - **Medium CA**: 100 KB - 1 MB (thousands of revocations)
 - **Large CA**: 1-10 MB (tens of thousands of revocations)
@@ -214,6 +215,7 @@ Track cache hit rates to optimize TTL:
 ### 5. Validate CRL Freshness
 
 The implementation automatically validates:
+
 - ✅ `thisUpdate <= current_time` (CRL is active)
 - ✅ `nextUpdate >= current_time` (CRL has not expired)
 
@@ -295,6 +297,7 @@ cargo test --features revocation
 ```
 
 Coverage:
+
 - ✅ 42 unit tests covering all modules
 - ✅ CRL parsing (DER/PEM)
 - ✅ Cache eviction (LRU)
@@ -310,6 +313,7 @@ cargo test --test revocation_integration --features revocation
 ```
 
 Coverage:
+
 - ✅ Configuration serialization/deserialization
 - ✅ Fail-open vs fail-closed modes
 - ✅ Static CRL file loading
@@ -319,6 +323,7 @@ Coverage:
 ### Generating Test PKI
 
 See [integration tests](../../tests/revocation_integration.rs) for full OpenSSL commands to generate:
+
 - Root CA
 - Intermediate CA
 - Client certificates
@@ -331,11 +336,13 @@ See [integration tests](../../tests/revocation_integration.rs) for full OpenSSL 
 **Symptom**: Warnings in logs about CRL fetch failures
 
 **Causes**:
+
 - CRL distribution point URL is unreachable
 - Network timeout
 - Invalid/expired TLS certificate on CRL server
 
 **Solutions**:
+
 1. Check network connectivity to CRL distribution point
 2. Increase `http_timeout_secs` if network is slow
 3. Add static CRL files as backup
@@ -346,11 +353,13 @@ See [integration tests](../../tests/revocation_integration.rs) for full OpenSSL 
 **Symptom**: Increasing memory consumption
 
 **Causes**:
+
 - Too many cached CRLs
 - Very large CRLs being cached
 - Cache not evicting old entries
 
 **Solutions**:
+
 1. Reduce `max_cache_entries`
 2. Reduce `max_crl_size_bytes`
 3. Reduce `cache_ttl_secs` to expire entries faster
@@ -360,11 +369,13 @@ See [integration tests](../../tests/revocation_integration.rs) for full OpenSSL 
 **Symptom**: Slow EAP-TLS authentication
 
 **Causes**:
+
 - CRL cache misses requiring HTTP fetches
 - Slow CRL distribution point servers
 - Large CRL download times
 
 **Solutions**:
+
 1. Increase `cache_ttl_secs` to improve cache hit rate
 2. Pre-load static CRL files
 3. Reduce `http_timeout_secs` for faster failover
@@ -375,11 +386,13 @@ See [integration tests](../../tests/revocation_integration.rs) for full OpenSSL 
 ### From No Revocation Checking
 
 1. Start with disabled mode to test integration:
+
    ```rust
    let config = RevocationConfig::disabled();
    ```
 
 2. Enable in Fail-Open mode for testing:
+
    ```rust
    let config = RevocationConfig::crl_only(
        CrlConfig::default(),
@@ -388,6 +401,7 @@ See [integration tests](../../tests/revocation_integration.rs) for full OpenSSL 
    ```
 
 3. Switch to Fail-Closed for production:
+
    ```rust
    let config = RevocationConfig::crl_only(
        CrlConfig::default(),
@@ -430,6 +444,7 @@ If migrating from custom CRL checking:
 ## Support
 
 For issues, questions, or contributions:
+
 - **Documentation**: See module-level docs in `src/revocation/mod.rs`
 - **Examples**: See `tests/revocation_integration.rs`
 - **Issues**: Report at project issue tracker

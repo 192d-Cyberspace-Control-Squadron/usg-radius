@@ -306,15 +306,15 @@ impl AccountingHandler for SimpleAccountingHandler {
             use radius_proto::AttributeType;
 
             // Extract accounting attributes
-            if let Some(attr) = packet.find_attribute(AttributeType::AcctSessionTime as u8) {
-                if attr.value.len() >= 4 {
-                    session.session_time = u32::from_be_bytes([
-                        attr.value[0],
-                        attr.value[1],
-                        attr.value[2],
-                        attr.value[3],
-                    ]);
-                }
+            if let Some(attr) = packet.find_attribute(AttributeType::AcctSessionTime as u8)
+                && attr.value.len() >= 4
+            {
+                session.session_time = u32::from_be_bytes([
+                    attr.value[0],
+                    attr.value[1],
+                    attr.value[2],
+                    attr.value[3],
+                ]);
             }
 
             // Extract input octets with 64-bit support (RFC 2869)
@@ -389,15 +389,15 @@ impl AccountingHandler for SimpleAccountingHandler {
                 session.output_octets = (high << 32) | (low as u64);
             }
 
-            if let Some(attr) = packet.find_attribute(AttributeType::AcctTerminateCause as u8) {
-                if attr.value.len() >= 4 {
-                    session.terminate_cause = Some(u32::from_be_bytes([
-                        attr.value[0],
-                        attr.value[1],
-                        attr.value[2],
-                        attr.value[3],
-                    ]));
-                }
+            if let Some(attr) = packet.find_attribute(AttributeType::AcctTerminateCause as u8)
+                && attr.value.len() >= 4
+            {
+                session.terminate_cause = Some(u32::from_be_bytes([
+                    attr.value[0],
+                    attr.value[1],
+                    attr.value[2],
+                    attr.value[3],
+                ]));
             }
 
             // Session is now removed and logged
@@ -430,15 +430,15 @@ impl AccountingHandler for SimpleAccountingHandler {
             // Update usage statistics
             use radius_proto::AttributeType;
 
-            if let Some(attr) = packet.find_attribute(AttributeType::AcctSessionTime as u8) {
-                if attr.value.len() >= 4 {
-                    session.session_time = u32::from_be_bytes([
-                        attr.value[0],
-                        attr.value[1],
-                        attr.value[2],
-                        attr.value[3],
-                    ]);
-                }
+            if let Some(attr) = packet.find_attribute(AttributeType::AcctSessionTime as u8)
+                && attr.value.len() >= 4
+            {
+                session.session_time = u32::from_be_bytes([
+                    attr.value[0],
+                    attr.value[1],
+                    attr.value[2],
+                    attr.value[3],
+                ]);
             }
 
             // Extract input octets with 64-bit support (RFC 2869)

@@ -3,6 +3,8 @@
 //! These tests verify end-to-end functionality including:
 //! - Authentication flows (PAP and CHAP)
 //! - Multi-round authentication (Access-Challenge)
+
+#![allow(clippy::field_reassign_with_default)]
 //! - Client validation
 //! - Rate limiting
 //! - Configuration validation
@@ -637,11 +639,11 @@ async fn test_ipv6_support() {
     let result = send_radius_request(&packet, server_addr).await;
 
     // If we get a routing error, IPv6 isn't fully configured, skip test
-    if let Err(ref e) = result {
-        if e.to_string().contains("No route to host") || e.to_string().contains("HostUnreachable") {
-            println!("IPv6 routing not configured, skipping test");
-            return;
-        }
+    if let Err(ref e) = result
+        && (e.to_string().contains("No route to host") || e.to_string().contains("HostUnreachable"))
+    {
+        println!("IPv6 routing not configured, skipping test");
+        return;
     }
 
     let response = result.expect("Failed to send request over IPv6");
@@ -949,10 +951,10 @@ impl AuthHandler for ChallengeAuthHandler {
         // If we have state, verify it and check the PIN
         if state == Some(b"challenge_state_123" as &[u8]) {
             // Password should be the PIN
-            if let Some(pwd) = password {
-                if pwd == self.pin {
-                    return AuthResult::Accept;
-                }
+            if let Some(pwd) = password
+                && pwd == self.pin
+            {
+                return AuthResult::Accept;
             }
         }
 

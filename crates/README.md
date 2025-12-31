@@ -13,6 +13,7 @@ The core RADIUS protocol implementation following RFC 2865, 2866, 2869, and 5997
 **Can be used**: Standalone for building RADIUS clients or custom servers
 
 **Features**:
+
 - Packet encoding/decoding
 - All standard RADIUS attributes (Types 1-80+)
 - MD5-based cryptography
@@ -20,6 +21,7 @@ The core RADIUS protocol implementation following RFC 2865, 2866, 2869, and 5997
 - Zero-copy parsing where possible
 
 **Example**:
+
 ```rust
 use radius_proto::{Packet, Code, Attribute};
 
@@ -38,6 +40,7 @@ Production-ready RADIUS server built on `radius-proto`.
 **Provides**: Binary `usg-radius` and library for custom servers
 
 **Features**:
+
 - Async I/O with Tokio
 - JSON configuration
 - Pluggable authentication handlers
@@ -45,6 +48,7 @@ Production-ready RADIUS server built on `radius-proto`.
 - Logging and monitoring
 
 **Example**:
+
 ```rust
 use radius_server::{RadiusServer, ServerConfig, SimpleAuthHandler};
 use std::sync::Arc;
@@ -67,15 +71,19 @@ server.run().await?;
 ## Future Crates
 
 ### `radius-client` (Planned)
+
 RADIUS client library for testing and integration.
 
 ### `radius-proxy` (Planned)
+
 Standalone RADIUS proxy server.
 
 ### `radius-tools` (Planned)
+
 CLI tools (radtest, radclient, raddebug).
 
 ### `radius-dict` (Planned)
+
 Dictionary file parser for vendor-specific attributes.
 
 ---
@@ -83,22 +91,26 @@ Dictionary file parser for vendor-specific attributes.
 ## Development
 
 Build all crates:
+
 ```bash
 cargo build --workspace
 ```
 
 Test all crates:
+
 ```bash
 cargo test --workspace
 ```
 
 Build specific crate:
+
 ```bash
 cargo build -p radius-proto
 cargo build -p radius-server
 ```
 
 Run server:
+
 ```bash
 cargo run -p radius-server
 ```
@@ -108,6 +120,7 @@ cargo run -p radius-server
 ## Documentation
 
 Generate documentation for all crates:
+
 ```bash
 cargo doc --workspace --no-deps --open
 ```

@@ -36,6 +36,7 @@ impl TlsFlags {
 ```
 
 **Example:**
+
 ```rust
 let flags = TlsFlags::new(true, true, false); // L=1, M=1, S=0
 assert!(flags.length_included());
@@ -68,6 +69,7 @@ impl EapTlsPacket {
 ```
 
 **Example:**
+
 ```rust
 // Create start packet
 let start = EapTlsPacket::start();
@@ -112,6 +114,7 @@ impl TlsFragmentAssembler {
 ```
 
 **Example:**
+
 ```rust
 let mut assembler = TlsFragmentAssembler::new();
 
@@ -164,6 +167,7 @@ impl EapTlsContext {
 ```
 
 **Example:**
+
 ```rust
 let mut ctx = EapTlsContext::new();
 
@@ -214,6 +218,7 @@ impl TlsCertificateConfig {
 ```
 
 **Example:**
+
 ```rust
 // Server-only authentication
 let config = TlsCertificateConfig::simple(
@@ -260,6 +265,7 @@ impl EapTlsServer {
 ```
 
 **Example:**
+
 ```rust
 use std::sync::Arc;
 
@@ -311,17 +317,20 @@ pub fn build_server_config(
 ```
 
 **Features:**
+
 - Server-only authentication (no client cert required)
 - Mutual TLS with client certificate verification
 - CA certificate chain validation
 - Automatic certificate validation
 
 **Errors:**
+
 - `CertificateError` - Invalid certificates, missing CA when client cert required
 - `TlsError` - Failed to build TLS configuration
 - `IoError` - Certificate files not found
 
 **Example:**
+
 ```rust
 // Server-only authentication
 let config = TlsCertificateConfig::simple(
@@ -354,6 +363,7 @@ pub fn fragment_tls_message(
 ```
 
 **Example:**
+
 ```rust
 let large_message = vec![0x42; 20000]; // 20KB
 let fragments = fragment_tls_message(&large_message, 1020);
@@ -377,6 +387,7 @@ pub fn derive_keys(
 **Returns:** `(MSK, EMSK)` - Each is 64 bytes
 
 **Example:**
+
 ```rust
 let master_secret = vec![0x42; 48];
 let client_random = [0xAA; 32];
@@ -400,10 +411,12 @@ pub fn load_certificates_from_pem(path: &str) -> Result<Vec<Vec<u8>>, EapError>
 **Returns:** Vector of DER-encoded certificates
 
 **Errors:**
+
 - `IoError` - File not found or cannot be read
 - `CertificateError` - Invalid PEM format or no certificates found
 
 **Example:**
+
 ```rust
 let certs = load_certificates_from_pem("/etc/radius/server.pem")?;
 println!("Loaded {} certificate(s)", certs.len());
@@ -424,10 +437,12 @@ pub fn load_private_key_from_pem(path: &str) -> Result<Vec<u8>, EapError>
 **Supports:** RSA, ECDSA, Ed25519 keys in PKCS#8 or traditional format
 
 **Errors:**
+
 - `IoError` - File not found or cannot be read
 - `CertificateError` - Invalid PEM format or no key found
 
 **Example:**
+
 ```rust
 let key = load_private_key_from_pem("/etc/radius/server-key.pem")?;
 println!("Loaded private key ({} bytes)", key.len());
@@ -444,14 +459,17 @@ pub fn validate_cert_key_pair(cert_der: &[u8], key_der: &[u8]) -> Result<(), Eap
 ```
 
 **Checks:**
+
 - Certificate is valid X.509 DER
 - Certificate is not expired
 - Certificate validity period is current
 
 **Errors:**
+
 - `CertificateError` - Invalid certificate, expired, or not yet valid
 
 **Example:**
+
 ```rust
 let certs = load_certificates_from_pem("server.pem")?;
 let key = load_private_key_from_pem("server-key.pem")?;

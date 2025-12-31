@@ -311,11 +311,13 @@ Always validate certificates properly:
 ### Cipher Suite Selection
 
 Prefer modern cipher suites with:
+
 - Forward secrecy (ECDHE/DHE)
 - AEAD encryption (GCM/ChaCha20-Poly1305)
 - Strong key sizes (2048-bit RSA minimum, prefer 256-bit ECDSA)
 
 Avoid:
+
 - Export ciphers
 - NULL encryption
 - MD5 and SHA1 (prefer SHA256+)
@@ -352,6 +354,7 @@ Solution: Regenerate certificate or update system time
 **4. Fragmentation Issues**
 
 If large certificates fail to transmit:
+
 - Reduce maximum fragment size (default 1020 bytes)
 - Check MTU settings on network
 - Verify authenticator supports fragmentation

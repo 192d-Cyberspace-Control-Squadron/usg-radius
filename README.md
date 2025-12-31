@@ -5,6 +5,7 @@ A RADIUS (Remote Authentication Dial-In User Service) server implementation in R
 ## Features
 
 ### Core Protocol
+
 - **RFC 2865 Compliant**: Full implementation of the RADIUS authentication protocol
 - **RFC 2866 Accounting**: Complete accounting protocol support with session tracking
 - **Authentication**: Support for Access-Request, Access-Accept, Access-Reject, and Access-Challenge
@@ -28,6 +29,7 @@ A RADIUS (Remote Authentication Dial-In User Service) server implementation in R
 - **Trait-based Design**: Extensible AccountingHandler trait for custom backends
 
 ### Security Features
+
 - **Client Authorization**: IP/CIDR-based client validation
 - **Request Deduplication**: Replay attack prevention with caching
 - **Rate Limiting**: Per-client and global rate limiting with token bucket algorithm
@@ -36,6 +38,7 @@ A RADIUS (Remote Authentication Dial-In User Service) server implementation in R
 - **Structured Logging**: Configurable log levels with tracing framework
 
 ### Configuration & Operations
+
 - **JSON Configuration**: Schema-validated configuration with comprehensive options
 - **Dual-Stack Networking**: Full IPv4 and IPv6 support for all network operations
 - **Async/Await**: Built on Tokio for high-performance asynchronous I/O
@@ -109,6 +112,7 @@ The server uses a JSON configuration file with full JSON Schema validation avail
 A complete JSON Schema is provided in [`config.schema.json`](config.schema.json) for IDE integration and validation.
 
 **VSCode Integration:**
+
 ```json
 {
   "$schema": "./config.schema.json"
@@ -118,26 +122,31 @@ A complete JSON Schema is provided in [`config.schema.json`](config.schema.json)
 ### Key Configuration Options
 
 **Server Settings:**
+
 - `listen_address`: IP address to bind to (default: "0.0.0.0")
 - `listen_port`: Port to listen on (default: 1812)
 - `secret`: Default shared secret for clients
 
 **Security & Logging:**
+
 - `log_level`: Structured logging level ("trace", "debug", "info", "warn", "error")
 - `audit_log_path`: Path to JSON audit log (optional)
 - `strict_rfc_compliance`: Enable strict RFC 2865 validation (default: true)
 
 **Rate Limiting:**
+
 - `rate_limit_per_client_rps`: Max requests/sec per client (default: 100)
 - `rate_limit_per_client_burst`: Per-client burst capacity (default: 200)
 - `rate_limit_global_rps`: Max requests/sec globally (default: 1000)
 - `rate_limit_global_burst`: Global burst capacity (default: 2000)
 
 **Request Deduplication:**
+
 - `request_cache_ttl`: Cache TTL in seconds (default: 60)
 - `request_cache_max_entries`: Max cached requests (default: 10000)
 
 For complete documentation, see:
+
 - [Server Configuration Guide](docs/docs/configuration/server.md)
 - [Security Best Practices](docs/docs/security/overview.md)
 
@@ -154,6 +163,7 @@ radtest admin admin123 localhost 1812 testing123
 ```
 
 Expected output for successful authentication:
+
 ```
 Sending Access-Request...
 Received Access-Accept
@@ -189,6 +199,7 @@ Received Access-Accept
 ### Packet Structure
 
 Per RFC 2865 Section 3:
+
 ```
  0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -243,6 +254,7 @@ Per RFC 2865 Section 3:
 ### Password Encryption
 
 Per RFC 2865 Section 5.2, passwords are encrypted using:
+
 ```
 Encrypted = P1 XOR MD5(Secret + RA)
            P2 XOR MD5(Secret + C(1))
@@ -250,6 +262,7 @@ Encrypted = P1 XOR MD5(Secret + RA)
 ```
 
 Where:
+
 - P1, P2, ... are 16-byte blocks of the password (padded)
 - RA is the Request Authenticator
 - C(1), C(2), ... are the previous ciphertext blocks

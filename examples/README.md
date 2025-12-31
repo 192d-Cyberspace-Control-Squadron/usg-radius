@@ -24,6 +24,7 @@ examples/
 **Use case:** Home lab testing, development, learning
 
 **Features:**
+
 - Localhost-only binding
 - Debug logging
 - Minimal rate limits
@@ -31,6 +32,7 @@ examples/
 - Weak secrets (NOT for production)
 
 **Start:**
+
 ```bash
 usg_radius examples/configs/basic-homelab.json
 ```
@@ -40,6 +42,7 @@ usg_radius examples/configs/basic-homelab.json
 **Use case:** Small business (10-100 users)
 
 **Features:**
+
 - Dual-stack IPv4/IPv6
 - Environment variable secrets
 - Audit logging enabled
@@ -47,6 +50,7 @@ usg_radius examples/configs/basic-homelab.json
 - Multiple client networks (wireless, VPN, switches)
 
 **Setup:**
+
 ```bash
 # Set environment variables
 export RADIUS_DEFAULT_SECRET=$(openssl rand -base64 32)
@@ -64,6 +68,7 @@ usg_radius examples/configs/small-business.json
 **Use case:** Enterprise deployment (1000+ users)
 
 **Features:**
+
 - High-performance settings
 - Large request cache
 - High rate limits
@@ -72,6 +77,7 @@ usg_radius examples/configs/small-business.json
 - Multiple security zones
 
 **Recommendations:**
+
 - Deploy behind load balancer
 - Use external authentication (LDAP/AD)
 - Configure monitoring and alerting
@@ -83,6 +89,7 @@ usg_radius examples/configs/small-business.json
 **Use case:** Container deployments (Docker, Kubernetes)
 
 **Features:**
+
 - All secrets via environment variables
 - Configurable via env vars
 - Designed for immutable infrastructure
@@ -95,21 +102,25 @@ usg_radius examples/configs/small-business.json
 ### Quick Start
 
 **1. Copy environment template:**
+
 ```bash
 cp examples/docker/.env.example .env
 ```
 
 **2. Edit secrets:**
+
 ```bash
 vim .env  # Set strong secrets
 ```
 
 **3. Start with Docker Compose:**
+
 ```bash
 docker-compose up -d
 ```
 
 **4. View logs:**
+
 ```bash
 docker-compose logs -f
 ```
@@ -119,12 +130,14 @@ docker-compose logs -f
 See `docker/.env.example` for all available variables.
 
 **Required variables:**
+
 - `RADIUS_SECRET` - Default shared secret
 - `CLIENT_1_SECRET` - Client network 1 secret
 - `CLIENT_2_SECRET` - Client network 2 secret
 - `ADMIN_PASSWORD` - Admin user password
 
 **Optional variables:**
+
 - `CLIENT_1_NETWORK` - Client 1 network CIDR (default: 192.168.1.0/24)
 - `CLIENT_2_NETWORK` - Client 2 network CIDR (default: 10.0.0.0/8)
 - `LOG_LEVEL` - Logging level (default: info)
@@ -135,16 +148,19 @@ See `docker/.env.example` for all available variables.
 ### Installation
 
 **1. Copy service file:**
+
 ```bash
 sudo cp examples/systemd/usg-radius.service /etc/systemd/system/
 ```
 
 **2. Reload systemd:**
+
 ```bash
 sudo systemctl daemon-reload
 ```
 
 **3. Enable and start:**
+
 ```bash
 sudo systemctl enable usg-radius
 sudo systemctl start usg-radius
@@ -171,6 +187,7 @@ sudo systemctl stop usg-radius
 ### Secrets
 
 **Generate strong secrets:**
+
 ```bash
 # Linux/macOS
 openssl rand -base64 32
@@ -180,6 +197,7 @@ head -c 32 /dev/urandom | base64
 ```
 
 **Requirements:**
+
 - Minimum 16 characters
 - Include uppercase, lowercase, numbers, symbols
 - Unique secret per client
@@ -189,12 +207,14 @@ head -c 32 /dev/urandom | base64
 ### File Permissions
 
 **Configuration file:**
+
 ```bash
 chmod 600 /etc/radius/config.json
 chown radius:radius /etc/radius/config.json
 ```
 
 **Log directory:**
+
 ```bash
 chmod 750 /var/log/radius
 chown radius:radius /var/log/radius
@@ -203,6 +223,7 @@ chown radius:radius /var/log/radius
 ### Firewall
 
 **Only allow RADIUS clients:**
+
 ```bash
 # UFW
 sudo ufw allow from 192.168.1.0/24 to any port 1812 proto udp
@@ -218,6 +239,7 @@ sudo iptables -A INPUT -p udp --dport 1812 -j DROP
 ### Using radtest
 
 Install FreeRADIUS utils:
+
 ```bash
 # Debian/Ubuntu
 sudo apt install freeradius-utils
@@ -227,16 +249,19 @@ sudo yum install freeradius-utils
 ```
 
 Test authentication:
+
 ```bash
 radtest username password server_ip 1812 shared_secret
 ```
 
 Example:
+
 ```bash
 radtest admin admin123 localhost 1812 testing123
 ```
 
 Expected output (success):
+
 ```
 Sent Access-Request Id 123 from 0.0.0.0:12345 to 127.0.0.1:1812 length 77
 Received Access-Accept Id 123 from 127.0.0.1:1812 to 127.0.0.1:12345 length 20
@@ -245,6 +270,7 @@ Received Access-Accept Id 123 from 127.0.0.1:1812 to 127.0.0.1:12345 length 20
 ### Using Docker
 
 Test Docker deployment:
+
 ```bash
 # Build image
 docker build -t usg-radius .
@@ -264,6 +290,7 @@ radtest admin admin123 localhost 1812 testing123
 ### Configuration Validation
 
 Validate config before starting:
+
 ```bash
 usg_radius --validate config.json
 ```
@@ -271,17 +298,20 @@ usg_radius --validate config.json
 ### Common Issues
 
 **Port permission denied:**
+
 ```bash
 sudo setcap 'cap_net_bind_service=+ep' /usr/local/bin/usg_radius
 ```
 
 **Environment variable not found:**
+
 ```bash
 # Make sure to export variables
 export RADIUS_SECRET="your_secret"
 ```
 
 **Firewall blocking:**
+
 ```bash
 # Check firewall status
 sudo ufw status

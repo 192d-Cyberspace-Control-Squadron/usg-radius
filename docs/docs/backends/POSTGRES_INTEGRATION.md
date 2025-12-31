@@ -116,6 +116,7 @@ psql -U radius -d radius -f examples/postgres-schema.sql
 ```
 
 The schema file (`examples/postgres-schema.sql`) includes:
+
 - Table definitions
 - Indexes for performance
 - Sample data
@@ -160,6 +161,7 @@ WHERE username = $1 AND enabled = true
 ```
 
 The query must:
+
 - Accept username as parameter `$1`
 - Return columns: `username`, `password_hash`
 - Return exactly one row for valid users
@@ -189,6 +191,7 @@ Optionally return per-user RADIUS attributes:
 ```
 
 The attributes query must:
+
 - Accept username as parameter `$1`
 - Return columns: `attribute_type` (integer), `attribute_value` (string)
 
@@ -201,6 +204,7 @@ The attributes query must:
 Bcrypt is the recommended algorithm for production use.
 
 **Generate hash (Python):**
+
 ```python
 import bcrypt
 password = b'your_password'
@@ -209,6 +213,7 @@ print(hash.decode())
 ```
 
 **Generate hash (Node.js):**
+
 ```javascript
 const bcrypt = require('bcrypt');
 bcrypt.hash('your_password', 10, function(err, hash) {
@@ -217,6 +222,7 @@ bcrypt.hash('your_password', 10, function(err, hash) {
 ```
 
 **Configuration:**
+
 ```json
 {
   "postgres": {
@@ -230,6 +236,7 @@ bcrypt.hash('your_password', 10, function(err, hash) {
 Plain text passwords are **not recommended** for production.
 
 **Configuration:**
+
 ```json
 {
   "postgres": {
@@ -295,6 +302,7 @@ cargo test --test postgres_tests
 Integration tests require a real PostgreSQL server. See commented tests in `tests/postgres_tests.rs` for examples.
 
 **Setup test database:**
+
 ```bash
 sudo -u postgres psql <<EOF
 CREATE DATABASE radius_test;
@@ -306,6 +314,7 @@ psql -U radius -d radius_test -f examples/postgres-schema.sql
 ```
 
 **Run integration tests:**
+
 ```bash
 cargo test --test postgres_tests -- --ignored
 ```
@@ -324,6 +333,7 @@ radtest testuser password123 localhost:1812 0 testing123
 ```
 
 Expected output for successful auth:
+
 ```
 Sent Access-Request Id 123 from 0.0.0.0:54321 to 127.0.0.1:1812 length 73
 Received Access-Accept Id 123 from 127.0.0.1:1812 to 0.0.0.0:54321 length 20
@@ -346,6 +356,7 @@ The `max_connections` parameter controls the connection pool size:
 ```
 
 **Guidelines:**
+
 - Start with 10 connections for low traffic
 - Increase to 20-50 for medium traffic
 - Use 50-100 for high traffic scenarios
@@ -417,6 +428,7 @@ GRANT INSERT ON auth_attempts TO radius;
 ```
 
 SSL modes:
+
 - `disable`: No SSL
 - `require`: SSL required, no verification
 - `verify-ca`: Verify server certificate
@@ -475,11 +487,13 @@ ORDER BY timestamp DESC;
 **Error: "Connection refused"**
 
 Check PostgreSQL is running:
+
 ```bash
 sudo systemctl status postgresql
 ```
 
 Check PostgreSQL is listening:
+
 ```bash
 sudo netstat -tlnp | grep 5432
 ```
@@ -487,21 +501,25 @@ sudo netstat -tlnp | grep 5432
 **Error: "Authentication failed"**
 
 Verify credentials:
+
 ```bash
 psql -U radius -d radius -h localhost
 ```
 
 Check `pg_hba.conf`:
+
 ```bash
 sudo vi /etc/postgresql/*/main/pg_hba.conf
 ```
 
 Add/modify line:
+
 ```
 host    radius    radius    127.0.0.1/32    md5
 ```
 
 Reload PostgreSQL:
+
 ```bash
 sudo systemctl reload postgresql
 ```
@@ -511,6 +529,7 @@ sudo systemctl reload postgresql
 **Error: "User not found"**
 
 Verify user exists:
+
 ```sql
 SELECT * FROM users WHERE username = 'testuser';
 ```
@@ -518,6 +537,7 @@ SELECT * FROM users WHERE username = 'testuser';
 **Error: "Query error"**
 
 Test query manually:
+
 ```sql
 SELECT username, password_hash
 FROM users
@@ -525,6 +545,7 @@ WHERE username = 'testuser' AND enabled = true;
 ```
 
 Enable verbose logging:
+
 ```json
 {
   "log_level": "debug"
@@ -536,6 +557,7 @@ Enable verbose logging:
 **Slow authentication:**
 
 1. Check database performance:
+
 ```sql
 SELECT * FROM pg_stat_statements
 ORDER BY total_time DESC
@@ -543,11 +565,13 @@ LIMIT 10;
 ```
 
 2. Verify indexes exist:
+
 ```sql
 SELECT * FROM pg_indexes WHERE tablename = 'users';
 ```
 
 3. Increase connection pool:
+
 ```json
 {
   "postgres": {
@@ -561,6 +585,7 @@ SELECT * FROM pg_indexes WHERE tablename = 'users';
 **Bcrypt error:**
 
 Verify bcrypt hash format:
+
 ```python
 import bcrypt
 # Should start with $2a$, $2b$, or $2y$
@@ -570,6 +595,7 @@ hash = '$2b$12$...'
 **Plain text not working:**
 
 Verify password_hash setting:
+
 ```json
 {
   "postgres": {

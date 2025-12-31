@@ -11,6 +11,7 @@ Implemented comprehensive EAP-TLS (Type 13, RFC 5216) for certificate-based auth
 **File:** `crates/radius-proto/src/eap.rs`
 
 #### Protocol Structures
+
 - `TlsFlags` - EAP-TLS flag handling (L/M/S bits per RFC 5216)
 - `EapTlsPacket` - Complete packet parsing, encoding, validation
 - `TlsHandshakeState` - State machine for handshake progression
@@ -18,6 +19,7 @@ Implemented comprehensive EAP-TLS (Type 13, RFC 5216) for certificate-based auth
 - `fragment_tls_message()` - Smart fragmentation with MTU awareness
 
 #### Session Management
+
 - `EapTlsContext` - Complete session context manager
   - Handshake state tracking
   - Fragment queue management (outgoing)
@@ -26,12 +28,14 @@ Implemented comprehensive EAP-TLS (Type 13, RFC 5216) for certificate-based auth
   - Derived key storage (MSK, EMSK)
 
 #### Cryptography
+
 - `derive_keys()` - RFC 5216 Section 2.3 compliant MSK/EMSK derivation
 - `tls_prf_sha256()` - TLS 1.2 PRF using HMAC-SHA256
 - Proper label usage: "client EAP encryption"
 - 128 bytes of key material (64 MSK + 64 EMSK)
 
 #### Certificate Management
+
 - `TlsCertificateConfig` - Server certificate configuration
 - `load_certificates_from_pem()` - PEM certificate loading with rustls-pemfile
 - `load_private_key_from_pem()` - Private key loading (RSA/ECDSA/Ed25519)
@@ -39,6 +43,7 @@ Implemented comprehensive EAP-TLS (Type 13, RFC 5216) for certificate-based auth
 - `build_server_config()` - Creates rustls ServerConfig with mutual TLS support
 
 #### rustls Integration (NEW)
+
 - `EapTlsServer` - Complete TLS handshake management
   - Wraps rustls::ServerConnection
   - Integrates with EapTlsContext for fragmentation
@@ -54,6 +59,7 @@ Implemented comprehensive EAP-TLS (Type 13, RFC 5216) for certificate-based auth
 - Full TLS 1.2 and 1.3 support
 
 #### Error Handling
+
 - 3 new TLS-specific error types:
   - `EapError::TlsError` - TLS protocol errors
   - `EapError::CertificateError` - Certificate validation errors
@@ -64,6 +70,7 @@ Implemented comprehensive EAP-TLS (Type 13, RFC 5216) for certificate-based auth
 **Files:** `Cargo.toml`, `crates/radius-proto/Cargo.toml`
 
 Added TLS-related dependencies:
+
 - `rustls = "0.23"` - Pure Rust TLS implementation
 - `rustls-pemfile = "2.0"` - PEM file parsing
 - `x509-parser = "0.16"` - X.509 certificate parsing
@@ -77,6 +84,7 @@ Added feature flag: `tls = ["dep:rustls", "dep:rustls-pemfile", ...]`
 **File:** `crates/radius-proto/src/eap.rs` (tests section)
 
 Comprehensive test coverage:
+
 - TLS flags creation and parsing (2 tests)
 - EAP-TLS packet handling (7 tests)
 - Fragmentation and reassembly (6 tests)
@@ -92,9 +100,11 @@ Comprehensive test coverage:
 ### Documentation (1200+ lines)
 
 #### Protocol Documentation
+
 **File:** `docs/docs/protocol/EAP-TLS.md` (400+ lines)
 
 Complete guide including:
+
 - Overview and security benefits
 - Implementation status
 - Usage examples (basic and advanced)
@@ -110,9 +120,11 @@ Complete guide including:
 - RFC references
 
 #### Usage Examples
+
 **File:** `docs/docs/examples/eap-tls-example.md` (600+ lines)
 
 Practical examples:
+
 - Certificate generation script
 - Server setup examples
 - Fragmentation demonstration
@@ -125,9 +137,11 @@ Practical examples:
 - Common issues and solutions
 
 #### API Reference
+
 **File:** `docs/docs/api/EAP-TLS-API.md` (400+ lines)
 
 Complete API documentation:
+
 - All structures with examples (including EapTlsServer)
 - All functions with signatures (including build_server_config)
 - Usage patterns for mutual TLS
@@ -140,6 +154,7 @@ Complete API documentation:
 **File:** `docs/docs/development/ROADMAP.md`
 
 Updated EAP-TLS section with:
+
 - 21 completed features (✅)
 - 2 remaining features (RADIUS server integration, production key extraction)
 - Updated status: ~90% complete
@@ -179,6 +194,7 @@ Documentation:     1,300+ lines
 ### Architecture
 
 Clean separation of concerns:
+
 - Protocol layer (packet parsing/encoding)
 - Session management (state, buffering)
 - Cryptography (key derivation)

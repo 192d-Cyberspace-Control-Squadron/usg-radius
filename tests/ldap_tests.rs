@@ -23,7 +23,7 @@ fn test_ldap_handler_creation() {
 
     // Handler should be created successfully
     // We can't test much without a real LDAP server, but we can verify creation
-    assert!(true, "LDAP handler created successfully");
+    // Test passes if we reach this point without panicking
 }
 
 #[test]
@@ -254,5 +254,5 @@ fn test_ldap_handler_implements_auth_handler() {
     let _reject_attrs = handler.get_reject_attributes("testuser");
 
     // Both should return something
-    assert!(true, "AuthHandler trait implemented correctly");
+    // Test passes if we reach this point without panicking
 }

@@ -284,6 +284,7 @@ sudo setcap 'cap_net_bind_service=+ep' /usr/local/bin/usg_radius
 **Option 2: Run as root (not recommended)**
 
 Modify systemd service:
+
 ```ini
 [Service]
 User=root
@@ -293,6 +294,7 @@ Group=root
 **Option 3: Use high port (>1024)**
 
 Configure clients to use custom port:
+
 ```json
 {
   "listen_port": 11812
@@ -306,11 +308,13 @@ Configure clients to use custom port:
 ### Pre-Deployment
 
 - [ ] **Configuration validated**
+
   ```bash
   usg_radius --validate /etc/radius/config.json
   ```
 
 - [ ] **Strong secrets generated**
+
   ```bash
   openssl rand -base64 32
   ```
@@ -321,12 +325,14 @@ Configure clients to use custom port:
   - Use secret management (Vault, AWS Secrets Manager)
 
 - [ ] **File permissions configured**
+
   ```bash
   chmod 600 /etc/radius/config.json
   chown radius:radius /etc/radius/config.json
   ```
 
 - [ ] **Firewall rules configured**
+
   ```bash
   # UFW example
   sudo ufw allow from 192.168.1.0/24 to any port 1812 proto udp
@@ -349,17 +355,20 @@ Configure clients to use custom port:
 ### Post-Deployment
 
 - [ ] **Test authentication**
+
   ```bash
   # Using radtest (from freeradius-utils package)
   radtest username password localhost 1812 testing123
   ```
 
 - [ ] **Verify audit logs**
+
   ```bash
   tail -f /var/log/radius/audit.log
   ```
 
 - [ ] **Check resource usage**
+
   ```bash
   # CPU and memory
   top -p $(pgrep usg_radius)

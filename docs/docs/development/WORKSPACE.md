@@ -37,22 +37,27 @@ usg-radius/
 ## Workspace Benefits
 
 ### Modularity
+
 - **radius-proto**: Can be used standalone for clients, proxies, or custom servers
 - **radius-server**: Builds on radius-proto for a complete server solution
 - Clear separation of concerns
 
 ### Code Reuse
+
 - Shared dependencies across crates
 - Consistent versioning
 - Reduced duplication
 
 ### Development
+
 - Build all crates together: `cargo build --workspace`
 - Test all crates: `cargo test --workspace`
 - Build specific crate: `cargo build -p radius-proto`
 
 ### Future Expansion
+
 Easy to add new crates:
+
 - `radius-client` - Client library
 - `radius-proxy` - Proxy server
 - `radius-tools` - CLI utilities
@@ -92,23 +97,27 @@ tokio = { version = "1", features = ["full"] }
 ## Building & Testing
 
 ### Build Everything
+
 ```bash
 cargo build --workspace
 cargo build --workspace --release
 ```
 
 ### Test Everything
+
 ```bash
 cargo test --workspace
 ```
 
 ### Build Specific Crate
+
 ```bash
 cargo build -p radius-proto
 cargo build -p radius-server --release
 ```
 
 ### Run Server
+
 ```bash
 cargo run -p radius-server
 # or with custom config
@@ -116,6 +125,7 @@ cargo run -p radius-server -- /path/to/config.json
 ```
 
 ### Run Example
+
 ```bash
 cargo run -p radius-server --example simple_client alice password secret
 ```
@@ -123,6 +133,7 @@ cargo run -p radius-server --example simple_client alice password secret
 ## Documentation
 
 ### Generate Docs
+
 ```bash
 # All crates
 cargo doc --workspace --no-deps --open
@@ -150,6 +161,7 @@ cargo publish
 The project was reorganized from a monolithic structure to a workspace in v0.1.0:
 
 **Before**:
+
 ```
 src/
 ├── main.rs
@@ -162,6 +174,7 @@ src/
 ```
 
 **After**:
+
 ```
 crates/
 ├── radius-proto/src/
@@ -175,6 +188,7 @@ crates/
 ```
 
 **Benefits**:
+
 - Clear separation of protocol vs. application logic
 - radius-proto can be used by other projects
 - Easier to maintain and test
@@ -183,6 +197,7 @@ crates/
 ## Development Workflow
 
 ### Working on Protocol
+
 ```bash
 cd crates/radius-proto
 cargo watch -x test      # Auto-test on changes
@@ -190,6 +205,7 @@ cargo build
 ```
 
 ### Working on Server
+
 ```bash
 cd crates/radius-server
 cargo run                # Run server
@@ -197,6 +213,7 @@ cargo test               # Run tests
 ```
 
 ### Working on Both
+
 ```bash
 # From workspace root
 cargo build --workspace

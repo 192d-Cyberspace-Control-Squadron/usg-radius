@@ -25,12 +25,12 @@ async fn test_postgres_connection() {
         attributes_query: None,
     };
 
-    let handler = PostgresAuthHandler::new(config)
+    let _handler = PostgresAuthHandler::new(config)
         .await
         .expect("Failed to create PostgreSQL handler");
 
     // If we got here, connection pool was created successfully
-    assert!(true, "PostgreSQL handler created successfully");
+    // Test passes if we reach this point without panicking
 }
 
 #[tokio::test]

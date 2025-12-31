@@ -193,10 +193,10 @@ impl EapAuthHandler {
         // If state is provided, try to find existing session
         if let Some(state_bytes) = state {
             // State format: session_id encoded as string
-            if let Ok(session_id) = String::from_utf8(state_bytes.to_vec()) {
-                if manager.get_session(&session_id).is_some() {
-                    return session_id;
-                }
+            if let Ok(session_id) = String::from_utf8(state_bytes.to_vec())
+                && manager.get_session(&session_id).is_some()
+            {
+                return session_id;
             }
         }
 
@@ -235,6 +235,7 @@ impl EapAuthHandler {
     }
 
     /// Start EAP-MD5 Challenge authentication
+    #[allow(dead_code)]
     fn start_eap_md5(&self, _username: &str, _session_id: &str) -> AuthResult {
         // EAP-MD5 implementation would go here
         // For now, not implemented
@@ -286,6 +287,7 @@ impl EapAuthHandler {
 
     /// Start EAP-TEAP authentication
     #[cfg(feature = "tls")]
+    #[allow(dead_code)]
     fn start_eap_teap(&self, username: &str, session_id: &str) -> AuthResult {
         // Get TEAP TLS config for user's realm (or default)
         let configs = self.tls_configs.read().unwrap();
@@ -383,7 +385,7 @@ impl EapAuthHandler {
 
                         // Fragment if needed and create EAP-TLS packets
                         let fragments =
-                            radius_proto::eap::eap_tls::fragment_tls_message(&response_data, 1020);
+                            radius_proto::eap::eap_tls::fragment_tls_message(response_data, 1020);
 
                         if let Some(first_fragment) = fragments.first() {
                             let eap_packet = first_fragment.to_eap_request(identifier);
@@ -476,7 +478,7 @@ impl EapAuthHandler {
 
                         // Fragment if needed and create EAP-TEAP packets
                         let fragments =
-                            radius_proto::eap::eap_tls::fragment_tls_message(&response_data, 1020);
+                            radius_proto::eap::eap_tls::fragment_tls_message(response_data, 1020);
 
                         if let Some(first_fragment) = fragments.first() {
                             // Create EAP packet with TEAP type

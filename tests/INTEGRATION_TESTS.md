@@ -167,6 +167,7 @@ For GitHub Actions or other CI systems:
    - `postgres_integration_tests.rs` for PostgreSQL tests
 
 2. Mark test with `#[ignore]` attribute:
+
    ```rust
    #[tokio::test]
    #[ignore] // Requires Docker
@@ -190,6 +191,7 @@ For GitHub Actions or other CI systems:
 ## Performance
 
 Integration tests are slower than unit tests due to:
+
 - Docker startup time (5-10 seconds)
 - Network latency
 - Database/LDAP query time

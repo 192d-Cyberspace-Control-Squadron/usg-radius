@@ -1299,6 +1299,7 @@ pub struct EapPayloadHandler {
     /// Expected username for authentication
     expected_username: String,
     /// Expected password for authentication
+    #[allow(dead_code)]
     expected_password: String,
     /// Current inner EAP state
     inner_state: InnerEapState,
@@ -1326,6 +1327,7 @@ enum InnerEapState {
     /// Method request sent, awaiting response
     MethodRequested,
     /// Method response received, processing
+    #[allow(dead_code)]
     MethodInProgress,
     /// Authentication completed (success or failure)
     Complete,

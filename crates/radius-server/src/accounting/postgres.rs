@@ -163,6 +163,7 @@ impl PostgresAccountingHandler {
     }
 
     /// Log an accounting event to the events table
+    #[allow(clippy::too_many_arguments)]
     async fn log_event(
         &self,
         event_type: &str,
@@ -636,11 +637,9 @@ impl PostgresAccountingHandler {
                 session_id.replace('"', "\"\""),
                 username.replace('"', "\"\""),
                 nas_ip,
-                framed_ip.unwrap_or_else(|| "".to_string()),
+                framed_ip.unwrap_or_default(),
                 start_time,
-                stop_time
-                    .map(|t| t.to_string())
-                    .unwrap_or_else(|| "".to_string()),
+                stop_time.map(|t| t.to_string()).unwrap_or_default(),
                 duration_minutes,
                 input_mb,
                 output_mb,
@@ -801,12 +800,13 @@ impl PostgresAccountingHandler {
             }
         }
         json.push_str("  ]\n");
-        json.push_str("}");
+        json.push('}');
 
         Ok(json)
     }
 
     /// Extract accounting attributes from packet
+    #[allow(clippy::type_complexity)]
     fn extract_accounting_attrs(
         packet: &Packet,
     ) -> (
