@@ -102,7 +102,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "server.pem".to_string(),
             "server-key.pem".to_string(),
             Some("ca.pem".to_string()), // CA for verifying client certificates
-            true,                        // Require client certificate (mutual TLS)
+            true,                       // Require client certificate (mutual TLS)
         );
 
         // Configure EAP-TLS for default realm

@@ -914,5 +914,5 @@ The USG RADIUS server is **production-ready** for modern enterprise deployments 
 
 ---
 
-*Last Updated: 2025-01-31*
+*Last Updated: 2025-12-31*
 *Document Version: 2.0 (Major update for v0.5.0 EAP-TLS completion)*

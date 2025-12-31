@@ -3513,3 +3513,18 @@ mod tests {
         }
     }
 }
+
+/// EAP-TEAP (Tunneled Extensible Authentication Protocol)
+///
+/// RFC 7170 - Tunnel Extensible Authentication Protocol (TEAP) Version 1
+///
+/// TEAP is a modern tunneled authentication protocol that supersedes legacy
+/// methods like EAP-TTLS, PEAP, and EAP-MSCHAPv2. It provides:
+///
+/// - Two-phase authentication (TLS tunnel + inner method)
+/// - TLV-based inner authentication protocol
+/// - Cryptographic binding between inner and outer authentication
+/// - Support for multiple inner authentication methods
+/// - Protected Access Credential (PAC) support for fast reconnect
+#[cfg(feature = "tls")]
+pub mod eap_teap;
