@@ -110,8 +110,7 @@ impl Packet {
         // Read code
         let mut code_buf = [0u8; 1];
         cursor.read_exact(&mut code_buf)?;
-        let code = Code::from_u8(code_buf[0])
-            .ok_or(PacketError::InvalidCode(code_buf[0]))?;
+        let code = Code::from_u8(code_buf[0]).ok_or(PacketError::InvalidCode(code_buf[0]))?;
 
         // Read identifier
         let mut id_buf = [0u8; 1];
@@ -171,7 +170,10 @@ impl Packet {
 
     /// Find all attributes by type
     pub fn find_all_attributes(&self, attr_type: u8) -> Vec<&Attribute> {
-        self.attributes.iter().filter(|a| a.attr_type == attr_type).collect()
+        self.attributes
+            .iter()
+            .filter(|a| a.attr_type == attr_type)
+            .collect()
     }
 }
 
@@ -181,7 +183,7 @@ mod tests {
 
     #[test]
     fn test_packet_encode_decode() {
-        let mut packet = Packet::new(Code::AccessRequest, 42, [1u8; 16]);
+        let packet = Packet::new(Code::AccessRequest, 42, [1u8; 16]);
         let encoded = packet.encode().unwrap();
         let decoded = Packet::decode(&encoded).unwrap();
 

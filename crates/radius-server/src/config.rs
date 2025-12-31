@@ -99,9 +99,17 @@ pub struct Config {
     #[serde(default)]
     pub users: Vec<User>,
 
-    /// Enable verbose logging
+    /// Enable verbose logging (deprecated: use log_level instead)
     #[serde(default)]
     pub verbose: bool,
+
+    /// Log level: "trace", "debug", "info", "warn", "error" (default: "info")
+    #[serde(default)]
+    pub log_level: Option<String>,
+
+    /// Audit log file path (JSON format, optional)
+    #[serde(default)]
+    pub audit_log_path: Option<String>,
 
     /// Request cache TTL in seconds (default: 60)
     #[serde(default)]
@@ -149,6 +157,8 @@ impl Default for Config {
             clients: vec![],
             users: vec![],
             verbose: false,
+            log_level: None,
+            audit_log_path: None,
             request_cache_ttl: None,
             request_cache_max_entries: None,
             rate_limit_per_client_rps: None,
@@ -283,6 +293,8 @@ impl Config {
                 },
             ],
             verbose: false,
+            log_level: Some("info".to_string()),
+            audit_log_path: Some("/var/log/radius/audit.log".to_string()),
             request_cache_ttl: Some(60),
             request_cache_max_entries: Some(10000),
             rate_limit_per_client_rps: Some(100),

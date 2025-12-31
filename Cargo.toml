@@ -28,8 +28,8 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 # Logging
-log = "0.4"
-env_logger = "0.11"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 # Network
 ipnetwork = "0.20"
@@ -37,8 +37,12 @@ ipnetwork = "0.20"
 # Caching and concurrency
 dashmap = "6.1"
 
+# Time
+chrono = "0.4"
+
 # Development
 hex = "0.4"
+tempfile = "3.0"
 
 # Internal crates
 radius-proto = { path = "crates/radius-proto" }

@@ -20,13 +20,10 @@ This document outlines the development roadmap for the USG RADIUS project, organ
 - ✅ Workspace structure with separate protocol and server crates
 
 ### Known Limitations
-- ⚠️ No client validation (accepts requests from any IP)
-- ⚠️ Single global shared secret
-- ⚠️ No rate limiting or DoS protection
-- ⚠️ No duplicate request detection
 - ⚠️ Only PAP authentication (no CHAP/EAP)
 - ⚠️ No accounting support
 - ⚠️ Basic logging only (println!)
+- ⚠️ No attribute validation
 
 See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
@@ -39,23 +36,23 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 ### Security Enhancements
 
-#### Client Validation & Authorization
-- [ ] Implement client IP address validation
-- [ ] Per-client shared secrets
-- [ ] Client database with enable/disable flags
-- [ ] Source IP verification against configuration
+#### Client Validation & Authorization ✅ COMPLETED
+- [x] Implement client IP address validation
+- [x] Per-client shared secrets
+- [x] Client database with enable/disable flags
+- [x] Source IP verification against configuration
 - [ ] NAS-Identifier validation
 
-**Estimated Effort**: 1-2 weeks
+**Status**: ✅ Complete (except NAS-Identifier)
 
-#### Request Security
-- [ ] Duplicate request detection (cache recent requests)
-- [ ] Identifier tracking and validation
-- [ ] Request timeout handling
-- [ ] Replay attack prevention
-- [ ] Request rate limiting per client
+#### Request Security ✅ COMPLETED
+- [x] Duplicate request detection (cache recent requests)
+- [x] Identifier tracking and validation
+- [x] Request timeout handling (via cache TTL)
+- [x] Replay attack prevention
+- [x] Request rate limiting per client
 
-**Estimated Effort**: 1-2 weeks
+**Status**: ✅ Complete
 
 #### Attribute Validation
 - [ ] Required attribute enforcement (User-Name must be present)
@@ -68,32 +65,32 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 ### Operational Improvements
 
-#### Logging & Monitoring
-- [ ] Replace println! with proper logging (log crate)
-- [ ] Structured logging with levels (info, warn, error)
-- [ ] Audit trail for authentication attempts
-- [ ] Security event logging
-- [ ] Configurable log levels and formats
-- [ ] Log rotation support
+#### Logging & Monitoring ✅ COMPLETE
+- [x] Replace println! with proper logging (tracing crate)
+- [x] Structured logging with levels (trace, debug, info, warn, error)
+- [x] Configurable log levels via config file or environment variable
+- [x] Security event logging (rate limits, unauthorized clients, auth failures)
+- [x] Audit trail for authentication attempts (JSON format)
+- [ ] Log rotation support (handled by external tools)
 
-**Estimated Effort**: 1 week
+**Status**: ✅ Complete (log rotation delegated to system tools like logrotate)
 
-#### Rate Limiting & DoS Protection
-- [ ] Per-client request rate limiting
-- [ ] Global request rate limiting
+#### Rate Limiting & DoS Protection ✅ COMPLETED
+- [x] Per-client request rate limiting
+- [x] Global request rate limiting
+- [x] Configurable limits (per-client and global RPS/burst)
 - [ ] Concurrent connection limits
 - [ ] Bandwidth throttling
-- [ ] Configurable limits
 
-**Estimated Effort**: 1 week
+**Status**: ✅ Core features complete
 
 ### Configuration
-- [ ] Validate client CIDR networks
+- [x] Validate client CIDR networks
 - [ ] Environment variable support for secrets
-- [ ] Configuration file validation on startup
+- [x] Configuration file validation on startup
 - [ ] Hot reload configuration (SIGHUP)
 
-**Estimated Effort**: 1 week
+**Status**: Partial (2/4 complete)
 
 **Total v0.2.0 Estimated Effort**: 6-8 weeks
 
