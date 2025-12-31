@@ -289,6 +289,8 @@ impl ServerConfig {
             per_client_burst: config.rate_limit_per_client_burst.unwrap_or(200),
             global_rps: config.rate_limit_global_rps.unwrap_or(1000),
             global_burst: config.rate_limit_global_burst.unwrap_or(2000),
+            max_concurrent_connections: config.max_concurrent_connections.unwrap_or(100),
+            max_bandwidth_bps: config.max_bandwidth_bps.unwrap_or(1_000_000), // 1 MB/s default
         };
         let rate_limiter = Arc::new(RateLimiter::new(rate_limit_config));
 

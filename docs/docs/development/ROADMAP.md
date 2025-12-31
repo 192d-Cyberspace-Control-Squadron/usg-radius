@@ -120,10 +120,10 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 - ✅ Per-client request rate limiting
 - ✅ Global request rate limiting
 - ✅ Configurable limits (per-client and global RPS/burst)
-- [ ] Concurrent connection limits
-- [ ] Bandwidth throttling
+- ✅ Concurrent connection limits
+- ✅ Bandwidth throttling
 
-**Status**: ✅ Core features complete
+**Status**: ✅ Complete
 
 ### Configuration
 

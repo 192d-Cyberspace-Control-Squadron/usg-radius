@@ -188,6 +188,14 @@ pub struct Config {
     #[serde(default)]
     pub rate_limit_global_burst: Option<u32>,
 
+    /// Maximum concurrent connections per client (default: 100, 0 = unlimited)
+    #[serde(default)]
+    pub max_concurrent_connections: Option<u32>,
+
+    /// Maximum bandwidth per client in bytes per second (default: 1000000 = 1 MB/s, 0 = unlimited)
+    #[serde(default)]
+    pub max_bandwidth_bps: Option<u64>,
+
     /// LDAP configuration for LDAP/AD authentication
     #[serde(default)]
     pub ldap: Option<crate::ldap_auth::LdapConfig>,
@@ -234,6 +242,8 @@ impl Default for Config {
             rate_limit_per_client_burst: None,
             rate_limit_global_rps: None,
             rate_limit_global_burst: None,
+            max_concurrent_connections: None,
+            max_bandwidth_bps: None,
             ldap: None,
             postgres: None,
         }
@@ -401,6 +411,8 @@ impl Config {
             rate_limit_per_client_burst: Some(200),
             rate_limit_global_rps: Some(1000),
             rate_limit_global_burst: Some(2000),
+            max_concurrent_connections: Some(100),
+            max_bandwidth_bps: Some(1_000_000), // 1 MB/s
             ldap: None,
             postgres: None,
         }
