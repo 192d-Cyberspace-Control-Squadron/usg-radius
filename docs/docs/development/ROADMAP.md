@@ -11,6 +11,8 @@ This document outlines the development roadmap for the USG RADIUS project, organ
 
 ### Known Limitations
 
+See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
+
 #### **Core Protocol (v0.1.0)**
 
 - ✅ Basic RADIUS protocol implementation (RFC 2865)
@@ -20,13 +22,6 @@ This document outlines the development roadmap for the USG RADIUS project, organ
 - ✅ 60+ standard attributes
 - ✅ Status-Server support (RFC 5997)
 - ✅ Async I/O with Tokio
-
-- ⚠️ No hot reload (requires server restart for config changes)
-
-See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
-
----
-
 - ✅ JSON configuration
 - ✅ Simple in-memory authentication
 - ✅ Workspace structure with separate protocol and server crates
@@ -130,7 +125,6 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 - ✅ Validate client CIDR networks
 - ✅ Environment variable support for secrets
 - ✅ Configuration file validation on startup
-- [ ] Hot reload configuration (SIGHUP) - deferred to future release
 
 **Status**: ✅ Complete (3/3 required features, hot reload marked as future enhancement)
 
@@ -873,6 +867,7 @@ RevocationConfig {
 - ✅ IPv6 support (dual-stack IPv4/IPv6 for all network operations)
 - [ ] RADIUS/JSON REST API
 - [ ] WebSocket transport
+- [ ] Hot reload configuration (SIGHUP) - deferred to future release
 - [ ] gRPC management API
 - [ ] Prometheus metrics export
 - [ ] Grafana dashboards
