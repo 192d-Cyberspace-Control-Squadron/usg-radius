@@ -563,18 +563,37 @@ impl CryptoBinding {
     ///
     /// Where session_key_seed is derived from TLS master secret.
     pub fn derive_imck(session_key_seed: &[u8], imsk: &[u8]) -> Vec<u8> {
-        // For MVP, use HMAC-SHA256 as TLS-PRF
+        // For MVP, use HMAC-SHA256 as TLS-PRF with expansion to 60 bytes
         // In production, should use actual TLS PRF from the TLS version negotiated
 
         let label = b"Inner Methods Compound Keys";
+
+        // HMAC-SHA256 produces 32 bytes, we need 60 bytes
+        // Use iterative HMAC to expand the output
+        let mut output = Vec::with_capacity(60);
+
+        // First iteration: HMAC(seed, label || imsk || 0x01)
         let mut mac = Hmac::<Sha256>::new_from_slice(session_key_seed)
             .expect("HMAC can take key of any size");
-
         mac.update(label);
         mac.update(imsk);
+        mac.update(&[0x01]);
+        let a1 = mac.finalize().into_bytes();
+        output.extend_from_slice(&a1);
 
-        let result = mac.finalize();
-        result.into_bytes()[..60].to_vec()
+        // Second iteration: HMAC(seed, A1 || label || imsk || 0x02)
+        let mut mac = Hmac::<Sha256>::new_from_slice(session_key_seed)
+            .expect("HMAC can take key of any size");
+        mac.update(&a1);
+        mac.update(label);
+        mac.update(imsk);
+        mac.update(&[0x02]);
+        let a2 = mac.finalize().into_bytes();
+        output.extend_from_slice(&a2);
+
+        // Truncate to 60 bytes
+        output.truncate(60);
+        output
     }
 
     /// Derive CMK (Compound MAC Key) from IMCK - RFC 7170 Section 5.3
@@ -621,7 +640,7 @@ impl CryptoBinding {
     pub fn generate_nonce() -> [u8; 32] {
         use rand::Rng;
         let mut nonce = [0u8; 32];
-        rand::thread_rng().fill(&mut nonce);
+        rand::rng().fill(&mut nonce);
         nonce
     }
 
@@ -819,16 +838,27 @@ impl EapTeapServer {
                 Some(TlvType::BasicPasswordAuthResp) => {
                     // Password auth response received
                     if let Some(ref mut handler) = self.inner_method {
-                        let result_tlv = handler.process_inner_request(tlv)?;
+                        let _result_tlv = handler.process_inner_request(tlv)?;
 
                         // Check if authentication is complete
                         if handler.is_complete() {
-                            self.phase = TeapPhase::Complete;
+                            let auth_result = handler.get_result();
 
-                            // Encrypt and return result TLV
-                            return self.encrypt_and_send_tlvs(&[result_tlv]);
+                            // If authentication succeeded, initiate crypto-binding
+                            if auth_result == TeapResult::Success {
+                                return self.send_crypto_binding_request();
+                            } else {
+                                // Authentication failed, send failure result
+                                self.phase = TeapPhase::Complete;
+                                let failure_tlv = TeapResult::Failure.to_result_tlv();
+                                return self.encrypt_and_send_tlvs(&[failure_tlv]);
+                            }
                         }
                     }
+                }
+                Some(TlvType::CryptoBinding) => {
+                    // Crypto-Binding response received from client
+                    return self.process_crypto_binding_response(tlv);
                 }
                 Some(TlvType::Result) => {
                     // Final result TLV from client (acknowledgment)
@@ -873,6 +903,95 @@ impl EapTeapServer {
         // For MVP, return plaintext TLVs
         // In production, this would be encrypted through the TLS connection
         Ok(Some(tlv_data))
+    }
+
+    /// Send Crypto-Binding Request TLV
+    ///
+    /// RFC 7170 Section 5.3: After successful inner authentication, the server
+    /// sends a Crypto-Binding TLV to bind the inner and outer authentication.
+    fn send_crypto_binding_request(&mut self) -> Result<Option<Vec<u8>>, EapError> {
+        // TODO: In production, derive session_key_seed from TLS master secret
+        // For MVP, use placeholder key derivation
+        let session_key_seed = vec![0u8; 32];
+
+        // TODO: Get IMSK from inner authentication method
+        // For Basic-Password-Auth, IMSK is derived from the password
+        // For MVP, use placeholder IMSK
+        let imsk = vec![0u8; 32];
+
+        // Create crypto-binding context
+        let crypto_binding = CryptoBinding::new(&session_key_seed, &imsk);
+
+        // Create Crypto-Binding TLV Request
+        let cb_tlv_data = CryptoBindingTlv {
+            version: CryptoBindingTlv::VERSION,
+            received_version: 0, // First request, no version received yet
+            sub_type: CryptoBindingTlv::SUBTYPE_REQUEST,
+            nonce: crypto_binding.server_nonce,
+            compound_mac: vec![0u8; 32], // MAC will be calculated after encoding
+        };
+
+        // Calculate Compound MAC
+        // TODO: In production, BUFFER should include all previous TLVs
+        let mut tlv_for_mac = cb_tlv_data.clone();
+        tlv_for_mac.compound_mac = vec![0u8; 32]; // Zero out MAC field
+        let tlv_bytes = tlv_for_mac.to_tlv().to_bytes();
+        let compound_mac = CryptoBinding::calculate_compound_mac(&crypto_binding.cmk, &tlv_bytes);
+
+        // Create final TLV with calculated MAC
+        let cb_tlv = CryptoBindingTlv {
+            compound_mac,
+            ..cb_tlv_data
+        };
+
+        // Store crypto-binding context for verification
+        self.crypto_binding = Some(crypto_binding);
+
+        // Send Crypto-Binding Request TLV
+        self.encrypt_and_send_tlvs(&[cb_tlv.to_tlv()])
+    }
+
+    /// Process Crypto-Binding Response TLV
+    ///
+    /// RFC 7170 Section 5.3: Verify the client's Crypto-Binding response
+    /// to ensure the inner and outer authentication are properly bound.
+    fn process_crypto_binding_response(&mut self, tlv: &TeapTlv) -> Result<Option<Vec<u8>>, EapError> {
+        // Parse Crypto-Binding TLV
+        let cb_response = CryptoBindingTlv::from_tlv(tlv)?;
+
+        // Verify we have a crypto-binding context
+        let crypto_binding = self.crypto_binding.as_mut()
+            .ok_or(EapError::InvalidState)?;
+
+        // Verify sub-type is RESPONSE
+        if cb_response.sub_type != CryptoBindingTlv::SUBTYPE_RESPONSE {
+            return Err(EapError::InvalidResponseFormat);
+        }
+
+        // Store client nonce
+        crypto_binding.client_nonce = Some(cb_response.nonce);
+
+        // Verify Compound MAC
+        // TODO: In production, BUFFER should include all previous TLVs
+        let mut tlv_for_mac = cb_response.clone();
+        tlv_for_mac.compound_mac = vec![0u8; 32]; // Zero out MAC field
+        let tlv_bytes = tlv_for_mac.to_tlv().to_bytes();
+
+        if !CryptoBinding::verify_compound_mac(
+            &crypto_binding.cmk,
+            &tlv_bytes,
+            &cb_response.compound_mac,
+        ) {
+            // Crypto-binding verification failed - authentication fails
+            self.phase = TeapPhase::Complete;
+            let failure_tlv = TeapResult::Failure.to_result_tlv();
+            return self.encrypt_and_send_tlvs(&[failure_tlv]);
+        }
+
+        // Crypto-binding successful - send success result
+        self.phase = TeapPhase::Complete;
+        let success_tlv = TeapResult::Success.to_result_tlv();
+        self.encrypt_and_send_tlvs(&[success_tlv])
     }
 }
 
@@ -1543,20 +1662,21 @@ mod tests {
         let result = server.process_phase2_tlvs(&[password_response]);
         assert!(result.is_ok());
 
-        // Server should transition to Complete
-        assert_eq!(server.phase, TeapPhase::Complete);
+        // With crypto-binding enabled, server should remain in Phase2InnerAuth
+        // and send Crypto-Binding Request
+        assert_eq!(server.phase, TeapPhase::Phase2InnerAuth);
 
         let response = result.unwrap();
         assert!(response.is_some());
 
-        // Parse the response TLVs - should be Result TLV with Success
+        // Parse the response TLVs - should be Crypto-Binding TLV Request
         let tlvs = TeapTlv::parse_tlvs(&response.unwrap()).unwrap();
         assert_eq!(tlvs.len(), 1);
-        assert_eq!(tlvs[0].get_type(), Some(TlvType::Result));
+        assert_eq!(tlvs[0].get_type(), Some(TlvType::CryptoBinding));
 
-        // Parse Result TLV value
-        let result_value = u16::from_be_bytes([tlvs[0].value[0], tlvs[0].value[1]]);
-        assert_eq!(result_value, TeapResult::Success as u16);
+        // Verify it's a Crypto-Binding Request
+        let cb_tlv = CryptoBindingTlv::from_tlv(&tlvs[0]).unwrap();
+        assert_eq!(cb_tlv.sub_type, CryptoBindingTlv::SUBTYPE_REQUEST);
     }
 
     #[test]
@@ -1634,7 +1754,7 @@ mod tests {
         let tlvs2 = TeapTlv::parse_tlvs(&result2.unwrap()).unwrap();
         assert_eq!(tlvs2[0].get_type(), Some(TlvType::BasicPasswordAuthReq));
 
-        // Step 3: Password response -> Result (Success)
+        // Step 3: Password response -> Crypto-Binding Request
         let mut value = Vec::new();
         value.extend_from_slice(&5u16.to_be_bytes());
         value.extend_from_slice(b"alice");
@@ -1644,11 +1764,43 @@ mod tests {
 
         let result3 = server.process_phase2_tlvs(&[password_response]).unwrap();
         assert!(result3.is_some());
-        assert_eq!(server.phase, TeapPhase::Complete);
+        assert_eq!(server.phase, TeapPhase::Phase2InnerAuth);
 
         let tlvs3 = TeapTlv::parse_tlvs(&result3.unwrap()).unwrap();
-        assert_eq!(tlvs3[0].get_type(), Some(TlvType::Result));
-        let result_value = u16::from_be_bytes([tlvs3[0].value[0], tlvs3[0].value[1]]);
+        assert_eq!(tlvs3[0].get_type(), Some(TlvType::CryptoBinding));
+
+        // Verify it's a Crypto-Binding Request
+        let cb_request = CryptoBindingTlv::from_tlv(&tlvs3[0]).unwrap();
+        assert_eq!(cb_request.sub_type, CryptoBindingTlv::SUBTYPE_REQUEST);
+
+        // Step 4: Crypto-Binding Response -> Result (Success)
+        let cb_response = CryptoBindingTlv {
+            version: CryptoBindingTlv::VERSION,
+            received_version: CryptoBindingTlv::VERSION,
+            sub_type: CryptoBindingTlv::SUBTYPE_RESPONSE,
+            nonce: [0u8; 32], // Client nonce
+            compound_mac: vec![0u8; 32], // Will be recalculated in real scenario
+        };
+
+        // For testing, we need to calculate the correct MAC
+        let crypto_binding = server.crypto_binding.as_ref().unwrap();
+        let mut tlv_for_mac = cb_response.clone();
+        tlv_for_mac.compound_mac = vec![0u8; 32];
+        let tlv_bytes = tlv_for_mac.to_tlv().to_bytes();
+        let compound_mac = CryptoBinding::calculate_compound_mac(&crypto_binding.cmk, &tlv_bytes);
+
+        let cb_response_with_mac = CryptoBindingTlv {
+            compound_mac,
+            ..cb_response
+        };
+
+        let result4 = server.process_phase2_tlvs(&[cb_response_with_mac.to_tlv()]).unwrap();
+        assert!(result4.is_some());
+        assert_eq!(server.phase, TeapPhase::Complete);
+
+        let tlvs4 = TeapTlv::parse_tlvs(&result4.unwrap()).unwrap();
+        assert_eq!(tlvs4[0].get_type(), Some(TlvType::Result));
+        let result_value = u16::from_be_bytes([tlvs4[0].value[0], tlvs4[0].value[1]]);
         assert_eq!(result_value, TeapResult::Success as u16);
     }
 
@@ -1730,5 +1882,284 @@ mod tests {
         // For MVP, encrypted data should be plaintext TLV encoding
         let expected = TeapTlv::encode_tlvs(&[tlv]);
         assert_eq!(encrypted.unwrap(), expected);
+    }
+
+    // ===== Crypto-Binding Tests (Week 4-5) =====
+
+    #[test]
+    fn test_crypto_binding_imck_derivation() {
+        // Test IMCK derivation
+        let session_key_seed = vec![0x01; 32];
+        let imsk = vec![0x02; 32];
+
+        let imck = CryptoBinding::derive_imck(&session_key_seed, &imsk);
+
+        // Should produce exactly 60 bytes
+        assert_eq!(imck.len(), 60);
+
+        // Should be deterministic - same inputs produce same output
+        let imck2 = CryptoBinding::derive_imck(&session_key_seed, &imsk);
+        assert_eq!(imck, imck2);
+
+        // Different inputs should produce different output
+        let imsk_different = vec![0x03; 32];
+        let imck3 = CryptoBinding::derive_imck(&session_key_seed, &imsk_different);
+        assert_ne!(imck, imck3);
+    }
+
+    #[test]
+    fn test_crypto_binding_cmk_derivation() {
+        // Test CMK derivation
+        let session_key_seed = vec![0x01; 32];
+        let imsk = vec![0x02; 32];
+
+        let imck = CryptoBinding::derive_imck(&session_key_seed, &imsk);
+        let cmk = CryptoBinding::derive_cmk(&imck);
+
+        // CMK should be 20 bytes (first 20 bytes of IMCK)
+        assert_eq!(cmk.len(), 20);
+
+        // Should match first 20 bytes of IMCK
+        assert_eq!(&cmk[..], &imck[..20]);
+    }
+
+    #[test]
+    fn test_crypto_binding_compound_mac_calculation() {
+        let cmk = vec![0x01; 20];
+        let buffer = b"test buffer data";
+
+        let mac = CryptoBinding::calculate_compound_mac(&cmk, buffer);
+
+        // HMAC-SHA256 produces 32 bytes
+        assert_eq!(mac.len(), 32);
+
+        // Should be deterministic
+        let mac2 = CryptoBinding::calculate_compound_mac(&cmk, buffer);
+        assert_eq!(mac, mac2);
+
+        // Different buffer should produce different MAC
+        let mac3 = CryptoBinding::calculate_compound_mac(&cmk, b"different data");
+        assert_ne!(mac, mac3);
+    }
+
+    #[test]
+    fn test_crypto_binding_mac_verification() {
+        let cmk = vec![0x01; 20];
+        let buffer = b"test buffer data";
+
+        let mac = CryptoBinding::calculate_compound_mac(&cmk, buffer);
+
+        // Correct MAC should verify
+        assert!(CryptoBinding::verify_compound_mac(&cmk, buffer, &mac));
+
+        // Wrong MAC should not verify
+        let mut wrong_mac = mac.clone();
+        wrong_mac[0] ^= 0x01; // Flip one bit
+        assert!(!CryptoBinding::verify_compound_mac(&cmk, buffer, &wrong_mac));
+
+        // Wrong buffer should not verify
+        assert!(!CryptoBinding::verify_compound_mac(&cmk, b"wrong buffer", &mac));
+    }
+
+    #[test]
+    fn test_crypto_binding_nonce_generation() {
+        let nonce1 = CryptoBinding::generate_nonce();
+        let nonce2 = CryptoBinding::generate_nonce();
+
+        // Nonces should be 32 bytes
+        assert_eq!(nonce1.len(), 32);
+        assert_eq!(nonce2.len(), 32);
+
+        // Random nonces should be different (statistically)
+        assert_ne!(nonce1, nonce2);
+    }
+
+    #[test]
+    fn test_crypto_binding_context_creation() {
+        let session_key_seed = vec![0x01; 32];
+        let imsk = vec![0x02; 32];
+
+        let crypto_binding = CryptoBinding::new(&session_key_seed, &imsk);
+
+        // Should have 60-byte IMCK
+        assert_eq!(crypto_binding.imck.len(), 60);
+
+        // Should have 20-byte CMK
+        assert_eq!(crypto_binding.cmk.len(), 20);
+
+        // Should have 32-byte server nonce
+        assert_eq!(crypto_binding.server_nonce.len(), 32);
+
+        // Client nonce should initially be None
+        assert!(crypto_binding.client_nonce.is_none());
+    }
+
+    #[test]
+    fn test_crypto_binding_tlv_encoding_decoding() {
+        let cb_tlv = CryptoBindingTlv {
+            version: CryptoBindingTlv::VERSION,
+            received_version: 0,
+            sub_type: CryptoBindingTlv::SUBTYPE_REQUEST,
+            nonce: [0x42; 32],
+            compound_mac: vec![0xAB; 32],
+        };
+
+        // Encode to TLV
+        let tlv = cb_tlv.to_tlv();
+
+        // Should be CryptoBinding type (12)
+        assert_eq!(tlv.get_type(), Some(TlvType::CryptoBinding));
+
+        // Should be mandatory
+        assert!(tlv.mandatory);
+
+        // Decode back
+        let decoded = CryptoBindingTlv::from_tlv(&tlv).unwrap();
+
+        // Should match original
+        assert_eq!(decoded.version, cb_tlv.version);
+        assert_eq!(decoded.received_version, cb_tlv.received_version);
+        assert_eq!(decoded.sub_type, cb_tlv.sub_type);
+        assert_eq!(decoded.nonce, cb_tlv.nonce);
+        assert_eq!(decoded.compound_mac, cb_tlv.compound_mac);
+    }
+
+    #[test]
+    fn test_crypto_binding_invalid_tlv_type() {
+        // Create a Result TLV (not CryptoBinding)
+        let result_tlv = TeapResult::Success.to_result_tlv();
+
+        // Should fail to parse as CryptoBinding
+        let result = CryptoBindingTlv::from_tlv(&result_tlv);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_crypto_binding_tlv_too_short() {
+        // Create invalid TLV with too little data
+        let tlv = TeapTlv::new(TlvType::CryptoBinding, true, vec![0x01, 0x00, 0x00, 0x00]);
+
+        // Should fail to parse (need at least 68 bytes: 4 header + 32 nonce + 32 MAC)
+        let result = CryptoBindingTlv::from_tlv(&tlv);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_crypto_binding_response_verification_success() {
+        use std::sync::Arc as StdArc;
+
+        let config = StdArc::new(
+            rustls::ServerConfig::builder()
+                .with_no_client_auth()
+                .with_cert_resolver(StdArc::new(
+                    rustls::server::ResolvesServerCertUsingSni::new(),
+                )),
+        );
+
+        let handler = BasicPasswordAuthHandler::new("alice".to_string(), "secret".to_string());
+        let mut server = EapTeapServer::with_inner_method(config, Box::new(handler));
+
+        server.phase = TeapPhase::Phase2InnerAuth;
+
+        // Trigger crypto-binding by authenticating
+        let mut value = Vec::new();
+        value.extend_from_slice(&5u16.to_be_bytes());
+        value.extend_from_slice(b"alice");
+        value.extend_from_slice(&6u16.to_be_bytes());
+        value.extend_from_slice(b"secret");
+        let password_response = TeapTlv::new(TlvType::BasicPasswordAuthResp, true, value);
+
+        // This should send crypto-binding request
+        let _result = server.process_phase2_tlvs(&[password_response]).unwrap();
+
+        // Server should have crypto-binding context
+        assert!(server.crypto_binding.is_some());
+
+        // Create valid crypto-binding response
+        let crypto_binding = server.crypto_binding.as_ref().unwrap();
+        let cb_response = CryptoBindingTlv {
+            version: CryptoBindingTlv::VERSION,
+            received_version: CryptoBindingTlv::VERSION,
+            sub_type: CryptoBindingTlv::SUBTYPE_RESPONSE,
+            nonce: [0u8; 32],
+            compound_mac: vec![0u8; 32],
+        };
+
+        // Calculate correct MAC
+        let mut tlv_for_mac = cb_response.clone();
+        tlv_for_mac.compound_mac = vec![0u8; 32];
+        let tlv_bytes = tlv_for_mac.to_tlv().to_bytes();
+        let compound_mac = CryptoBinding::calculate_compound_mac(&crypto_binding.cmk, &tlv_bytes);
+
+        let cb_response_with_mac = CryptoBindingTlv {
+            compound_mac,
+            ..cb_response
+        };
+
+        // Process response - should succeed
+        let result = server.process_phase2_tlvs(&[cb_response_with_mac.to_tlv()]);
+        assert!(result.is_ok());
+
+        // Should transition to Complete and send Success
+        assert_eq!(server.phase, TeapPhase::Complete);
+
+        let response = result.unwrap().unwrap();
+        let tlvs = TeapTlv::parse_tlvs(&response).unwrap();
+        assert_eq!(tlvs[0].get_type(), Some(TlvType::Result));
+
+        let result_value = u16::from_be_bytes([tlvs[0].value[0], tlvs[0].value[1]]);
+        assert_eq!(result_value, TeapResult::Success as u16);
+    }
+
+    #[test]
+    fn test_crypto_binding_response_verification_failure() {
+        use std::sync::Arc as StdArc;
+
+        let config = StdArc::new(
+            rustls::ServerConfig::builder()
+                .with_no_client_auth()
+                .with_cert_resolver(StdArc::new(
+                    rustls::server::ResolvesServerCertUsingSni::new(),
+                )),
+        );
+
+        let handler = BasicPasswordAuthHandler::new("alice".to_string(), "secret".to_string());
+        let mut server = EapTeapServer::with_inner_method(config, Box::new(handler));
+
+        server.phase = TeapPhase::Phase2InnerAuth;
+
+        // Trigger crypto-binding by authenticating
+        let mut value = Vec::new();
+        value.extend_from_slice(&5u16.to_be_bytes());
+        value.extend_from_slice(b"alice");
+        value.extend_from_slice(&6u16.to_be_bytes());
+        value.extend_from_slice(b"secret");
+        let password_response = TeapTlv::new(TlvType::BasicPasswordAuthResp, true, value);
+
+        // This should send crypto-binding request
+        let _result = server.process_phase2_tlvs(&[password_response]).unwrap();
+
+        // Create INVALID crypto-binding response (wrong MAC)
+        let cb_response = CryptoBindingTlv {
+            version: CryptoBindingTlv::VERSION,
+            received_version: CryptoBindingTlv::VERSION,
+            sub_type: CryptoBindingTlv::SUBTYPE_RESPONSE,
+            nonce: [0u8; 32],
+            compound_mac: vec![0xFF; 32], // Wrong MAC
+        };
+
+        // Process response - should fail verification
+        let result = server.process_phase2_tlvs(&[cb_response.to_tlv()]);
+        assert!(result.is_ok());
+
+        // Should transition to Complete and send Failure
+        assert_eq!(server.phase, TeapPhase::Complete);
+
+        let response = result.unwrap().unwrap();
+        let tlvs = TeapTlv::parse_tlvs(&response).unwrap();
+        assert_eq!(tlvs[0].get_type(), Some(TlvType::Result));
+
+        let result_value = u16::from_be_bytes([tlvs[0].value[0], tlvs[0].value[1]]);
+        assert_eq!(result_value, TeapResult::Failure as u16);
     }
 }
