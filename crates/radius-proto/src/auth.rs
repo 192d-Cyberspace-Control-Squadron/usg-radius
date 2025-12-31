@@ -124,10 +124,10 @@ pub fn encrypt_user_password(password: &str, secret: &[u8], authenticator: &[u8;
     // Pad password to multiple of 16 bytes
     let mut padded = password_bytes.to_vec();
     let padding_needed = (16 - (padded.len() % 16)) % 16;
-    if padding_needed > 0 || padded.len() == 0 {
+    if padding_needed > 0 || padded.is_empty() {
         padded.resize(padded.len() + padding_needed, 0);
     }
-    if padded.len() == 0 {
+    if padded.is_empty() {
         padded.resize(16, 0);
     }
 
@@ -158,7 +158,7 @@ pub fn decrypt_user_password(
     secret: &[u8],
     authenticator: &[u8; 16],
 ) -> Result<String, String> {
-    if encrypted.len() % 16 != 0 || encrypted.is_empty() {
+    if !encrypted.len().is_multiple_of(16) || encrypted.is_empty() {
         return Err("Invalid encrypted password length".to_string());
     }
 
