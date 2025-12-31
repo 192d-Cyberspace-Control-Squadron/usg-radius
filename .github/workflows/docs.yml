@@ -5,7 +5,7 @@ on:
       - main
       - master
     paths:
-      - ".docs/**"
+      - "docs/**"
   workflow_dispatch:
 permissions:
   contents: read
