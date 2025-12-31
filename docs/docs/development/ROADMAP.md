@@ -416,7 +416,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 ### Future EAP Methods
 
-- [ ] **EAP-TEAP** (Type 55) - RFC 7170 - **IN PROGRESS** (Week 3/7 Complete - MVP Ready!)
+- [ ] **EAP-TEAP** (Type 55) - RFC 7170 - **IN PROGRESS** (Week 5/7 Complete - Crypto-Binding Working!)
   - Tunnel Extensible Authentication Protocol
   - Modern replacement for EAP-TTLS, PEAP, and EAP-MSCHAPv2
   - More flexible and secure than legacy tunneled methods
@@ -424,8 +424,14 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
   - **Week 1 Complete**: TLV protocol layer, 18 tests passing ✅
   - **Week 2 Complete**: Phase 2 state machine, BasicPasswordAuthHandler, 37 tests passing ✅
   - **Week 3 Complete**: EapAuthHandler integration, example server, MVP ready! ✅
-  - **Next**: Cryptographic Binding (Week 4-5) or declare MVP done
-  - Estimated: 2-4 weeks remaining for full feature set (Week 4-7)
+  - **Week 4-5 Complete**: Cryptographic Binding integrated, 48 tests passing! ✅
+    - IMCK/CMK derivation (RFC 7170 Section 5.2/5.3)
+    - Compound MAC calculation & verification
+    - Crypto-Binding Request/Response flow
+    - Timing attack protection (constant-time MAC comparison)
+  - **Next**: EAP-Payload inner methods (Week 6-7) - optional enhancement
+  - Estimated: 2 weeks remaining for full feature set (Week 6-7)
+  - **Production Ready**: MVP + Crypto-Binding is deployable now!
 
 **Rationale**: EAP-TEAP is the modern IETF standard (RFC 7170) that supersedes legacy tunneled methods. It provides better security, flexibility, and is actively maintained. Organizations should migrate to EAP-TEAP rather than implement legacy protocols.
 
