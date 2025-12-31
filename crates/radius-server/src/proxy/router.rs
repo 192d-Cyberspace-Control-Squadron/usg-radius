@@ -194,30 +194,26 @@ impl Default for Router {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::proxy::home_server::{HomeServer, HomeServerConfig};
-    use crate::proxy::pool::{HomeServerPool, LoadBalanceStrategy};
+    use crate::proxy::home_server::HomeServerConfig;
+    use crate::proxy::pool::{HomeServerPool, HomeServerPoolConfig, LoadBalanceStrategy};
     use crate::proxy::realm::{Realm, RealmConfig, RealmMatchConfig};
     use radius_proto::attributes::Attribute;
     use radius_proto::Code;
 
-    fn create_test_home_server(name: &str) -> Arc<HomeServer> {
-        let config = HomeServerConfig {
-            address: "127.0.0.1:1812".to_string(),
-            secret: "test_secret".to_string(),
-            timeout: 30,
-            max_outstanding: 100,
-            name: Some(name.to_string()),
-        };
-        Arc::new(HomeServer::new(config).unwrap())
-    }
-
     fn create_test_pool(name: &str, server_name: &str) -> Arc<HomeServerPool> {
-        let server = create_test_home_server(server_name);
-        Arc::new(HomeServerPool {
+        let config = HomeServerPoolConfig {
             name: name.to_string(),
-            servers: vec![server],
             strategy: LoadBalanceStrategy::RoundRobin,
-        })
+            servers: vec![HomeServerConfig {
+                address: "127.0.0.1:1812".to_string(),
+                secret: "test_secret".to_string(),
+                timeout: 30,
+                max_outstanding: 100,
+                name: Some(server_name.to_string()),
+            }],
+        };
+
+        Arc::new(HomeServerPool::new(config).unwrap())
     }
 
     fn create_test_request(username: &str) -> Packet {
