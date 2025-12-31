@@ -8,9 +8,9 @@
   "properties": {
     "listen_address": {
       "type": "string",
-      "description": "IP address the server binds to. Use 0.0.0.0 for all IPv4 interfaces, :: for all IPv6 interfaces, or specific IP for single interface",
-      "default": "0.0.0.0",
-      "examples": ["0.0.0.0", "127.0.0.1", "192.168.1.10", "::", "::1", "fe80::1"],
+      "description": "IP address the server binds to. Use :: for dual-stack (IPv4+IPv6), 0.0.0.0 for IPv4-only, or specific IP for single interface",
+      "default": "::",
+      "examples": ["::", "0.0.0.0", "127.0.0.1", "192.168.1.10", "::1", "fe80::1"],
       "oneOf": [
         {
           "format": "ipv4"
@@ -183,7 +183,7 @@
   "additionalProperties": false,
   "examples": [
     {
-      "listen_address": "0.0.0.0",
+      "listen_address": "::",
       "listen_port": 1812,
       "secret": "testing123",
       "clients": [

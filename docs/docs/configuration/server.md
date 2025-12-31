@@ -18,7 +18,7 @@ usg_radius /path/to/custom-config.json
 
 ```json
 {
-  "listen_address": "0.0.0.0",
+  "listen_address": "::",
   "listen_port": 1812,
   "secret": "testing123",
   "clients": [],
@@ -43,22 +43,26 @@ usg_radius /path/to/custom-config.json
 The IP address the server binds to.
 
 - **Type**: String (IP address)
-- **Default**: `"0.0.0.0"`
+- **Default**: `"::"`
 - **Valid values**:
-  - `"0.0.0.0"` - Listen on all interfaces
-  - `"127.0.0.1"` - Listen on localhost only
-  - `"192.168.1.10"` - Listen on specific interface
+  - `"::"` - Dual-stack: Listen on all IPv6 and IPv4 interfaces (recommended)
+  - `"0.0.0.0"` - IPv4-only: Listen on all IPv4 interfaces
+  - `"127.0.0.1"` - IPv4 localhost only
+  - `"::1"` - IPv6 localhost only
+  - `"192.168.1.10"` - Specific IPv4 interface
+  - `"fe80::1"` - Specific IPv6 interface
 
 **Example:**
 
 ```json
 {
-  "listen_address": "192.168.1.10"
+  "listen_address": "::"
 }
 ```
 
 !!! tip
-    Use `"127.0.0.1"` for testing, `"0.0.0.0"` for production.
+    Use `"::"` for dual-stack production deployments (accepts both IPv4 and IPv6).
+    Use `"127.0.0.1"` or `"::1"` for localhost-only testing.
 
 ### listen_port
 
@@ -315,7 +319,7 @@ Burst capacity for global rate limiting.
 
 ```json
 {
-  "listen_address": "0.0.0.0",
+  "listen_address": "::",
   "listen_port": 1812,
   "secret": "SecureSharedSecret2024!",
   "clients": [
@@ -350,7 +354,7 @@ Burst capacity for global rate limiting.
 
 ```json
 {
-  "listen_address": "0.0.0.0",
+  "listen_address": "::",
   "listen_port": 1812,
   "secret": "ProductionDefaultSecret2024!Change",
   "clients": [

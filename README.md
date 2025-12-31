@@ -55,7 +55,7 @@ cargo run
 
 ```json
 {
-  "listen_address": "0.0.0.0",
+  "listen_address": "::",
   "listen_port": 1812,
   "secret": "testing123",
   "clients": [

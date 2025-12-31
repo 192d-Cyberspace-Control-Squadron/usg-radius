@@ -143,7 +143,7 @@ pub struct Config {
 }
 
 fn default_listen_address() -> String {
-    "0.0.0.0".to_string()
+    "::".to_string() // IPv6 unspecified - accepts both IPv6 and IPv4-mapped IPv6 on most systems
 }
 
 fn default_listen_port() -> u16 {
@@ -274,7 +274,7 @@ impl Config {
     /// Create an example configuration file
     pub fn example() -> Self {
         Config {
-            listen_address: "0.0.0.0".to_string(),
+            listen_address: "::".to_string(),
             listen_port: 1812,
             secret: "testing123".to_string(),
             clients: vec![
