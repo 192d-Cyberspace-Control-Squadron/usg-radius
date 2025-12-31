@@ -27,6 +27,22 @@ impl RevocationConfig {
         }
     }
 
+    /// Create configuration for static CRL files (no HTTP fetching)
+    pub fn static_files(
+        crl_paths: Vec<String>,
+        fallback_behavior: FallbackBehavior,
+    ) -> Self {
+        Self {
+            check_mode: RevocationCheckMode::CrlOnly,
+            fallback_behavior,
+            crl_config: CrlConfig {
+                static_crl_paths: crl_paths,
+                enable_http_fetch: false,
+                ..CrlConfig::default()
+            },
+        }
+    }
+
     /// Create a disabled revocation configuration
     pub fn disabled() -> Self {
         Self {
