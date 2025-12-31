@@ -272,11 +272,13 @@ impl AuthHandler for LdapAuthHandler {
     }
 
     fn get_reject_attributes(&self, _username: &str) -> Vec<Attribute> {
-        vec![Attribute::string(
-            radius_proto::attributes::AttributeType::ReplyMessage as u8,
-            "LDAP authentication failed",
-        )
-        .unwrap()]
+        vec![
+            Attribute::string(
+                radius_proto::attributes::AttributeType::ReplyMessage as u8,
+                "LDAP authentication failed",
+            )
+            .unwrap(),
+        ]
     }
 }
 

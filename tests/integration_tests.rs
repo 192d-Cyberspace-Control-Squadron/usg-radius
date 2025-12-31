@@ -9,7 +9,7 @@
 //! - Audit logging
 
 use radius_proto::auth::{encrypt_user_password, generate_request_authenticator};
-use radius_proto::chap::{compute_chap_response, ChapChallenge, ChapResponse};
+use radius_proto::chap::{ChapChallenge, ChapResponse, compute_chap_response};
 use radius_proto::{Attribute, AttributeType, Code, Packet};
 use radius_server::{
     AuthHandler, AuthResult, Config, RadiusServer, ServerConfig, SimpleAuthHandler,

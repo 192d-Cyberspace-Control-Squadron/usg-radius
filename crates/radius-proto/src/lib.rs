@@ -44,17 +44,15 @@ pub mod message_auth;
 pub mod packet;
 pub mod validation;
 
-pub use accounting::{
-    AcctAuthentic, AcctStatusType, AcctTerminateCause, AccountingError,
-};
+pub use accounting::{AccountingError, AcctAuthentic, AcctStatusType, AcctTerminateCause};
 pub use attributes::{Attribute, AttributeType};
 pub use auth::{
     calculate_response_authenticator, decrypt_user_password, encrypt_user_password,
     generate_request_authenticator, verify_response_authenticator,
 };
 pub use chap::{
-    compute_chap_response, verify_chap_response, ChapChallenge, ChapError, ChapResponse,
+    ChapChallenge, ChapError, ChapResponse, compute_chap_response, verify_chap_response,
 };
 pub use message_auth::{calculate_message_authenticator, verify_message_authenticator};
 pub use packet::{Code, Packet, PacketError};
-pub use validation::{validate_packet, ValidationError, ValidationMode};
+pub use validation::{ValidationError, ValidationMode, validate_packet};

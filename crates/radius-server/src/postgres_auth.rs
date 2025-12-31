@@ -5,8 +5,8 @@
 use crate::server::AuthHandler;
 use radius_proto::attributes::Attribute;
 use serde::{Deserialize, Serialize};
-use sqlx::postgres::{PgPool, PgPoolOptions};
 use sqlx::Row;
+use sqlx::postgres::{PgPool, PgPoolOptions};
 use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
@@ -275,11 +275,13 @@ impl AuthHandler for PostgresAuthHandler {
     }
 
     fn get_reject_attributes(&self, _username: &str) -> Vec<Attribute> {
-        vec![Attribute::string(
-            radius_proto::attributes::AttributeType::ReplyMessage as u8,
-            "PostgreSQL authentication failed",
-        )
-        .unwrap()]
+        vec![
+            Attribute::string(
+                radius_proto::attributes::AttributeType::ReplyMessage as u8,
+                "PostgreSQL authentication failed",
+            )
+            .unwrap(),
+        ]
     }
 }
 

@@ -105,9 +105,7 @@ pub trait AccountingHandler: Send + Sync {
     ) -> impl std::future::Future<Output = Result<AccountingResult, AccountingError>> + Send;
 
     /// Get active sessions (optional, for monitoring)
-    fn get_active_sessions(
-        &self,
-    ) -> impl std::future::Future<Output = Vec<Session>> + Send {
+    fn get_active_sessions(&self) -> impl std::future::Future<Output = Vec<Session>> + Send {
         async { Vec::new() }
     }
 
@@ -363,7 +361,12 @@ mod tests {
         let packet = create_test_packet();
 
         let result = handler
-            .handle_start("session123", "testuser", "192.168.1.1".parse().unwrap(), &packet)
+            .handle_start(
+                "session123",
+                "testuser",
+                "192.168.1.1".parse().unwrap(),
+                &packet,
+            )
             .await;
 
         assert!(result.is_ok());
@@ -383,13 +386,23 @@ mod tests {
 
         // First start should succeed
         handler
-            .handle_start("session123", "testuser", "192.168.1.1".parse().unwrap(), &packet)
+            .handle_start(
+                "session123",
+                "testuser",
+                "192.168.1.1".parse().unwrap(),
+                &packet,
+            )
             .await
             .unwrap();
 
         // Second start with same ID should fail
         let result = handler
-            .handle_start("session123", "testuser", "192.168.1.1".parse().unwrap(), &packet)
+            .handle_start(
+                "session123",
+                "testuser",
+                "192.168.1.1".parse().unwrap(),
+                &packet,
+            )
             .await;
 
         assert!(result.is_err());
@@ -406,19 +419,31 @@ mod tests {
 
         // Start session
         handler
-            .handle_start("session123", "testuser", "192.168.1.1".parse().unwrap(), &packet)
+            .handle_start(
+                "session123",
+                "testuser",
+                "192.168.1.1".parse().unwrap(),
+                &packet,
+            )
             .await
             .unwrap();
 
         // Add accounting attributes to stop packet
-        packet
-            .add_attribute(Attribute::new(AttributeType::AcctSessionTime as u8, vec![0, 0, 0, 100]).unwrap());
-        packet
-            .add_attribute(Attribute::new(AttributeType::AcctInputOctets as u8, vec![0, 0, 1, 0]).unwrap());
+        packet.add_attribute(
+            Attribute::new(AttributeType::AcctSessionTime as u8, vec![0, 0, 0, 100]).unwrap(),
+        );
+        packet.add_attribute(
+            Attribute::new(AttributeType::AcctInputOctets as u8, vec![0, 0, 1, 0]).unwrap(),
+        );
 
         // Stop session
         let result = handler
-            .handle_stop("session123", "testuser", "192.168.1.1".parse().unwrap(), &packet)
+            .handle_stop(
+                "session123",
+                "testuser",
+                "192.168.1.1".parse().unwrap(),
+                &packet,
+            )
             .await;
 
         assert!(result.is_ok());
@@ -432,19 +457,31 @@ mod tests {
 
         // Start session
         handler
-            .handle_start("session123", "testuser", "192.168.1.1".parse().unwrap(), &packet)
+            .handle_start(
+                "session123",
+                "testuser",
+                "192.168.1.1".parse().unwrap(),
+                &packet,
+            )
             .await
             .unwrap();
 
         // Add accounting attributes for interim update
-        packet
-            .add_attribute(Attribute::new(AttributeType::AcctSessionTime as u8, vec![0, 0, 0, 50]).unwrap());
-        packet
-            .add_attribute(Attribute::new(AttributeType::AcctInputOctets as u8, vec![0, 0, 0, 200]).unwrap());
+        packet.add_attribute(
+            Attribute::new(AttributeType::AcctSessionTime as u8, vec![0, 0, 0, 50]).unwrap(),
+        );
+        packet.add_attribute(
+            Attribute::new(AttributeType::AcctInputOctets as u8, vec![0, 0, 0, 200]).unwrap(),
+        );
 
         // Send interim update
         let result = handler
-            .handle_interim_update("session123", "testuser", "192.168.1.1".parse().unwrap(), &packet)
+            .handle_interim_update(
+                "session123",
+                "testuser",
+                "192.168.1.1".parse().unwrap(),
+                &packet,
+            )
             .await;
 
         assert!(result.is_ok());

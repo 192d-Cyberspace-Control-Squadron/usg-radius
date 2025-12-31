@@ -1,6 +1,6 @@
 use radius_proto::{
-    auth::{encrypt_user_password, generate_request_authenticator},
     Attribute, AttributeType, Code, Packet,
+    auth::{encrypt_user_password, generate_request_authenticator},
 };
 use std::net::UdpSocket;
 

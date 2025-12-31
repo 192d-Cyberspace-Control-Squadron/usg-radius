@@ -5,8 +5,8 @@ use crate::ratelimit::{RateLimitConfig, RateLimiter};
 use radius_proto::attributes::{Attribute, AttributeType};
 use radius_proto::auth::{calculate_response_authenticator, decrypt_user_password};
 use radius_proto::{
-    validate_packet, verify_chap_response, ChapChallenge, ChapResponse, Code, Packet, PacketError,
-    ValidationMode,
+    ChapChallenge, ChapResponse, Code, Packet, PacketError, ValidationMode, validate_packet,
+    verify_chap_response,
 };
 use std::net::SocketAddr;
 use std::sync::Arc;

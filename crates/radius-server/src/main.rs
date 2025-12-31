@@ -3,7 +3,7 @@ use radius_server::{Config, RadiusServer, ServerConfig, SimpleAuthHandler};
 use std::process;
 use std::sync::Arc;
 use tracing::{error, info, warn};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 /// USG RADIUS Server - RFC 2865 RADIUS Authentication Server
 #[derive(Parser, Debug)]

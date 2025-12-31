@@ -420,10 +420,12 @@ mod tests {
 
         let result = validate_packet(&packet, ValidationMode::Lenient);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .message
-            .contains("User-Name attribute is required"));
+        assert!(
+            result
+                .unwrap_err()
+                .message
+                .contains("User-Name attribute is required")
+        );
     }
 
     #[test]
@@ -433,10 +435,12 @@ mod tests {
 
         let result = validate_packet(&packet, ValidationMode::Lenient);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .message
-            .contains("User-Password or CHAP-Password is required"));
+        assert!(
+            result
+                .unwrap_err()
+                .message
+                .contains("User-Password or CHAP-Password is required")
+        );
     }
 
     #[test]
@@ -452,10 +456,12 @@ mod tests {
 
         let result = validate_packet(&packet, ValidationMode::Lenient);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .message
-            .contains("cannot both be present"));
+        assert!(
+            result
+                .unwrap_err()
+                .message
+                .contains("cannot both be present")
+        );
     }
 
     #[test]
