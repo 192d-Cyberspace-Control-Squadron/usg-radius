@@ -3,13 +3,11 @@
 //! This module provides RADIUS authentication against LDAP/AD servers.
 
 use crate::server::AuthHandler;
-use ldap3::{LdapConn, LdapConnAsync, LdapConnSettings, Scope, SearchEntry};
+use ldap3::{LdapConnAsync, LdapConnSettings, Scope, SearchEntry};
 use radius_proto::attributes::Attribute;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
-use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
 #[derive(Error, Debug)]
@@ -93,11 +91,9 @@ impl Default for LdapConfig {
     }
 }
 
-/// LDAP authentication handler with connection pooling
+/// LDAP authentication handler
 pub struct LdapAuthHandler {
     config: LdapConfig,
-    /// Cached connection (single connection for now, can be expanded to pool)
-    connection: Arc<RwLock<Option<LdapConn>>>,
 }
 
 impl LdapAuthHandler {
@@ -105,27 +101,12 @@ impl LdapAuthHandler {
     pub fn new(config: LdapConfig) -> Self {
         LdapAuthHandler {
             config,
-            connection: Arc::new(RwLock::new(None)),
         }
     }
 
-    /// Get or create LDAP connection
-    async fn get_connection(&self) -> Result<LdapConn, LdapError> {
-        // Try to reuse existing connection
-        {
-            let conn_guard = self.connection.read().await;
-            if let Some(conn) = conn_guard.as_ref() {
-                // Test if connection is still alive by doing a simple operation
-                // If this fails, we'll create a new connection
-                if let Ok(_) = conn.clone().simple_bind("", "") {
-                    debug!("Reusing existing LDAP connection");
-                    return Ok(conn.clone());
-                }
-            }
-        }
-
-        // Create new connection
-        debug!("Creating new LDAP connection to {}", self.config.url);
+    /// Create LDAP connection for searching
+    async fn connect_for_search(&self) -> Result<ldap3::Ldap, LdapError> {
+        debug!("Creating LDAP connection to {}", self.config.url);
         let settings = LdapConnSettings::new()
             .set_conn_timeout(Duration::from_secs(self.config.timeout));
 
@@ -160,21 +141,12 @@ impl LdapAuthHandler {
             debug!("Anonymous bind to LDAP");
         }
 
-        // Convert async LDAP to sync for compatibility
-        let sync_conn = ldap.into_sync();
-
-        // Store connection for reuse
-        {
-            let mut conn_guard = self.connection.write().await;
-            *conn_guard = Some(sync_conn.clone());
-        }
-
-        Ok(sync_conn)
+        Ok(ldap)
     }
 
     /// Search for user in LDAP
     async fn find_user(&self, username: &str) -> Result<String, LdapError> {
-        let mut ldap = self.get_connection().await?;
+        let mut ldap = self.connect_for_search().await?;
 
         // Build search filter by replacing {username}
         let filter = self.config.search_filter.replace("{username}", username);
@@ -194,6 +166,7 @@ impl LdapAuthHandler {
                 &filter,
                 &self.config.attributes,
             )
+            .await
             .map_err(|e| LdapError::Search(e.to_string()))?
             .success()
             .map_err(|e| LdapError::Search(e.to_string()))?;
