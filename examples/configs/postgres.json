@@ -1,0 +1,41 @@
+{
+  "listen_address": "::",
+  "listen_port": 1812,
+  "secret": "${RADIUS_SECRET}",
+  "strict_rfc_compliance": true,
+
+  "log_level": "info",
+  "audit_log_path": "/var/log/radius/audit.log",
+
+  "clients": [
+    {
+      "name": "Wireless Access Points",
+      "address": "192.168.10.0/24",
+      "secret": "${AP_SECRET}",
+      "enabled": true
+    },
+    {
+      "name": "Network Switches",
+      "address": "192.168.20.0/24",
+      "secret": "${SWITCH_SECRET}",
+      "enabled": true
+    }
+  ],
+
+  "postgres": {
+    "url": "postgresql://radius:${DB_PASSWORD}@localhost:5432/radius",
+    "max_connections": 10,
+    "timeout": 10,
+    "query": "SELECT username, password_hash FROM users WHERE username = $1 AND enabled = true",
+    "password_hash": "bcrypt",
+    "attributes_query": "SELECT attribute_type, attribute_value FROM user_attributes WHERE username = $1"
+  },
+
+  "request_cache_ttl": 300,
+  "request_cache_max_entries": 50000,
+
+  "rate_limit_per_client_rps": 500,
+  "rate_limit_per_client_burst": 1000,
+  "rate_limit_global_rps": 5000,
+  "rate_limit_global_burst": 10000
+}

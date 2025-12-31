@@ -143,6 +143,14 @@ USG RADIUS follows a modular architecture:
 
     [:octicons-arrow-right-24: Configure](configuration/server.md)
 
+-   :material-database:{ .lg .middle } **Authentication Backends**
+
+    ---
+
+    LDAP/AD, PostgreSQL, and file-based authentication
+
+    [:octicons-arrow-right-24: Backends](backends/BACKEND_INTEGRATIONS.md)
+
 -   :material-shield-lock:{ .lg .middle } __Security__
 
     ---

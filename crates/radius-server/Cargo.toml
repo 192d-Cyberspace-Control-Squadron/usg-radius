@@ -24,6 +24,8 @@ dashmap.workspace = true
 chrono.workspace = true
 clap.workspace = true
 ldap3.workspace = true
+sqlx.workspace = true
+bcrypt.workspace = true
 
 [dev-dependencies]
 hex.workspace = true

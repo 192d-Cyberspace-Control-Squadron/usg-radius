@@ -46,6 +46,10 @@ clap = { version = "4.5", features = ["derive", "cargo"] }
 # LDAP
 ldap3 = "0.11"
 
+# Database
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "macros", "chrono"] }
+bcrypt = "0.15"
+
 # Development
 hex = "0.4"
 tempfile = "3.0"
@@ -66,6 +70,7 @@ radius-proto.workspace = true
 radius-server.workspace = true
 tokio.workspace = true
 tempfile.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true

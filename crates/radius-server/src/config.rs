@@ -169,6 +169,10 @@ pub struct Config {
     /// LDAP configuration for LDAP/AD authentication
     #[serde(default)]
     pub ldap: Option<crate::ldap_auth::LdapConfig>,
+
+    /// PostgreSQL configuration for database-backed authentication
+    #[serde(default)]
+    pub postgres: Option<crate::postgres_auth::PostgresConfig>,
 }
 
 fn default_listen_address() -> String {
@@ -206,6 +210,7 @@ impl Default for Config {
             rate_limit_global_rps: None,
             rate_limit_global_burst: None,
             ldap: None,
+            postgres: None,
         }
     }
 }
@@ -365,6 +370,7 @@ impl Config {
             rate_limit_global_rps: Some(1000),
             rate_limit_global_burst: Some(2000),
             ldap: None,
+            postgres: None,
         }
     }
 }
