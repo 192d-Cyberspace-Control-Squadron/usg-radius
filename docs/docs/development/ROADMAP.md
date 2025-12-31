@@ -207,7 +207,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 **Goal**: Add RADIUS Accounting support (RFC 2866)
 **Priority**: HIGH
-**Status**: 🚧 In Progress (90% complete)
+**Status**: 🚧 In Progress (95% complete)
 
 ### Accounting Protocol ✅ COMPLETED
 
@@ -253,11 +253,12 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
     - [x] All accounting event types supported
     - [x] Session query methods
   - [ ] MySQL backend
-- [ ] Accounting data retention policies
-  - [ ] Configurable retention periods
-  - [ ] Automated cleanup for old records
+- [x] Accounting data retention policies
+  - [x] Configurable retention periods (accounting_retention_days)
+  - [x] Automated cleanup method for PostgreSQL backend
+  - [x] Deletes old sessions and events based on age
 
-**Status**: 🚧 Partial (file and PostgreSQL backends complete, MySQL and retention policies pending)
+**Status**: 🚧 Partial (file and PostgreSQL backends complete, MySQL pending)
 
 ### Usage Metrics
 
