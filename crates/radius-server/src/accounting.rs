@@ -126,13 +126,28 @@ pub trait AccountingHandler: Send + Sync {
 /// accounting functionality. Not recommended for production use.
 pub struct SimpleAccountingHandler {
     sessions: Arc<dashmap::DashMap<String, Session>>,
+    /// Session timeout in seconds (0 = no timeout)
+    session_timeout: u64,
+    /// Maximum concurrent sessions per user (0 = unlimited)
+    max_sessions_per_user: usize,
 }
 
 impl SimpleAccountingHandler {
-    /// Create a new simple accounting handler
+    /// Create a new simple accounting handler with default settings
     pub fn new() -> Self {
         SimpleAccountingHandler {
             sessions: Arc::new(dashmap::DashMap::new()),
+            session_timeout: 3600, // Default: 1 hour timeout
+            max_sessions_per_user: 0, // Default: unlimited sessions
+        }
+    }
+
+    /// Create a new accounting handler with custom settings
+    pub fn with_config(session_timeout: u64, max_sessions_per_user: usize) -> Self {
+        SimpleAccountingHandler {
+            sessions: Arc::new(dashmap::DashMap::new()),
+            session_timeout,
+            max_sessions_per_user,
         }
     }
 
@@ -144,6 +159,67 @@ impl SimpleAccountingHandler {
     /// Clear all sessions (for testing)
     pub fn clear(&self) {
         self.sessions.clear();
+    }
+
+    /// Clean up stale sessions (sessions that haven't been updated within timeout period)
+    pub fn cleanup_stale_sessions(&self) -> usize {
+        if self.session_timeout == 0 {
+            return 0; // No timeout configured
+        }
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let mut removed_count = 0;
+        self.sessions.retain(|_, session| {
+            let age = now.saturating_sub(session.last_update);
+            if age > self.session_timeout {
+                removed_count += 1;
+                false // Remove this session
+            } else {
+                true // Keep this session
+            }
+        });
+
+        removed_count
+    }
+
+    /// Get sessions for a specific user
+    pub async fn get_sessions_by_user(&self, username: &str) -> Vec<Session> {
+        self.sessions
+            .iter()
+            .filter(|entry| entry.value().username == username)
+            .map(|entry| entry.value().clone())
+            .collect()
+    }
+
+    /// Get sessions for a specific NAS
+    pub async fn get_sessions_by_nas(&self, nas_ip: IpAddr) -> Vec<Session> {
+        self.sessions
+            .iter()
+            .filter(|entry| entry.value().nas_ip == nas_ip)
+            .map(|entry| entry.value().clone())
+            .collect()
+    }
+
+    /// Get count of active sessions for a user
+    fn get_user_session_count(&self, username: &str) -> usize {
+        self.sessions
+            .iter()
+            .filter(|entry| entry.value().username == username)
+            .count()
+    }
+
+    /// Check if user can start a new session (respects concurrent session limit)
+    fn can_start_session(&self, username: &str) -> bool {
+        if self.max_sessions_per_user == 0 {
+            return true; // No limit
+        }
+
+        let current_count = self.get_user_session_count(username);
+        current_count < self.max_sessions_per_user
     }
 }
 
@@ -164,9 +240,22 @@ impl AccountingHandler for SimpleAccountingHandler {
         let session_id = session_id.to_string();
         let username = username.to_string();
         Box::pin(async move {
+            // Clean up stale sessions before starting new one
+            self.cleanup_stale_sessions();
+
             // Check for duplicate session
             if self.sessions.contains_key(&session_id) {
                 return Err(AccountingError::DuplicateSession(session_id.to_string()));
+            }
+
+            // Check concurrent session limit
+            if !self.can_start_session(&username) {
+                let current = self.get_user_session_count(&username);
+                return Err(AccountingError::SessionLimitExceeded {
+                    username: username.to_string(),
+                    current,
+                    max: self.max_sessions_per_user,
+                });
             }
 
             // Create new session

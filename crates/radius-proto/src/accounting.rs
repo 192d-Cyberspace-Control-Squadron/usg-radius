@@ -217,6 +217,14 @@ pub enum AccountingError {
     /// Duplicate session start
     #[error("Duplicate session start: {0}")]
     DuplicateSession(String),
+
+    /// Session limit exceeded
+    #[error("Session limit exceeded for user {username}: {current}/{max} sessions")]
+    SessionLimitExceeded {
+        username: String,
+        current: usize,
+        max: usize,
+    },
 }
 
 #[cfg(test)]

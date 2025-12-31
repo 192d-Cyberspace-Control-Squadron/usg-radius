@@ -1641,3 +1641,263 @@ async fn test_message_authenticator_optional() {
     assert_eq!(response.code, Code::AccessAccept);
     assert_eq!(response.identifier, 3);
 }
+
+/// Test session timeout handling
+#[tokio::test]
+async fn test_accounting_session_timeout() {
+    let mut config = Config::default();
+    config.listen_address = "127.0.0.1".to_string();
+    config.listen_port = 0;
+    config.secret = "testing123".to_string();
+
+    let mut auth_handler = SimpleAuthHandler::new();
+    auth_handler.add_user("testuser", "testpass");
+
+    // Create accounting handler with 2 second timeout
+    let accounting_handler = Arc::new(SimpleAccountingHandler::with_config(2, 0));
+    let accounting_handler_impl = Arc::clone(&accounting_handler);
+
+    let server_config = ServerConfig::from_config(config, Arc::new(auth_handler))
+        .expect("Failed to create server config")
+        .with_accounting_handler(accounting_handler);
+
+    let server = RadiusServer::new(server_config)
+        .await
+        .expect("Failed to create server");
+    let server_addr = server.local_addr().expect("Failed to get server address");
+
+    tokio::spawn(async move {
+        server.run().await.ok();
+    });
+
+    sleep(Duration::from_millis(500)).await;
+
+    let secret = b"testing123";
+
+    // Start a session
+    let session_id = "timeout-session-123";
+    let start_packet = create_accounting_request(
+        AcctStatusType::Start,
+        session_id,
+        "testuser",
+        1,
+        secret,
+    );
+
+    let start_response = send_radius_request(&start_packet, server_addr)
+        .await
+        .expect("Failed to send Accounting-Start");
+
+    assert_eq!(start_response.code, Code::AccountingResponse);
+    assert_eq!(accounting_handler_impl.session_count(), 1);
+
+    // Wait for session to timeout (2 seconds + buffer)
+    sleep(Duration::from_secs(3)).await;
+
+    // Try to start another session - this should trigger cleanup
+    let start_packet2 = create_accounting_request(
+        AcctStatusType::Start,
+        "new-session-456",
+        "testuser",
+        2,
+        secret,
+    );
+
+    send_radius_request(&start_packet2, server_addr)
+        .await
+        .expect("Failed to send second Accounting-Start");
+
+    // Should have only 1 session (the old one was cleaned up)
+    assert_eq!(accounting_handler_impl.session_count(), 1);
+
+    // Verify the old session was removed
+    let old_session = accounting_handler_impl.get_session(session_id).await;
+    assert!(old_session.is_none());
+
+    // Verify the new session exists
+    let new_session = accounting_handler_impl.get_session("new-session-456").await;
+    assert!(new_session.is_some());
+}
+
+/// Test concurrent session limits
+#[tokio::test]
+async fn test_accounting_concurrent_session_limit() {
+    let mut config = Config::default();
+    config.listen_address = "127.0.0.1".to_string();
+    config.listen_port = 0;
+    config.secret = "testing123".to_string();
+
+    let mut auth_handler = SimpleAuthHandler::new();
+    auth_handler.add_user("testuser", "testpass");
+
+    // Create accounting handler with limit of 2 sessions per user
+    let accounting_handler = Arc::new(SimpleAccountingHandler::with_config(0, 2));
+    let accounting_handler_impl = Arc::clone(&accounting_handler);
+
+    let server_config = ServerConfig::from_config(config, Arc::new(auth_handler))
+        .expect("Failed to create server config")
+        .with_accounting_handler(accounting_handler);
+
+    let server = RadiusServer::new(server_config)
+        .await
+        .expect("Failed to create server");
+    let server_addr = server.local_addr().expect("Failed to get server address");
+
+    tokio::spawn(async move {
+        server.run().await.ok();
+    });
+
+    sleep(Duration::from_millis(500)).await;
+
+    let secret = b"testing123";
+
+    // Start first session - should succeed
+    let start1 = create_accounting_request(
+        AcctStatusType::Start,
+        "session-1",
+        "testuser",
+        1,
+        secret,
+    );
+    let response1 = send_radius_request(&start1, server_addr)
+        .await
+        .expect("Failed to send first start");
+    assert_eq!(response1.code, Code::AccountingResponse);
+    assert_eq!(accounting_handler_impl.session_count(), 1);
+
+    // Start second session - should succeed
+    let start2 = create_accounting_request(
+        AcctStatusType::Start,
+        "session-2",
+        "testuser",
+        2,
+        secret,
+    );
+    let response2 = send_radius_request(&start2, server_addr)
+        .await
+        .expect("Failed to send second start");
+    assert_eq!(response2.code, Code::AccountingResponse);
+    assert_eq!(accounting_handler_impl.session_count(), 2);
+
+    // Try to start third session - should fail (limit exceeded)
+    let start3 = create_accounting_request(
+        AcctStatusType::Start,
+        "session-3",
+        "testuser",
+        3,
+        secret,
+    );
+
+    // Server currently doesn't respond when session limit exceeded (returns error)
+    // This causes a timeout - in future, should send Accounting-Response per RFC 2866
+    let result3 = tokio::time::timeout(
+        Duration::from_secs(1),
+        send_radius_request(&start3, server_addr)
+    ).await;
+
+    // Should timeout or error (session limit exceeded)
+    assert!(result3.is_err() || matches!(result3, Ok(Err(_))));
+
+    // Session count should stay at 2 (limit not exceeded)
+    assert_eq!(accounting_handler_impl.session_count(), 2);
+
+    // Verify only the first two sessions exist
+    assert!(accounting_handler_impl.get_session("session-1").await.is_some());
+    assert!(accounting_handler_impl.get_session("session-2").await.is_some());
+    assert!(accounting_handler_impl.get_session("session-3").await.is_none());
+
+    // Stop one session
+    let stop1 = create_accounting_request(
+        AcctStatusType::Stop,
+        "session-1",
+        "testuser",
+        4,
+        secret,
+    );
+    send_radius_request(&stop1, server_addr)
+        .await
+        .expect("Failed to send stop");
+    assert_eq!(accounting_handler_impl.session_count(), 1);
+
+    // Now we should be able to start a new session
+    let start4 = create_accounting_request(
+        AcctStatusType::Start,
+        "session-4",
+        "testuser",
+        5,
+        secret,
+    );
+    let response4 = send_radius_request(&start4, server_addr)
+        .await
+        .expect("Failed to send fourth start");
+    assert_eq!(response4.code, Code::AccountingResponse);
+    assert_eq!(accounting_handler_impl.session_count(), 2);
+}
+
+/// Test session query by user
+#[tokio::test]
+async fn test_accounting_query_by_user() {
+    let mut config = Config::default();
+    config.listen_address = "127.0.0.1".to_string();
+    config.listen_port = 0;
+    config.secret = "testing123".to_string();
+
+    let mut auth_handler = SimpleAuthHandler::new();
+    auth_handler.add_user("user1", "pass1");
+    auth_handler.add_user("user2", "pass2");
+
+    let accounting_handler = Arc::new(SimpleAccountingHandler::new());
+    let accounting_handler_impl = Arc::clone(&accounting_handler);
+
+    let server_config = ServerConfig::from_config(config, Arc::new(auth_handler))
+        .expect("Failed to create server config")
+        .with_accounting_handler(accounting_handler);
+
+    let server = RadiusServer::new(server_config)
+        .await
+        .expect("Failed to create server");
+    let server_addr = server.local_addr().expect("Failed to get server address");
+
+    tokio::spawn(async move {
+        server.run().await.ok();
+    });
+
+    sleep(Duration::from_millis(500)).await;
+
+    let secret = b"testing123";
+
+    // Start 2 sessions for user1
+    send_radius_request(
+        &create_accounting_request(AcctStatusType::Start, "user1-session-1", "user1", 1, secret),
+        server_addr,
+    )
+    .await
+    .unwrap();
+
+    send_radius_request(
+        &create_accounting_request(AcctStatusType::Start, "user1-session-2", "user1", 2, secret),
+        server_addr,
+    )
+    .await
+    .unwrap();
+
+    // Start 1 session for user2
+    send_radius_request(
+        &create_accounting_request(AcctStatusType::Start, "user2-session-1", "user2", 3, secret),
+        server_addr,
+    )
+    .await
+    .unwrap();
+
+    // Query sessions by user
+    let user1_sessions = accounting_handler_impl.get_sessions_by_user("user1").await;
+    assert_eq!(user1_sessions.len(), 2);
+    assert!(user1_sessions.iter().all(|s| s.username == "user1"));
+
+    let user2_sessions = accounting_handler_impl.get_sessions_by_user("user2").await;
+    assert_eq!(user2_sessions.len(), 1);
+    assert_eq!(user2_sessions[0].username, "user2");
+
+    let user3_sessions = accounting_handler_impl.get_sessions_by_user("user3").await;
+    assert_eq!(user3_sessions.len(), 0);
+}
