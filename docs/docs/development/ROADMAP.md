@@ -462,9 +462,14 @@ The following legacy methods will **not** be implemented due to modern alternati
 - ✅ Certificate/key pair validation
 - ✅ PEM file loading (certificates and keys)
 - ✅ X.509 DER parsing and validation
-- [ ] Certificate revocation (CRL/OCSP)
+- [ ] **Certificate Revocation (CRL/OCSP)** - **PLANNED for v0.6.0**
+  - Production-grade revocation checking
+  - See v0.6.0 roadmap below for full architecture
+  - Estimated: 6-8 weeks for full implementation
+  - Phased approach: CRL-only (3-4 weeks), then OCSP (2-3 weeks), then optimization
 
-**Status**: 🔄 Mostly Complete (CRL/OCSP pending)
+**Status**: ✅ Core features complete (Dec 2025)
+**Note**: For v0.5.0, manual certificate lifecycle management recommended. Use short-lived certificates (1-30 days) to minimize revocation needs until v0.6.0.
 
 ### Completed Features
 
@@ -605,10 +610,93 @@ The following legacy methods will **not** be implemented due to modern alternati
 **Status**: 🔄 Benchmarking framework exists, optimizations pending
 **Estimated Effort**: 2 weeks
 
+### Certificate Revocation (CRL/OCSP)
+
+Production-grade certificate revocation checking for EAP-TLS mutual authentication.
+
+**Architecture Overview**:
+
+- Custom `RevocationCheckingVerifier` wrapping `WebPkiClientVerifier`
+- Async HTTP fetching with sync verification bridge
+- Shared caching layer (DashMap) with TTL management
+- Configurable revocation policies (CRL, OCSP, both, prefer)
+- Fail-open or fail-closed behavior on network errors
+
+**Features**:
+
+**Phase 1: CRL Support** (3-4 weeks)
+
+- [ ] CRL parsing using x509-parser (RFC 5280)
+- [ ] HTTP fetching from distribution points
+- [ ] Static CRL file loading
+- [ ] CRL signature verification
+- [ ] Serial number revocation checking
+- [ ] TTL-based caching with automatic refresh
+- [ ] CRL size limits and validation
+
+**Phase 2: OCSP Support** (2-3 weeks)
+
+- [ ] OCSP request building (ASN.1 DER encoding)
+- [ ] OCSP HTTP POST requests to responders
+- [ ] OCSP response parsing and validation
+- [ ] OCSP signature verification
+- [ ] Nonce support for replay protection
+- [ ] OCSP stapling (RFC 6066)
+- [ ] Response caching with TTL
+
+**Phase 3: Integration & Optimization** (1-2 weeks)
+
+- [ ] Custom verifier integration with `build_server_config()`
+- [ ] Async-sync bridge using `tokio::task::block_in_place`
+- [ ] Background refresh tasks for CRL/OCSP updates
+- [ ] Graceful fallback behavior (fail-open/fail-closed)
+- [ ] Network timeout and retry logic
+- [ ] Performance optimization and benchmarking
+
+**Configuration API**:
+
+```rust
+RevocationConfig {
+    check_mode: RevocationCheckMode,      // CrlOnly, OcspOnly, Both, PreferOcsp
+    fallback_behavior: FallbackBehavior,  // FailOpen, FailClosed
+    crl_config: CrlConfig,
+    ocsp_config: OcspConfig,
+}
+```
+
+**Dependencies** (behind `revocation` feature flag):
+
+- `reqwest` - HTTP client for CRL/OCSP fetching
+- `url` - URL parsing for distribution points
+- `der` - ASN.1 DER encoding/decoding
+- `x509-parser` (existing) - CRL parsing
+
+**Testing**:
+
+- [ ] Unit tests for CRL/OCSP parsing
+- [ ] Mock HTTP server for integration tests
+- [ ] Test PKI generation (revoked/valid certs)
+- [ ] Performance benchmarks (cache hit/miss)
+- [ ] Network failure simulation
+
+**Documentation**:
+
+- [ ] Configuration guide with examples
+- [ ] Security considerations and best practices
+- [ ] Troubleshooting guide for common issues
+- [ ] Migration guide from v0.5.0
+
+**Status**: 📋 Planned (architecture complete)
+**Estimated Effort**: 6-8 weeks total
+**Dependencies**: EAP-TLS (✅ complete), rustls 0.23 (✅ complete)
+**Priority**: HIGH for production deployments
+
+**Rationale**: While short-lived certificates (1-30 days) can mitigate revocation needs, production environments require robust revocation checking for compliance (PCI-DSS, HIPAA, NIST 800-53) and security. This implementation provides enterprise-grade revocation with minimal performance impact through caching.
+
 **Total v0.6.0 Effort**:
 
 - ✅ Completed: ~4 weeks (LDAP, PostgreSQL, docs, tests)
-- ⏳ Remaining: ~8 weeks (HA, additional backends, optimization)
+- ⏳ Remaining: ~14-16 weeks (HA, additional backends, optimization, CRL/OCSP)
 
 ---
 
