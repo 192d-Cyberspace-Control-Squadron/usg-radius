@@ -49,20 +49,24 @@
 pub mod config;
 pub mod error;
 
-// CRL, caching, and fetching modules (in development)
-// These modules are feature-gated and will be completed in Phase 1.2-1.4
+// CRL, caching, fetching, and verification modules
 #[cfg(feature = "revocation")]
 pub(crate) mod crl;
 #[cfg(feature = "revocation")]
 pub(crate) mod cache;
 #[cfg(feature = "revocation")]
 pub(crate) mod fetch;
+#[cfg(feature = "revocation")]
+pub mod verifier;
 
 // Re-export public types
 pub use config::{
     CrlConfig, FallbackBehavior, RevocationCheckMode, RevocationConfig,
 };
 pub use error::RevocationError;
+
+#[cfg(feature = "revocation")]
+pub use verifier::RevocationCheckingVerifier;
 
 // Internal types (will be made public as implementation progresses)
 #[cfg(feature = "revocation")]
