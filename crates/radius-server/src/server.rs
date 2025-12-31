@@ -1,7 +1,9 @@
+use crate::accounting::AccountingHandler;
 use crate::audit::{AuditEntry, AuditEventType, AuditLogger};
 use crate::cache::{RequestCache, RequestFingerprint};
 use crate::config::Config;
 use crate::ratelimit::{RateLimitConfig, RateLimiter};
+use radius_proto::accounting::{AcctStatusType, AccountingError};
 use radius_proto::attributes::{Attribute, AttributeType};
 use radius_proto::auth::{calculate_response_authenticator, decrypt_user_password};
 use radius_proto::{
@@ -31,6 +33,8 @@ pub enum ServerError {
     DuplicateRequest,
     #[error("Rate limit exceeded")]
     RateLimited,
+    #[error("Accounting error: {0}")]
+    Accounting(#[from] AccountingError),
 }
 
 /// Authentication result for multi-round authentication
@@ -171,6 +175,8 @@ pub struct ServerConfig {
     pub secret: Vec<u8>,
     /// Authentication handler
     pub auth_handler: Arc<dyn AuthHandler>,
+    /// Accounting handler (optional)
+    pub accounting_handler: Option<Arc<dyn AccountingHandler>>,
     /// Optional full configuration with client validation
     pub config: Option<Arc<Config>>,
     /// Request deduplication cache
@@ -200,11 +206,21 @@ impl ServerConfig {
             bind_addr,
             secret: secret.into(),
             auth_handler,
+            accounting_handler: None,
             config: None,
             request_cache,
             rate_limiter,
             audit_logger,
         }
+    }
+
+    /// Set the accounting handler
+    pub fn with_accounting_handler(
+        mut self,
+        accounting_handler: Arc<dyn AccountingHandler>,
+    ) -> Self {
+        self.accounting_handler = Some(accounting_handler);
+        self
     }
 
     /// Create server config from a full Config object
@@ -238,6 +254,7 @@ impl ServerConfig {
             bind_addr,
             secret,
             auth_handler,
+            accounting_handler: None,
             config: Some(Arc::new(config)),
             request_cache,
             rate_limiter,
@@ -428,6 +445,9 @@ impl RadiusServer {
         let response = match request.code {
             Code::AccessRequest => {
                 Self::handle_access_request(&request, &config, addr.ip()).await?
+            }
+            Code::AccountingRequest => {
+                Self::handle_accounting_request(&request, &config, addr.ip()).await?
             }
             Code::StatusServer => Self::handle_status_server(&request, &config, addr.ip())?,
             _ => {
@@ -713,6 +733,172 @@ impl RadiusServer {
                 Ok(response)
             }
         }
+    }
+
+    /// Handle Accounting-Request packet (RFC 2866)
+    async fn handle_accounting_request(
+        request: &Packet,
+        config: &ServerConfig,
+        source_ip: std::net::IpAddr,
+    ) -> Result<Packet, ServerError> {
+        // Check if accounting is enabled
+        let accounting_handler = config
+            .accounting_handler
+            .as_ref()
+            .ok_or_else(|| ServerError::Validation("Accounting not enabled".to_string()))?;
+
+        // Get the appropriate shared secret for this client
+        let secret = config.get_secret_for_client(source_ip);
+
+        // Extract Acct-Status-Type (required)
+        let status_type_attr = request
+            .find_attribute(AttributeType::AcctStatusType as u8)
+            .ok_or_else(|| {
+                warn!(
+                    client_ip = %source_ip,
+                    request_id = request.identifier,
+                    "Missing Acct-Status-Type attribute"
+                );
+                ServerError::Validation("Missing Acct-Status-Type attribute".to_string())
+            })?;
+
+        if status_type_attr.value.len() < 4 {
+            return Err(ServerError::Validation(
+                "Invalid Acct-Status-Type attribute".to_string(),
+            ));
+        }
+
+        let status_type_value = u32::from_be_bytes([
+            status_type_attr.value[0],
+            status_type_attr.value[1],
+            status_type_attr.value[2],
+            status_type_attr.value[3],
+        ]);
+
+        let status_type = AcctStatusType::from_u32(status_type_value).ok_or_else(|| {
+            warn!(
+                client_ip = %source_ip,
+                request_id = request.identifier,
+                status_type = status_type_value,
+                "Invalid Acct-Status-Type value"
+            );
+            ServerError::Validation(format!("Invalid Acct-Status-Type: {}", status_type_value))
+        })?;
+
+        debug!(
+            client_ip = %source_ip,
+            request_id = request.identifier,
+            status_type = ?status_type,
+            "Accounting request received"
+        );
+
+        // Handle based on status type
+        let result = if status_type.is_session_status() {
+            // Session-related accounting (Start, Stop, Interim-Update)
+            // Extract session ID and username (required for session accounting)
+            let session_id = request
+                .find_attribute(AttributeType::AcctSessionId as u8)
+                .and_then(|attr| attr.as_string().ok())
+                .ok_or_else(|| {
+                    ServerError::Validation("Missing Acct-Session-Id attribute".to_string())
+                })?;
+
+            let username = request
+                .find_attribute(AttributeType::UserName as u8)
+                .and_then(|attr| attr.as_string().ok())
+                .ok_or_else(|| {
+                    ServerError::Validation("Missing User-Name attribute".to_string())
+                })?;
+
+            info!(
+                username = %username,
+                session_id = %session_id,
+                client_ip = %source_ip,
+                request_id = request.identifier,
+                status_type = ?status_type,
+                "Processing accounting request"
+            );
+
+            // Route to appropriate handler method
+            match status_type {
+                AcctStatusType::Start => {
+                    accounting_handler
+                        .handle_start(&session_id, &username, source_ip, request)
+                        .await?
+                }
+                AcctStatusType::Stop => {
+                    accounting_handler
+                        .handle_stop(&session_id, &username, source_ip, request)
+                        .await?
+                }
+                AcctStatusType::InterimUpdate => {
+                    accounting_handler
+                        .handle_interim_update(&session_id, &username, source_ip, request)
+                        .await?
+                }
+                _ => unreachable!(), // is_session_status() guarantees these three
+            }
+        } else {
+            // NAS-related accounting (Accounting-On, Accounting-Off)
+            info!(
+                client_ip = %source_ip,
+                request_id = request.identifier,
+                status_type = ?status_type,
+                "Processing NAS accounting request"
+            );
+
+            match status_type {
+                AcctStatusType::AccountingOn => {
+                    accounting_handler
+                        .handle_accounting_on(source_ip, request)
+                        .await?
+                }
+                AcctStatusType::AccountingOff => {
+                    accounting_handler
+                        .handle_accounting_off(source_ip, request)
+                        .await?
+                }
+                _ => unreachable!(), // is_nas_status() guarantees these two
+            }
+        };
+
+        // Check result
+        match result {
+            crate::accounting::AccountingResult::Success => {
+                info!(
+                    client_ip = %source_ip,
+                    request_id = request.identifier,
+                    status_type = ?status_type,
+                    "Accounting request successful"
+                );
+            }
+            crate::accounting::AccountingResult::Failure(reason) => {
+                warn!(
+                    client_ip = %source_ip,
+                    request_id = request.identifier,
+                    status_type = ?status_type,
+                    reason = %reason,
+                    "Accounting request failed"
+                );
+            }
+        }
+
+        // Create Accounting-Response (always success per RFC 2866)
+        let mut response = Packet::new(Code::AccountingResponse, request.identifier, [0u8; 16]);
+
+        // Copy Proxy-State attributes from request to response (RFC 2865 Section 5.33)
+        for attr in request.attributes.iter() {
+            if attr.attr_type == AttributeType::ProxyState as u8 {
+                response.add_attribute(attr.clone());
+            }
+        }
+
+        // Calculate and set Response Authenticator using client-specific secret
+        let response_auth =
+            calculate_response_authenticator(&response, &request.authenticator, secret);
+        response.authenticator = response_auth;
+
+        Ok(response)
     }
 
     /// Handle Status-Server packet (RFC 5997)

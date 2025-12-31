@@ -4,7 +4,9 @@
 //! accounting requests and managing sessions.
 
 use radius_proto::{AccountingError, Packet};
+use std::future::Future;
 use std::net::IpAddr;
+use std::pin::Pin;
 use std::sync::Arc;
 
 /// Session information tracked by the accounting system
@@ -62,7 +64,7 @@ pub trait AccountingHandler: Send + Sync {
         username: &str,
         nas_ip: IpAddr,
         packet: &Packet,
-    ) -> impl std::future::Future<Output = Result<AccountingResult, AccountingError>> + Send;
+    ) -> Pin<Box<dyn Future<Output = Result<AccountingResult, AccountingError>> + Send + '_>>;
 
     /// Handle an accounting Stop request
     ///
@@ -73,7 +75,7 @@ pub trait AccountingHandler: Send + Sync {
         username: &str,
         nas_ip: IpAddr,
         packet: &Packet,
-    ) -> impl std::future::Future<Output = Result<AccountingResult, AccountingError>> + Send;
+    ) -> Pin<Box<dyn Future<Output = Result<AccountingResult, AccountingError>> + Send + '_>>;
 
     /// Handle an accounting Interim-Update request
     ///
@@ -84,7 +86,7 @@ pub trait AccountingHandler: Send + Sync {
         username: &str,
         nas_ip: IpAddr,
         packet: &Packet,
-    ) -> impl std::future::Future<Output = Result<AccountingResult, AccountingError>> + Send;
+    ) -> Pin<Box<dyn Future<Output = Result<AccountingResult, AccountingError>> + Send + '_>>;
 
     /// Handle an Accounting-On request
     ///
@@ -93,7 +95,7 @@ pub trait AccountingHandler: Send + Sync {
         &self,
         nas_ip: IpAddr,
         packet: &Packet,
-    ) -> impl std::future::Future<Output = Result<AccountingResult, AccountingError>> + Send;
+    ) -> Pin<Box<dyn Future<Output = Result<AccountingResult, AccountingError>> + Send + '_>>;
 
     /// Handle an Accounting-Off request
     ///
@@ -102,20 +104,19 @@ pub trait AccountingHandler: Send + Sync {
         &self,
         nas_ip: IpAddr,
         packet: &Packet,
-    ) -> impl std::future::Future<Output = Result<AccountingResult, AccountingError>> + Send;
+    ) -> Pin<Box<dyn Future<Output = Result<AccountingResult, AccountingError>> + Send + '_>>;
 
     /// Get active sessions (optional, for monitoring)
-    fn get_active_sessions(&self) -> impl std::future::Future<Output = Vec<Session>> + Send {
-        async { Vec::new() }
+    fn get_active_sessions(&self) -> Pin<Box<dyn Future<Output = Vec<Session>> + Send + '_>> {
+        Box::pin(async { Vec::new() })
     }
 
     /// Get session by ID (optional, for queries)
     fn get_session(
         &self,
-        session_id: &str,
-    ) -> impl std::future::Future<Output = Option<Session>> + Send {
-        let _session_id = session_id;
-        async { None }
+        _session_id: &str,
+    ) -> Pin<Box<dyn Future<Output = Option<Session>> + Send + '_>> {
+        Box::pin(async { None })
     }
 }
 
@@ -153,196 +154,217 @@ impl Default for SimpleAccountingHandler {
 }
 
 impl AccountingHandler for SimpleAccountingHandler {
-    async fn handle_start(
+    fn handle_start(
         &self,
         session_id: &str,
         username: &str,
         nas_ip: IpAddr,
         _packet: &Packet,
-    ) -> Result<AccountingResult, AccountingError> {
-        // Check for duplicate session
-        if self.sessions.contains_key(session_id) {
-            return Err(AccountingError::DuplicateSession(session_id.to_string()));
-        }
+    ) -> Pin<Box<dyn Future<Output = Result<AccountingResult, AccountingError>> + Send + '_>> {
+        let session_id = session_id.to_string();
+        let username = username.to_string();
+        Box::pin(async move {
+            // Check for duplicate session
+            if self.sessions.contains_key(&session_id) {
+                return Err(AccountingError::DuplicateSession(session_id.to_string()));
+            }
 
-        // Create new session
-        let session = Session {
-            session_id: session_id.to_string(),
-            username: username.to_string(),
-            nas_ip,
-            framed_ip: None,
-            start_time: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
-            last_update: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
-            input_octets: 0,
-            output_octets: 0,
-            input_packets: 0,
-            output_packets: 0,
-            session_time: 0,
-            terminate_cause: None,
-        };
+            // Create new session
+            let session = Session {
+                session_id: session_id.clone(),
+                username,
+                nas_ip,
+                framed_ip: None,
+                start_time: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+                last_update: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+                input_octets: 0,
+                output_octets: 0,
+                input_packets: 0,
+                output_packets: 0,
+                session_time: 0,
+                terminate_cause: None,
+            };
 
-        self.sessions.insert(session_id.to_string(), session);
-        Ok(AccountingResult::Success)
+            self.sessions.insert(session_id, session);
+            Ok(AccountingResult::Success)
+        })
     }
 
-    async fn handle_stop(
+    fn handle_stop(
         &self,
         session_id: &str,
         _username: &str,
         _nas_ip: IpAddr,
         packet: &Packet,
-    ) -> Result<AccountingResult, AccountingError> {
-        // Get and remove session
-        let mut session = self
-            .sessions
-            .remove(session_id)
-            .ok_or_else(|| AccountingError::SessionNotFound(session_id.to_string()))?
-            .1;
+    ) -> Pin<Box<dyn Future<Output = Result<AccountingResult, AccountingError>> + Send + '_>> {
+        let session_id = session_id.to_string();
+        let packet = packet.clone();
+        Box::pin(async move {
+            // Get and remove session
+            let mut session = self
+                .sessions
+                .remove(&session_id)
+                .ok_or_else(|| AccountingError::SessionNotFound(session_id.to_string()))?
+                .1;
 
-        // Update session with stop information
-        use radius_proto::AttributeType;
+            // Update session with stop information
+            use radius_proto::AttributeType;
 
-        // Extract accounting attributes
-        if let Some(attr) = packet.find_attribute(AttributeType::AcctSessionTime as u8) {
-            if attr.value.len() >= 4 {
-                session.session_time = u32::from_be_bytes([
-                    attr.value[0],
-                    attr.value[1],
-                    attr.value[2],
-                    attr.value[3],
-                ]);
+            // Extract accounting attributes
+            if let Some(attr) = packet.find_attribute(AttributeType::AcctSessionTime as u8) {
+                if attr.value.len() >= 4 {
+                    session.session_time = u32::from_be_bytes([
+                        attr.value[0],
+                        attr.value[1],
+                        attr.value[2],
+                        attr.value[3],
+                    ]);
+                }
             }
-        }
 
-        if let Some(attr) = packet.find_attribute(AttributeType::AcctInputOctets as u8) {
-            if attr.value.len() >= 4 {
-                session.input_octets = u32::from_be_bytes([
-                    attr.value[0],
-                    attr.value[1],
-                    attr.value[2],
-                    attr.value[3],
-                ]) as u64;
+            if let Some(attr) = packet.find_attribute(AttributeType::AcctInputOctets as u8) {
+                if attr.value.len() >= 4 {
+                    session.input_octets = u32::from_be_bytes([
+                        attr.value[0],
+                        attr.value[1],
+                        attr.value[2],
+                        attr.value[3],
+                    ]) as u64;
+                }
             }
-        }
 
-        if let Some(attr) = packet.find_attribute(AttributeType::AcctOutputOctets as u8) {
-            if attr.value.len() >= 4 {
-                session.output_octets = u32::from_be_bytes([
-                    attr.value[0],
-                    attr.value[1],
-                    attr.value[2],
-                    attr.value[3],
-                ]) as u64;
+            if let Some(attr) = packet.find_attribute(AttributeType::AcctOutputOctets as u8) {
+                if attr.value.len() >= 4 {
+                    session.output_octets = u32::from_be_bytes([
+                        attr.value[0],
+                        attr.value[1],
+                        attr.value[2],
+                        attr.value[3],
+                    ]) as u64;
+                }
             }
-        }
 
-        if let Some(attr) = packet.find_attribute(AttributeType::AcctTerminateCause as u8) {
-            if attr.value.len() >= 4 {
-                session.terminate_cause = Some(u32::from_be_bytes([
-                    attr.value[0],
-                    attr.value[1],
-                    attr.value[2],
-                    attr.value[3],
-                ]));
+            if let Some(attr) = packet.find_attribute(AttributeType::AcctTerminateCause as u8) {
+                if attr.value.len() >= 4 {
+                    session.terminate_cause = Some(u32::from_be_bytes([
+                        attr.value[0],
+                        attr.value[1],
+                        attr.value[2],
+                        attr.value[3],
+                    ]));
+                }
             }
-        }
 
-        // Session is now removed and logged
-        Ok(AccountingResult::Success)
+            // Session is now removed and logged
+            Ok(AccountingResult::Success)
+        })
     }
 
-    async fn handle_interim_update(
+    fn handle_interim_update(
         &self,
         session_id: &str,
         _username: &str,
         _nas_ip: IpAddr,
         packet: &Packet,
-    ) -> Result<AccountingResult, AccountingError> {
-        // Update existing session
-        let mut session = self
-            .sessions
-            .get_mut(session_id)
-            .ok_or_else(|| AccountingError::SessionNotFound(session_id.to_string()))?;
+    ) -> Pin<Box<dyn Future<Output = Result<AccountingResult, AccountingError>> + Send + '_>> {
+        let session_id = session_id.to_string();
+        let packet = packet.clone();
+        Box::pin(async move {
+            // Update existing session
+            let mut session = self
+                .sessions
+                .get_mut(&session_id)
+                .ok_or_else(|| AccountingError::SessionNotFound(session_id.to_string()))?;
 
-        // Update last update time
-        session.last_update = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+            // Update last update time
+            session.last_update = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
 
-        // Update usage statistics
-        use radius_proto::AttributeType;
+            // Update usage statistics
+            use radius_proto::AttributeType;
 
-        if let Some(attr) = packet.find_attribute(AttributeType::AcctSessionTime as u8) {
-            if attr.value.len() >= 4 {
-                session.session_time = u32::from_be_bytes([
-                    attr.value[0],
-                    attr.value[1],
-                    attr.value[2],
-                    attr.value[3],
-                ]);
+            if let Some(attr) = packet.find_attribute(AttributeType::AcctSessionTime as u8) {
+                if attr.value.len() >= 4 {
+                    session.session_time = u32::from_be_bytes([
+                        attr.value[0],
+                        attr.value[1],
+                        attr.value[2],
+                        attr.value[3],
+                    ]);
+                }
             }
-        }
 
-        if let Some(attr) = packet.find_attribute(AttributeType::AcctInputOctets as u8) {
-            if attr.value.len() >= 4 {
-                session.input_octets = u32::from_be_bytes([
-                    attr.value[0],
-                    attr.value[1],
-                    attr.value[2],
-                    attr.value[3],
-                ]) as u64;
+            if let Some(attr) = packet.find_attribute(AttributeType::AcctInputOctets as u8) {
+                if attr.value.len() >= 4 {
+                    session.input_octets = u32::from_be_bytes([
+                        attr.value[0],
+                        attr.value[1],
+                        attr.value[2],
+                        attr.value[3],
+                    ]) as u64;
+                }
             }
-        }
 
-        if let Some(attr) = packet.find_attribute(AttributeType::AcctOutputOctets as u8) {
-            if attr.value.len() >= 4 {
-                session.output_octets = u32::from_be_bytes([
-                    attr.value[0],
-                    attr.value[1],
-                    attr.value[2],
-                    attr.value[3],
-                ]) as u64;
+            if let Some(attr) = packet.find_attribute(AttributeType::AcctOutputOctets as u8) {
+                if attr.value.len() >= 4 {
+                    session.output_octets = u32::from_be_bytes([
+                        attr.value[0],
+                        attr.value[1],
+                        attr.value[2],
+                        attr.value[3],
+                    ]) as u64;
+                }
             }
-        }
 
-        Ok(AccountingResult::Success)
+            Ok(AccountingResult::Success)
+        })
     }
 
-    async fn handle_accounting_on(
+    fn handle_accounting_on(
         &self,
         _nas_ip: IpAddr,
         _packet: &Packet,
-    ) -> Result<AccountingResult, AccountingError> {
-        // NAS is starting up - could clear all sessions from this NAS
-        Ok(AccountingResult::Success)
+    ) -> Pin<Box<dyn Future<Output = Result<AccountingResult, AccountingError>> + Send + '_>> {
+        Box::pin(async move {
+            // NAS is starting up - could clear all sessions from this NAS
+            Ok(AccountingResult::Success)
+        })
     }
 
-    async fn handle_accounting_off(
+    fn handle_accounting_off(
         &self,
         nas_ip: IpAddr,
         _packet: &Packet,
-    ) -> Result<AccountingResult, AccountingError> {
-        // NAS is shutting down - terminate all sessions from this NAS
-        self.sessions.retain(|_, session| session.nas_ip != nas_ip);
-        Ok(AccountingResult::Success)
+    ) -> Pin<Box<dyn Future<Output = Result<AccountingResult, AccountingError>> + Send + '_>> {
+        Box::pin(async move {
+            // NAS is shutting down - terminate all sessions from this NAS
+            self.sessions.retain(|_, session| session.nas_ip != nas_ip);
+            Ok(AccountingResult::Success)
+        })
     }
 
-    async fn get_active_sessions(&self) -> Vec<Session> {
-        self.sessions
-            .iter()
-            .map(|entry| entry.value().clone())
-            .collect()
+    fn get_active_sessions(&self) -> Pin<Box<dyn Future<Output = Vec<Session>> + Send + '_>> {
+        Box::pin(async move {
+            self.sessions
+                .iter()
+                .map(|entry| entry.value().clone())
+                .collect()
+        })
     }
 
-    async fn get_session(&self, session_id: &str) -> Option<Session> {
-        self.sessions.get(session_id).map(|entry| entry.clone())
+    fn get_session(&self, session_id: &str) -> Pin<Box<dyn Future<Output = Option<Session>> + Send + '_>> {
+        let session_id = session_id.to_string();
+        Box::pin(async move {
+            self.sessions.get(&session_id).map(|entry| entry.clone())
+        })
     }
 }
 

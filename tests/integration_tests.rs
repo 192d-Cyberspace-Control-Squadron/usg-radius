@@ -8,11 +8,13 @@
 //! - Configuration validation
 //! - Audit logging
 
+use radius_proto::accounting::AcctStatusType;
 use radius_proto::auth::{encrypt_user_password, generate_request_authenticator};
 use radius_proto::chap::{ChapChallenge, ChapResponse, compute_chap_response};
 use radius_proto::{Attribute, AttributeType, Code, Packet};
 use radius_server::{
-    AuthHandler, AuthResult, Config, RadiusServer, ServerConfig, SimpleAuthHandler,
+    AccountingHandler, AuthHandler, AuthResult, Config, RadiusServer, ServerConfig,
+    SimpleAccountingHandler, SimpleAuthHandler,
 };
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -951,4 +953,283 @@ async fn test_access_challenge_wrong_pin() {
     // Should get Access-Reject for wrong PIN
     assert_eq!(response2.code, Code::AccessReject);
     assert_eq!(response2.identifier, 2);
+}
+
+// ============================================================================
+// Accounting Tests
+// ============================================================================
+
+/// Test helper to create an Accounting-Request packet
+fn create_accounting_request(
+    status_type: AcctStatusType,
+    session_id: &str,
+    username: &str,
+    identifier: u8,
+) -> Packet {
+    let req_auth = generate_request_authenticator();
+    let mut packet = Packet::new(Code::AccountingRequest, identifier, req_auth);
+
+    // Add Acct-Status-Type
+    let status_bytes = status_type.as_u32().to_be_bytes().to_vec();
+    packet.add_attribute(
+        Attribute::new(AttributeType::AcctStatusType as u8, status_bytes)
+            .expect("Failed to create Acct-Status-Type attribute"),
+    );
+
+    // Add Acct-Session-Id (for session-related accounting)
+    if status_type.is_session_status() {
+        packet.add_attribute(
+            Attribute::string(AttributeType::AcctSessionId as u8, session_id)
+                .expect("Failed to create Acct-Session-Id attribute"),
+        );
+    }
+
+    // Add User-Name (for session-related accounting)
+    if status_type.is_session_status() {
+        packet.add_attribute(
+            Attribute::string(AttributeType::UserName as u8, username)
+                .expect("Failed to create User-Name attribute"),
+        );
+    }
+
+    packet
+}
+
+#[tokio::test]
+async fn test_accounting_session_lifecycle() {
+    // Create test configuration
+    let mut config = Config::default();
+    config.listen_address = "127.0.0.1".to_string();
+    config.listen_port = 0; // Let OS assign a random port
+
+    let mut auth_handler = SimpleAuthHandler::new();
+    auth_handler.add_user("testuser", "testpass");
+    let accounting_handler_impl = Arc::new(SimpleAccountingHandler::new());
+    let accounting_handler = accounting_handler_impl.clone() as Arc<dyn AccountingHandler>;
+
+    // Create server config with accounting enabled
+    let server_config = ServerConfig::from_config(config, Arc::new(auth_handler))
+        .expect("Failed to create server config")
+        .with_accounting_handler(accounting_handler.clone());
+
+    // Start server
+    let server = RadiusServer::new(server_config)
+        .await
+        .expect("Failed to create server");
+    let server_addr = server.local_addr().expect("Failed to get server address");
+
+    // Start server in background
+    tokio::spawn(async move {
+        let _ = server.run().await;
+    });
+
+    // Give server time to start
+    sleep(Duration::from_millis(100)).await;
+
+    let session_id = "session-12345";
+
+    // Test 1: Accounting Start
+    let start_packet = create_accounting_request(
+        AcctStatusType::Start,
+        session_id,
+        "testuser",
+        1,
+    );
+    let start_response = send_radius_request(&start_packet, server_addr)
+        .await
+        .expect("Failed to send Accounting-Start");
+
+    assert_eq!(start_response.code, Code::AccountingResponse);
+    assert_eq!(start_response.identifier, 1);
+    assert_eq!(accounting_handler_impl.session_count(), 1);
+
+    // Test 2: Interim Update
+    let mut interim_packet = create_accounting_request(
+        AcctStatusType::InterimUpdate,
+        session_id,
+        "testuser",
+        2,
+    );
+
+    // Add usage statistics
+    interim_packet.add_attribute(
+        Attribute::new(AttributeType::AcctSessionTime as u8, vec![0, 0, 0, 60])
+            .expect("Failed to create Acct-Session-Time attribute"),
+    );
+    interim_packet.add_attribute(
+        Attribute::new(AttributeType::AcctInputOctets as u8, vec![0, 0, 1, 0])
+            .expect("Failed to create Acct-Input-Octets attribute"),
+    );
+
+    let interim_response = send_radius_request(&interim_packet, server_addr)
+        .await
+        .expect("Failed to send Interim-Update");
+
+    assert_eq!(interim_response.code, Code::AccountingResponse);
+    assert_eq!(interim_response.identifier, 2);
+    assert_eq!(accounting_handler_impl.session_count(), 1);
+
+    // Verify session was updated
+    let sessions = accounting_handler_impl.get_active_sessions().await;
+    assert_eq!(sessions.len(), 1);
+    assert_eq!(sessions[0].session_time, 60);
+    assert_eq!(sessions[0].input_octets, 256);
+
+    // Test 3: Accounting Stop
+    let mut stop_packet = create_accounting_request(
+        AcctStatusType::Stop,
+        session_id,
+        "testuser",
+        3,
+    );
+
+    // Add final usage statistics
+    stop_packet.add_attribute(
+        Attribute::new(AttributeType::AcctSessionTime as u8, vec![0, 0, 1, 44])
+            .expect("Failed to create Acct-Session-Time attribute"),
+    );
+    stop_packet.add_attribute(
+        Attribute::new(AttributeType::AcctInputOctets as u8, vec![0, 0, 2, 0])
+            .expect("Failed to create Acct-Input-Octets attribute"),
+    );
+    stop_packet.add_attribute(
+        Attribute::new(AttributeType::AcctOutputOctets as u8, vec![0, 0, 3, 0])
+            .expect("Failed to create Acct-Output-Octets attribute"),
+    );
+
+    let stop_response = send_radius_request(&stop_packet, server_addr)
+        .await
+        .expect("Failed to send Accounting-Stop");
+
+    assert_eq!(stop_response.code, Code::AccountingResponse);
+    assert_eq!(stop_response.identifier, 3);
+
+    // Session should be removed after stop
+    assert_eq!(accounting_handler_impl.session_count(), 0);
+}
+
+#[tokio::test]
+async fn test_accounting_nas_events() {
+    // Create test configuration
+    let mut config = Config::default();
+    config.listen_address = "127.0.0.1".to_string();
+    config.listen_port = 0; // Let OS assign a random port
+
+    let mut auth_handler = SimpleAuthHandler::new();
+    auth_handler.add_user("testuser", "testpass");
+    let accounting_handler_impl = Arc::new(SimpleAccountingHandler::new());
+    let accounting_handler = accounting_handler_impl.clone() as Arc<dyn AccountingHandler>;
+
+    // Create server config with accounting enabled
+    let server_config = ServerConfig::from_config(config, Arc::new(auth_handler))
+        .expect("Failed to create server config")
+        .with_accounting_handler(accounting_handler.clone());
+
+    // Start server
+    let server = RadiusServer::new(server_config)
+        .await
+        .expect("Failed to create server");
+    let server_addr = server.local_addr().expect("Failed to get server address");
+
+    // Start server in background
+    tokio::spawn(async move {
+        let _ = server.run().await;
+    });
+
+    // Give server time to start
+    sleep(Duration::from_millis(100)).await;
+
+    // Test Accounting-On
+    let on_packet = create_accounting_request(
+        AcctStatusType::AccountingOn,
+        "",
+        "",
+        1,
+    );
+    let on_response = send_radius_request(&on_packet, server_addr)
+        .await
+        .expect("Failed to send Accounting-On");
+
+    assert_eq!(on_response.code, Code::AccountingResponse);
+    assert_eq!(on_response.identifier, 1);
+
+    // Create a few sessions
+    for i in 0..3 {
+        let session_id = format!("session-{}", i);
+        let start_packet = create_accounting_request(
+            AcctStatusType::Start,
+            &session_id,
+            "testuser",
+            i + 2,
+        );
+        let _ = send_radius_request(&start_packet, server_addr).await;
+    }
+
+    assert_eq!(accounting_handler_impl.session_count(), 3);
+
+    // Test Accounting-Off (should terminate all sessions from this NAS)
+    let off_packet = create_accounting_request(
+        AcctStatusType::AccountingOff,
+        "",
+        "",
+        10,
+    );
+    let off_response = send_radius_request(&off_packet, server_addr)
+        .await
+        .expect("Failed to send Accounting-Off");
+
+    assert_eq!(off_response.code, Code::AccountingResponse);
+    assert_eq!(off_response.identifier, 10);
+
+    // All sessions from this NAS should be terminated
+    // Note: In real implementation, this would only clear sessions from the specific NAS IP
+    // For this test, since all sessions are from 127.0.0.1, they should all be removed
+    assert_eq!(accounting_handler_impl.session_count(), 0);
+}
+
+#[tokio::test]
+async fn test_accounting_without_handler() {
+    // Create test configuration without accounting handler
+    let mut config = Config::default();
+    config.listen_address = "127.0.0.1".to_string();
+    config.listen_port = 0; // Let OS assign a random port
+
+    let mut auth_handler = SimpleAuthHandler::new();
+    auth_handler.add_user("testuser", "testpass");
+
+    // Create server config WITHOUT accounting enabled
+    let server_config = ServerConfig::from_config(config, Arc::new(auth_handler))
+        .expect("Failed to create server config");
+
+    // Start server
+    let server = RadiusServer::new(server_config)
+        .await
+        .expect("Failed to create server");
+    let server_addr = server.local_addr().expect("Failed to get server address");
+
+    // Start server in background
+    tokio::spawn(async move {
+        let _ = server.run().await;
+    });
+
+    // Give server time to start
+    sleep(Duration::from_millis(100)).await;
+
+    // Try to send accounting request
+    let start_packet = create_accounting_request(
+        AcctStatusType::Start,
+        "session-123",
+        "testuser",
+        1,
+    );
+
+    // Request should fail silently or return no response
+    // (server will log an error but won't respond to invalid requests)
+    let result = tokio::time::timeout(
+        Duration::from_secs(1),
+        send_radius_request(&start_packet, server_addr)
+    ).await;
+
+    // Should timeout since server doesn't respond to accounting without handler
+    assert!(result.is_err() || result.unwrap().is_err());
 }
