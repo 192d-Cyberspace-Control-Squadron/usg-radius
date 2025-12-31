@@ -139,6 +139,12 @@ pub struct Config {
     #[serde(default)]
     pub audit_log_path: Option<String>,
 
+    /// Accounting log file path (JSON Lines format, optional)
+    /// When specified, enables file-based accounting with one JSON record per line.
+    /// Example: "/var/log/radius/accounting.jsonl"
+    #[serde(default)]
+    pub accounting_log_path: Option<String>,
+
     /// Strict RFC 2865 compliance mode (default: true)
     /// When enabled, enforces strict validation of attribute values and types.
     /// Set to false for lenient mode if compatibility with non-compliant clients is needed.
@@ -205,6 +211,7 @@ impl Default for Config {
             verbose: false,
             log_level: None,
             audit_log_path: None,
+            accounting_log_path: None,
             strict_rfc_compliance: true,
             request_cache_ttl: None,
             request_cache_max_entries: None,
@@ -367,6 +374,7 @@ impl Config {
             verbose: false,
             log_level: Some("info".to_string()),
             audit_log_path: Some("/var/log/radius/audit.log".to_string()),
+            accounting_log_path: Some("/var/log/radius/accounting.jsonl".to_string()),
             strict_rfc_compliance: true,
             request_cache_ttl: Some(60),
             request_cache_max_entries: Some(10000),
