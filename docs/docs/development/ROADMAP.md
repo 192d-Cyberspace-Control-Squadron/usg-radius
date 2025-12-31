@@ -414,32 +414,45 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
     - ✅ Direct key export without intermediate master_secret
     - ✅ Production-ready for wireless encryption keys
 
-### Future EAP Methods (Deferred)
+### Future EAP Methods
 
-The following EAP methods are deferred for future development:
-
-- [ ] **EAP-TTLS** (Type 21) - RFC 5281 (tunneled TLS) - **DEFERRED**
-  - Requires EAP-TLS production keys working first
-  - Builds tunnel over TLS for inner authentication
-  - Estimated: 3-4 weeks after EAP-TLS keys complete
-
-- [ ] **PEAP** (Type 25) - Protected EAP - **DEFERRED**
-  - Similar to EAP-TTLS, requires working TLS foundation
-  - Microsoft/Cisco implementation differences
-  - Estimated: 3-4 weeks after EAP-TLS keys complete
-
-- [ ] **EAP-MSCHAPv2** (Type 26) - **DEFERRED**
-  - Often used as inner method for PEAP
-  - Challenge-response authentication
-  - Estimated: 1-2 weeks
-
-- [ ] **EAP-TEAP** (Type 55) - RFC 7170 - **DEFERRED**
+- [ ] **EAP-TEAP** (Type 55) - RFC 7170 - **PLANNED**
   - Tunnel Extensible Authentication Protocol
-  - Modern replacement for PEAP
+  - Modern replacement for EAP-TTLS, PEAP, and EAP-MSCHAPv2
+  - More flexible and secure than legacy tunneled methods
+  - Supports cryptographic binding, channel binding, and inner method negotiation
   - Estimated: 4-5 weeks
 
-**Status**: ✅ EAP-TLS ~95% complete (Dec 2025), EAP-MD5 complete
-**Future Work**: Complete production key extraction, then implement tunneled methods
+**Rationale**: EAP-TEAP is the modern IETF standard (RFC 7170) that supersedes legacy tunneled methods. It provides better security, flexibility, and is actively maintained. Organizations should migrate to EAP-TEAP rather than implement legacy protocols.
+
+### Legacy EAP Methods (Not Planned)
+
+The following legacy methods will **not** be implemented due to modern alternatives:
+
+- **EAP-TTLS** (Type 21, RFC 5281) - **DROPPED**
+  - Superseded by EAP-TEAP
+  - Less flexible cryptographic binding
+  - Recommend EAP-TEAP for new deployments
+
+- **PEAP** (Type 25) - **DROPPED**
+  - Superseded by EAP-TEAP
+  - Microsoft/Cisco implementation differences cause compatibility issues
+  - Never fully standardized (draft only)
+  - Recommend EAP-TEAP for new deployments
+
+- **EAP-MSCHAPv2** (Type 26) - **DROPPED**
+  - Superseded by EAP-TEAP with modern inner methods
+  - Known cryptographic weaknesses
+  - Deprecated by Microsoft in favor of certificate-based auth
+  - Recommend EAP-TLS or EAP-TEAP for new deployments
+
+**Migration Path**: Organizations using EAP-TTLS, PEAP, or EAP-MSCHAPv2 should migrate to:
+
+1. **EAP-TLS** (best security, certificate-based) - ✅ **Available now**
+2. **EAP-TEAP** (modern tunneled method) - Planned for future release
+
+**Status**: ✅ EAP-TLS 100% complete (Dec 2025), EAP-MD5 complete
+**Future Work**: Implement EAP-TEAP as the modern tunneled EAP method
 
 ### Certificate Management
 
