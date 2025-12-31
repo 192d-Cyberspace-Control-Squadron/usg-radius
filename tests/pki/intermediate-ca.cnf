@@ -1,0 +1,6 @@
+[ v3_intermediate_ca ]
+basicConstraints = critical,CA:TRUE,pathlen:0
+keyUsage = critical,keyCertSign,cRLSign
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer
+crlDistributionPoints = URI:http://ca.example.com/root-ca.crl

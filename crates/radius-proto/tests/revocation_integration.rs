@@ -169,39 +169,109 @@ fn test_config_json_serialization() {
 
 /// Integration test with real CRL parsing
 ///
-/// This test requires a real CRL file generated with the commands in the module docs.
-/// To run: `cargo test --features revocation test_real_crl_parsing -- --ignored`
-///
-/// Note: CrlInfo is internal, so this test demonstrates the expected behavior
-/// without direct access to the parsing API.
+/// This test uses the generated test PKI in tests/pki/ to verify CRL parsing
 #[test]
-#[ignore]
 fn test_real_crl_parsing() {
-    // This would require a real CRL file and would be tested through
-    // the RevocationCheckingVerifier API rather than directly.
-    //
-    // Example flow:
-    // 1. Create verifier with static CRL file
-    // 2. Verify client certificate
-    // 3. Verifier internally parses CRL and checks revocation
+    use std::path::Path;
+    use std::fs;
 
-    // Placeholder for now
-    assert!(true, "Real CRL parsing test requires test PKI generation");
+    // Ensure test PKI exists (relative to workspace root)
+    let workspace_root = std::env::var("CARGO_MANIFEST_DIR")
+        .map(|p| Path::new(&p).parent().unwrap().parent().unwrap().to_path_buf())
+        .unwrap();
+    let crl_path = workspace_root.join("tests/pki/crls/intermediate-ca-empty.crl.der");
+    assert!(
+        crl_path.exists(),
+        "Test PKI not found at {:?}. Run PKI generation first.",
+        crl_path
+    );
+
+    // Read and parse the CRL to validate it's well-formed
+    let crl_bytes = fs::read(&crl_path).expect("Failed to read CRL");
+
+    // Parse CRL using x509-parser
+    use x509_parser::prelude::*;
+    use x509_parser::revocation_list::CertificateRevocationList;
+
+    let parse_result = CertificateRevocationList::from_der(&crl_bytes);
+    assert!(
+        parse_result.is_ok(),
+        "Failed to parse real CRL: {:?}",
+        parse_result.err()
+    );
+
+    let (_, crl) = parse_result.unwrap();
+
+    // Verify it's an empty CRL (no revocations)
+    let revoked_certs = crl.iter_revoked_certificates().collect::<Vec<_>>();
+    assert_eq!(
+        revoked_certs.len(),
+        0,
+        "Empty CRL should have no revoked certificates"
+    );
+
+    // Verify issuer is correct
+    assert!(
+        crl.issuer().to_string().contains("Test Intermediate CA"),
+        "CRL issuer should be Test Intermediate CA"
+    );
 }
 
 /// Integration test with revoked certificate
+///
+/// This test validates that the CRL implementation correctly identifies
+/// revoked certificates by their serial number.
 #[test]
-#[ignore]
 fn test_revoked_certificate_detection() {
-    // This would require:
-    // 1. A client certificate
-    // 2. A CRL with that certificate's serial number
-    // 3. Full verifier setup
+    use std::path::Path;
+    use std::fs;
 
-    // Placeholder documentation
+    // Ensure test PKI exists (relative to workspace root)
+    let workspace_root = std::env::var("CARGO_MANIFEST_DIR")
+        .map(|p| Path::new(&p).parent().unwrap().parent().unwrap().to_path_buf())
+        .unwrap();
+    let crl_path = workspace_root.join("tests/pki/crls/intermediate-ca.crl.der");
+    let revoked_cert_path = workspace_root.join("tests/pki/certs/client-revoked.crt.der");
+
     assert!(
-        true,
-        "Revoked certificate detection requires test PKI generation"
+        crl_path.exists(),
+        "Test CRL not found at {:?}",
+        crl_path
+    );
+    assert!(
+        revoked_cert_path.exists(),
+        "Test revoked certificate not found at {:?}",
+        revoked_cert_path
+    );
+
+    // Read the CRL and verify it contains the revoked certificate
+    let crl_bytes = fs::read(crl_path).expect("Failed to read CRL");
+
+    // Parse using x509-parser to verify structure
+    use x509_parser::prelude::*;
+    use x509_parser::revocation_list::CertificateRevocationList;
+    let (_, crl) = CertificateRevocationList::from_der(&crl_bytes).expect("Failed to parse CRL");
+
+    // Verify CRL has at least one revoked certificate
+    let revoked_certs = crl.iter_revoked_certificates().collect::<Vec<_>>();
+    assert!(
+        !revoked_certs.is_empty(),
+        "CRL should contain revoked certificates"
+    );
+
+    // Read the revoked certificate and get its serial
+    let cert_bytes = fs::read(revoked_cert_path).expect("Failed to read certificate");
+    let (_, cert) = parse_x509_certificate(&cert_bytes).expect("Failed to parse certificate");
+
+    // Verify the certificate's serial is in the CRL
+    let cert_serial = cert.serial.to_bytes_be();
+    let is_revoked = revoked_certs.iter().any(|revoked| {
+        revoked.raw_serial() == cert_serial.as_slice()
+    });
+
+    assert!(
+        is_revoked,
+        "Revoked certificate serial should be in CRL"
     );
 }
 

@@ -1,0 +1,7 @@
+[ v3_client_cert ]
+basicConstraints = CA:FALSE
+keyUsage = critical,digitalSignature,keyEncipherment
+extendedKeyUsage = clientAuth
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer
+crlDistributionPoints = URI:http://ca.example.com/intermediate-ca.crl
