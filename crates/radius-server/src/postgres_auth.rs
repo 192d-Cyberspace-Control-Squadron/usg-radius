@@ -1,6 +1,38 @@
 //! PostgreSQL authentication handler
 //!
 //! This module provides RADIUS authentication against a PostgreSQL database.
+//!
+//! ## Performance Optimization
+//!
+//! For optimal performance, ensure your PostgreSQL database has proper indexes:
+//!
+//! ```sql
+//! -- CRITICAL: Index on username column for O(log n) lookups
+//! CREATE UNIQUE INDEX idx_users_username ON users(username);
+//!
+//! -- OPTIONAL: Partial index if you filter by enabled in queries
+//! CREATE INDEX idx_users_enabled ON users(enabled) WHERE enabled = true;
+//!
+//! -- CRITICAL: Composite index for user attributes lookups
+//! CREATE INDEX idx_user_attributes_username ON user_attributes(username, attribute_type);
+//! ```
+//!
+//! See `examples/postgres_schema.sql` for a complete schema with recommended indexes.
+//!
+//! ## Query Performance Verification
+//!
+//! Use `EXPLAIN ANALYZE` to verify indexes are being used:
+//!
+//! ```sql
+//! EXPLAIN ANALYZE
+//! SELECT username, password_hash
+//! FROM users
+//! WHERE username = $1 AND enabled = true;
+//! -- Expected: Index Scan using idx_users_username
+//! ```
+//!
+//! Without proper indexes, queries will perform full table scans (O(n) complexity)
+//! which severely degrades performance with many users.
 
 use crate::server::AuthHandler;
 use dashmap::DashMap;
