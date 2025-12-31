@@ -56,6 +56,10 @@ pub struct EapAuthHandler {
     /// Active EAP-TLS sessions (if TLS feature is enabled)
     #[cfg(feature = "tls")]
     tls_sessions: Arc<RwLock<HashMap<String, EapTlsServer>>>,
+
+    /// Active EAP-TEAP sessions (if TLS feature is enabled)
+    #[cfg(feature = "tls")]
+    teap_sessions: Arc<RwLock<HashMap<String, radius_proto::eap::eap_teap::EapTeapServer>>>,
 }
 
 impl EapAuthHandler {
@@ -82,6 +86,8 @@ impl EapAuthHandler {
             tls_configs: Arc::new(RwLock::new(HashMap::new())),
             #[cfg(feature = "tls")]
             tls_sessions: Arc::new(RwLock::new(HashMap::new())),
+            #[cfg(feature = "tls")]
+            teap_sessions: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -127,6 +133,55 @@ impl EapAuthHandler {
 
         let mut configs = self.tls_configs.write().unwrap();
         configs.insert(realm.to_string(), StdArc::new(server_config));
+
+        Ok(())
+    }
+
+    /// Configure EAP-TEAP for a specific realm or default
+    ///
+    /// # Arguments
+    ///
+    /// * `realm` - Realm identifier (use "" for default)
+    /// * `cert_config` - TLS certificate configuration (same as EAP-TLS)
+    ///
+    /// # Returns
+    ///
+    /// Result indicating success or error
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # #[cfg(feature = "tls")]
+    /// # {
+    /// # use radius_server::eap_auth::EapAuthHandler;
+    /// # use radius_server::server::SimpleAuthHandler;
+    /// # use radius_proto::eap::eap_tls::TlsCertificateConfig;
+    /// # use std::sync::Arc;
+    /// # let inner = SimpleAuthHandler::new();
+    /// let mut eap_handler = EapAuthHandler::new(Arc::new(inner));
+    ///
+    /// let tls_config = TlsCertificateConfig::simple(
+    ///     "certs/server.pem".to_string(),
+    ///     "certs/server-key.pem".to_string(),
+    /// );
+    ///
+    /// // TEAP uses the same TLS configuration as EAP-TLS for Phase 1
+    /// eap_handler.configure_teap("", tls_config).unwrap();
+    /// # }
+    /// ```
+    #[cfg(feature = "tls")]
+    pub fn configure_teap(
+        &mut self,
+        realm: &str,
+        cert_config: TlsCertificateConfig,
+    ) -> Result<(), String> {
+        // TEAP uses the same TLS config as EAP-TLS for Phase 1
+        // Store it in tls_configs for use when creating TEAP sessions
+        let server_config = build_server_config(&cert_config)
+            .map_err(|e| format!("Failed to build TLS config: {:?}", e))?;
+
+        let mut configs = self.tls_configs.write().unwrap();
+        configs.insert(format!("teap_{}", realm), StdArc::new(server_config));
 
         Ok(())
     }
@@ -233,6 +288,74 @@ impl EapAuthHandler {
         AuthResult::Reject
     }
 
+    /// Start EAP-TEAP authentication
+    #[cfg(feature = "tls")]
+    fn start_eap_teap(&self, username: &str, session_id: &str) -> AuthResult {
+        // Get TEAP TLS config for user's realm (or default)
+        let configs = self.tls_configs.read().unwrap();
+        let tls_config = configs.get("teap_").or_else(|| {
+            // Fallback to checking for teap_<realm> configs
+            configs.keys()
+                .find(|k| k.starts_with("teap_"))
+                .and_then(|k| configs.get(k))
+        });
+
+        if let Some(config) = tls_config {
+            // Create inner authentication handler for Phase 2
+            // Get user credentials from inner handler
+            let password = self.inner_handler.get_user_password(username)
+                .unwrap_or_else(|| String::from(""));
+
+            let inner_method = Box::new(
+                radius_proto::eap::eap_teap::BasicPasswordAuthHandler::new(
+                    username.to_string(),
+                    password,
+                )
+            );
+
+            // Create EAP-TEAP server for this session
+            let teap_server = radius_proto::eap::eap_teap::EapTeapServer::with_inner_method(
+                StdArc::clone(config),
+                inner_method,
+            );
+
+            // Store TEAP session
+            let mut teap_sessions = self.teap_sessions.write().unwrap();
+            teap_sessions.insert(session_id.to_string(), teap_server);
+
+            // Create EAP-TEAP Start packet (uses EAP-TLS packet format)
+            let start_packet = EapTlsPacket::start();
+            let identifier = {
+                let mut manager = self.session_manager.write().unwrap();
+                if let Some(session) = manager.get_session_mut(session_id) {
+                    session.next_identifier()
+                } else {
+                    0
+                }
+            };
+
+            // Create EAP packet with TEAP type (55)
+            let eap_data = start_packet.to_eap_data();
+            let eap_packet = radius_proto::eap::EapPacket::new(
+                radius_proto::eap::EapCode::Request,
+                identifier,
+                Some(radius_proto::eap::EapType::Teap),
+                eap_data,
+            );
+
+            // Convert EAP packet to RADIUS attributes
+            if let Ok(eap_attrs) = radius_proto::eap::eap_to_radius_attributes(&eap_packet) {
+                return AuthResult::Challenge {
+                    message: Some("EAP-TEAP authentication".to_string()),
+                    state: session_id.as_bytes().to_vec(),
+                    attributes: eap_attrs,
+                };
+            }
+        }
+
+        AuthResult::Reject
+    }
+
     /// Continue EAP-TLS authentication
     #[cfg(feature = "tls")]
     #[allow(unused_variables)]
@@ -319,6 +442,88 @@ impl EapAuthHandler {
 
         AuthResult::Reject
     }
+
+    /// Continue EAP-TEAP authentication
+    #[cfg(feature = "tls")]
+    #[allow(unused_variables)]
+    fn continue_eap_teap(
+        &self,
+        username: &str,
+        session_id: &str,
+        eap_response: &EapPacket,
+    ) -> AuthResult {
+        let mut teap_sessions = self.teap_sessions.write().unwrap();
+
+        if let Some(teap_server) = teap_sessions.get_mut(session_id) {
+            // Parse EAP-TLS packet from EAP data (TEAP uses EAP-TLS packet format)
+            if let Ok(tls_packet) = EapTlsPacket::from_eap_data(&eap_response.data) {
+                // Process client message through TEAP server
+                match teap_server.process_client_message(&tls_packet) {
+                    Ok(Some(ref response_data)) => {
+                        // Create response packet
+                        let identifier = {
+                            let mut manager = self.session_manager.write().unwrap();
+                            if let Some(session) = manager.get_session_mut(session_id) {
+                                session.next_identifier()
+                            } else {
+                                eap_response.identifier.wrapping_add(1)
+                            }
+                        };
+
+                        // Fragment if needed and create EAP-TEAP packets
+                        let fragments = radius_proto::eap::eap_tls::fragment_tls_message(&response_data, 1020);
+
+                        if let Some(first_fragment) = fragments.first() {
+                            // Create EAP packet with TEAP type
+                            let eap_data = first_fragment.to_eap_data();
+                            let eap_packet = radius_proto::eap::EapPacket::new(
+                                radius_proto::eap::EapCode::Request,
+                                identifier,
+                                Some(radius_proto::eap::EapType::Teap),
+                                eap_data,
+                            );
+
+                            if let Ok(eap_attrs) = radius_proto::eap::eap_to_radius_attributes(&eap_packet) {
+                                return AuthResult::Challenge {
+                                    message: None,
+                                    state: session_id.as_bytes().to_vec(),
+                                    attributes: eap_attrs,
+                                };
+                            }
+                        }
+                    }
+                    Ok(None) => {
+                        // Check if TEAP authentication is complete
+                        if teap_server.is_complete() {
+                            // Success!
+                            let identifier = {
+                                let mut manager = self.session_manager.write().unwrap();
+                                if let Some(session) = manager.get_session_mut(session_id) {
+                                    let _ = session.transition(EapState::Success);
+                                    session.next_identifier()
+                                } else {
+                                    eap_response.identifier.wrapping_add(1)
+                                }
+                            };
+
+                            let success_packet = EapPacket::success(identifier);
+
+                            if let Ok(_eap_attrs) = radius_proto::eap::eap_to_radius_attributes(&success_packet) {
+                                // Could add MS-MPPE keys here from MSK
+                                return AuthResult::Accept;
+                            }
+                        }
+                    }
+                    Err(_) => {
+                        // TEAP error
+                        return AuthResult::Reject;
+                    }
+                }
+            }
+        }
+
+        AuthResult::Reject
+    }
 }
 
 impl AuthHandler for EapAuthHandler {
@@ -387,10 +592,22 @@ impl AuthHandler for EapAuthHandler {
         // Parse EAP packet
         match EapPacket::from_bytes(&eap_data) {
             Ok(eap_packet) => {
-                // Process EAP packet based on session state
+                // Route to appropriate EAP method handler based on type
                 #[cfg(feature = "tls")]
                 {
-                    self.continue_eap_tls(&username, &session_id, &eap_packet)
+                    match eap_packet.eap_type {
+                        Some(EapType::Tls) => {
+                            self.continue_eap_tls(&username, &session_id, &eap_packet)
+                        }
+                        Some(EapType::Teap) => {
+                            self.continue_eap_teap(&username, &session_id, &eap_packet)
+                        }
+                        _ => {
+                            // Unknown or unsupported EAP type
+                            // Try TLS as fallback
+                            self.continue_eap_tls(&username, &session_id, &eap_packet)
+                        }
+                    }
                 }
                 #[cfg(not(feature = "tls"))]
                 {

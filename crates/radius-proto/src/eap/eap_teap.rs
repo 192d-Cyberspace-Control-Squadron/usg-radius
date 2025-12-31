@@ -518,6 +518,11 @@ impl EapTeapServer {
         self.phase
     }
 
+    /// Check if TEAP authentication is complete
+    pub fn is_complete(&self) -> bool {
+        self.phase == TeapPhase::Complete
+    }
+
     /// Process client message (Phase 1 - TLS handshake)
     ///
     /// This handles Phase 1 TLS tunnel establishment.
