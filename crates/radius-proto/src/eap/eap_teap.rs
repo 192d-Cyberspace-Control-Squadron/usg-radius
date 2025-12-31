@@ -39,6 +39,10 @@ use super::EapError;
 use super::eap_tls::{EapTlsPacket, EapTlsServer};
 use std::sync::Arc;
 
+// Cryptographic imports for Crypto-Binding
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
+
 /// TEAP TLV Type (RFC 7170 Section 4.2)
 ///
 /// Defines all TLV types used in TEAP Phase 2 authentication.
@@ -420,6 +424,222 @@ impl IdentityType {
     }
 }
 
+/// Crypto-Binding TLV (RFC 7170 Section 4.2.13 and 5.3)
+///
+/// Provides cryptographic binding between the outer TLS tunnel and inner authentication.
+/// This prevents man-in-the-middle attacks where an attacker could tunnel their own
+/// authentication inside a victim's TLS session.
+///
+/// # Format
+///
+/// ```text
+///  0                   1                   2                   3
+///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |    Reserved   |    Version    |   Received Ver|   Sub-Type    |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                                                               |
+/// ~                             Nonce                             ~
+/// |                                                               |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                                                               |
+/// ~                    Compound MAC                               ~
+/// |                                                               |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CryptoBindingTlv {
+    /// Version (1 byte) - TEAP version (currently 1)
+    pub version: u8,
+    /// Received Version (1 byte) - Highest version received from peer
+    pub received_version: u8,
+    /// Sub-Type (1 byte) - Binding request (0) or response (1)
+    pub sub_type: u8,
+    /// Nonce (32 bytes) - Random value for binding
+    pub nonce: [u8; 32],
+    /// Compound MAC (20 bytes for HMAC-SHA1 or 32 bytes for HMAC-SHA256)
+    pub compound_mac: Vec<u8>,
+}
+
+impl CryptoBindingTlv {
+    /// Crypto-Binding Request subtype
+    pub const SUBTYPE_REQUEST: u8 = 0;
+    /// Crypto-Binding Response subtype
+    pub const SUBTYPE_RESPONSE: u8 = 1;
+
+    /// TEAP version 1
+    pub const VERSION: u8 = 1;
+
+    /// Create new Crypto-Binding request
+    pub fn new_request(nonce: [u8; 32]) -> Self {
+        Self {
+            version: Self::VERSION,
+            received_version: Self::VERSION,
+            sub_type: Self::SUBTYPE_REQUEST,
+            nonce,
+            compound_mac: vec![0u8; 32], // Will be calculated later
+        }
+    }
+
+    /// Create new Crypto-Binding response
+    pub fn new_response(nonce: [u8; 32], received_version: u8) -> Self {
+        Self {
+            version: Self::VERSION,
+            received_version,
+            sub_type: Self::SUBTYPE_RESPONSE,
+            nonce,
+            compound_mac: vec![0u8; 32], // Will be calculated later
+        }
+    }
+
+    /// Convert to TEAP TLV
+    pub fn to_tlv(&self) -> TeapTlv {
+        let mut value = Vec::with_capacity(68); // 4 header + 32 nonce + 32 MAC
+
+        value.push(0); // Reserved
+        value.push(self.version);
+        value.push(self.received_version);
+        value.push(self.sub_type);
+        value.extend_from_slice(&self.nonce);
+        value.extend_from_slice(&self.compound_mac);
+
+        TeapTlv::new(TlvType::CryptoBinding, true, value)
+    }
+
+    /// Parse from TEAP TLV value
+    pub fn from_tlv(tlv: &TeapTlv) -> Result<Self, EapError> {
+        if tlv.tlv_type != TlvType::CryptoBinding as u16 {
+            return Err(EapError::InvalidResponseFormat);
+        }
+
+        if tlv.value.len() < 68 {
+            // Minimum: 4 bytes header + 32 nonce + 32 MAC
+            return Err(EapError::InvalidLength(tlv.value.len()));
+        }
+
+        let version = tlv.value[1];
+        let received_version = tlv.value[2];
+        let sub_type = tlv.value[3];
+
+        let mut nonce = [0u8; 32];
+        nonce.copy_from_slice(&tlv.value[4..36]);
+
+        let compound_mac = tlv.value[36..].to_vec();
+
+        Ok(Self {
+            version,
+            received_version,
+            sub_type,
+            nonce,
+            compound_mac,
+        })
+    }
+}
+
+/// Cryptographic binding context for TEAP
+///
+/// Manages the cryptographic keys and state needed for crypto-binding.
+#[derive(Debug, Clone)]
+pub struct CryptoBinding {
+    /// IMCK (Intermediate Compound Key) - 60 bytes
+    pub imck: Vec<u8>,
+    /// CMK (Compound MAC Key) derived from IMCK - 20 bytes
+    pub cmk: Vec<u8>,
+    /// Server nonce for crypto-binding
+    pub server_nonce: [u8; 32],
+    /// Client nonce (received in response)
+    pub client_nonce: Option<[u8; 32]>,
+}
+
+impl CryptoBinding {
+    /// Derive IMCK (Intermediate Compound Key) - RFC 7170 Section 5.2
+    ///
+    /// IMCK[j] = TLS-PRF(S-IMCK[j-1], "Inner Methods Compound Keys",
+    ///                    IMSK[j], 60)
+    ///
+    /// For first inner method (j=0):
+    /// IMCK[0] = TLS-PRF(session_key_seed, "Inner Methods Compound Keys",
+    ///                   IMSK[0], 60)
+    ///
+    /// Where session_key_seed is derived from TLS master secret.
+    pub fn derive_imck(session_key_seed: &[u8], imsk: &[u8]) -> Vec<u8> {
+        // For MVP, use HMAC-SHA256 as TLS-PRF
+        // In production, should use actual TLS PRF from the TLS version negotiated
+
+        let label = b"Inner Methods Compound Keys";
+        let mut mac = Hmac::<Sha256>::new_from_slice(session_key_seed)
+            .expect("HMAC can take key of any size");
+
+        mac.update(label);
+        mac.update(imsk);
+
+        let result = mac.finalize();
+        result.into_bytes()[..60].to_vec()
+    }
+
+    /// Derive CMK (Compound MAC Key) from IMCK - RFC 7170 Section 5.3
+    ///
+    /// CMK = First 20 bytes of IMCK
+    pub fn derive_cmk(imck: &[u8]) -> Vec<u8> {
+        imck[..20].to_vec()
+    }
+
+    /// Calculate Compound MAC - RFC 7170 Section 5.3
+    ///
+    /// Compound-MAC = HMAC-SHA256(CMK, BUFFER)
+    ///
+    /// Where BUFFER is the Crypto-Binding TLV with MAC field zeroed out,
+    /// plus all previous TLVs in the conversation.
+    pub fn calculate_compound_mac(cmk: &[u8], buffer: &[u8]) -> Vec<u8> {
+        let mut mac = Hmac::<Sha256>::new_from_slice(cmk)
+            .expect("HMAC can take key of any size");
+
+        mac.update(buffer);
+
+        let result = mac.finalize();
+        result.into_bytes().to_vec()
+    }
+
+    /// Verify Compound MAC
+    pub fn verify_compound_mac(cmk: &[u8], buffer: &[u8], received_mac: &[u8]) -> bool {
+        let calculated_mac = Self::calculate_compound_mac(cmk, buffer);
+
+        // Constant-time comparison
+        if calculated_mac.len() != received_mac.len() {
+            return false;
+        }
+
+        let mut result = 0u8;
+        for (a, b) in calculated_mac.iter().zip(received_mac.iter()) {
+            result |= a ^ b;
+        }
+
+        result == 0
+    }
+
+    /// Generate random nonce
+    pub fn generate_nonce() -> [u8; 32] {
+        use rand::Rng;
+        let mut nonce = [0u8; 32];
+        rand::thread_rng().fill(&mut nonce);
+        nonce
+    }
+
+    /// Create new crypto-binding context
+    pub fn new(session_key_seed: &[u8], imsk: &[u8]) -> Self {
+        let imck = Self::derive_imck(session_key_seed, imsk);
+        let cmk = Self::derive_cmk(&imck);
+        let server_nonce = Self::generate_nonce();
+
+        Self {
+            imck,
+            cmk,
+            server_nonce,
+            client_nonce: None,
+        }
+    }
+}
+
 /// TEAP authentication phase
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TeapPhase {
@@ -458,6 +678,9 @@ pub struct EapTeapServer {
 
     /// Intermediate results from inner methods
     intermediate_results: Vec<TeapResult>,
+
+    /// Cryptographic binding context (for security)
+    crypto_binding: Option<CryptoBinding>,
 }
 
 impl EapTeapServer {
@@ -482,6 +705,7 @@ impl EapTeapServer {
             phase: TeapPhase::Phase1TlsHandshake,
             inner_method: None,
             intermediate_results: Vec::new(),
+            crypto_binding: None,
         }
     }
 
@@ -500,6 +724,7 @@ impl EapTeapServer {
             phase: TeapPhase::Phase1TlsHandshake,
             inner_method: Some(inner_method),
             intermediate_results: Vec::new(),
+            crypto_binding: None,
         }
     }
 
