@@ -58,7 +58,6 @@ This document outlines the development roadmap for the USG RADIUS project, organ
 
 ### Known Limitations
 
-- ⚠️ No EAP support (planned for v0.5.0)
 - ⚠️ No hot reload (requires server restart for config changes)
 
 See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
@@ -366,10 +365,14 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 - ✅ EAP session management with timeout and cleanup
 - ✅ EAP-Message RADIUS integration helpers (RFC 3579)
 - ✅ RADIUS-level fragmentation (EAP packets split across multiple RADIUS attributes)
-- [ ] EAP packet-level fragmentation (Deferred to TLS-based EAP methods - EAP-TLS, PEAP, etc.)
+- ✅ EAP packet-level fragmentation (L/M/S flags per RFC 3748)
+  - ✅ TlsFlags structure (LENGTH_INCLUDED, MORE_FRAGMENTS, START bits)
+  - ✅ fragment_tls_message() - Automatic fragmentation of large TLS data
+  - ✅ TlsFragmentAssembler - Reassembly of fragmented messages
+  - ✅ EapTlsContext - Fragment queue and state management
+  - ✅ Comprehensive test coverage (fragmentation + reassembly round-trip)
 
 **Status**: ✅ Core framework complete (Dec 2025)
-**Note**: EAP packet-level fragmentation (L/M/S flags per RFC 3748) will be implemented alongside TLS-based EAP methods where it's required.
 
 ### EAP Methods
 
@@ -413,10 +416,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
     - ✅ 128-byte key derivation (64 MSK + 64 EMSK)
     - ✅ Direct key export without intermediate master_secret
     - ✅ Production-ready for wireless encryption keys
-
-### Future EAP Methods
-
-- [x] **EAP-TEAP** (Type 55) - RFC 7170 - **COMPLETE!** (All 7 weeks finished - Production Ready!)
+- ✅ **EAP-TEAP** (Type 55) - RFC 7170 - **COMPLETE!** (All 7 weeks finished - Production Ready!)
   - Tunnel Extensible Authentication Protocol
   - Modern replacement for EAP-TTLS, PEAP, and EAP-MSCHAPv2
   - More flexible and secure than legacy tunneled methods
