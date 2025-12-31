@@ -43,6 +43,7 @@
 //! }
 //! ```
 
+pub mod accounting;
 pub mod audit;
 pub mod cache;
 pub mod config;
@@ -51,6 +52,7 @@ pub mod postgres_auth;
 pub mod ratelimit;
 pub mod server;
 
+pub use accounting::{AccountingHandler, AccountingResult, Session, SimpleAccountingHandler};
 pub use audit::{AuditEntry, AuditEventType, AuditLogger};
 pub use cache::{RequestCache, RequestFingerprint};
 pub use config::{Client, Config, ConfigError, User};

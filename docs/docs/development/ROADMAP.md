@@ -9,7 +9,7 @@ This document outlines the development roadmap for the USG RADIUS project, organ
 
 ### Completed Features (v0.1.0 + v0.2.0 + v0.3.0)
 
-**Core Protocol (v0.1.0)**
+#### **Core Protocol (v0.1.0)**
 
 - ✅ Basic RADIUS protocol implementation (RFC 2865)
 - ✅ PAP authentication
@@ -23,7 +23,7 @@ This document outlines the development roadmap for the USG RADIUS project, organ
 - ✅ Workspace structure with separate protocol and server crates
 - ✅ IPv6 dual-stack support (IPv4 + IPv6)
 
-**Security & Production Hardening (v0.2.0)**
+#### **Security & Production Hardening (v0.2.0)**
 
 - ✅ Client IP address validation
 - ✅ Per-client shared secrets
