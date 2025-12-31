@@ -450,6 +450,9 @@ mod tests {
         packet.add_attribute(
             Attribute::new(AttributeType::UserPassword as u8, vec![0u8; 16]).unwrap(),
         );
+        packet.add_attribute(
+            Attribute::new(AttributeType::NasIpAddress as u8, vec![192, 168, 0, 1]).unwrap(),
+        );
 
         assert!(validate_packet(&packet, ValidationMode::Lenient).is_ok());
         assert!(validate_packet(&packet, ValidationMode::Strict).is_ok());
