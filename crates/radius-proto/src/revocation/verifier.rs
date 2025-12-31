@@ -284,8 +284,8 @@ impl RevocationCheckingVerifier {
     fn handle_error(&self, error: RevocationError) -> Result<(), RevocationError> {
         match self.config.fallback_behavior {
             FallbackBehavior::FailOpen => {
-                // Log warning but allow authentication
-                eprintln!("WARNING: CRL check failed (fail-open mode): {}", error);
+                // Log generic warning but allow authentication (avoid logging potentially sensitive error details)
+                eprintln!("WARNING: CRL check failed (fail-open mode)");
                 Ok(())
             }
             FallbackBehavior::FailClosed => {
