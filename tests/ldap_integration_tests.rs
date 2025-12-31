@@ -12,7 +12,7 @@
 
 use radius_server::{AuthHandler, LdapAuthHandler, LdapConfig};
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore] // Requires Docker
 async fn test_ldap_connection() {
     let config = LdapConfig {
@@ -33,7 +33,7 @@ async fn test_ldap_connection() {
     // Test passes if we reach this point without panicking
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore] // Requires Docker
 async fn test_ldap_authentication_success() {
     let config = LdapConfig {
@@ -58,7 +58,7 @@ async fn test_ldap_authentication_success() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore] // Requires Docker
 async fn test_ldap_authentication_failure_wrong_password() {
     let config = LdapConfig {
@@ -79,7 +79,7 @@ async fn test_ldap_authentication_failure_wrong_password() {
     assert!(!result, "Authentication should fail with wrong password");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore] // Requires Docker
 async fn test_ldap_authentication_user_not_found() {
     let config = LdapConfig {
@@ -100,7 +100,7 @@ async fn test_ldap_authentication_user_not_found() {
     assert!(!result, "Authentication should fail for non-existent user");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore] // Requires Docker
 async fn test_ldap_multiple_users() {
     let config = LdapConfig {
@@ -136,7 +136,7 @@ async fn test_ldap_multiple_users() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore] // Requires Docker
 async fn test_ldap_anonymous_bind() {
     let config = LdapConfig {
@@ -159,7 +159,7 @@ async fn test_ldap_anonymous_bind() {
     println!("Anonymous bind result: {}", result);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore] // Requires Docker
 async fn test_ldap_search_filter_variations() {
     // Test with different search filters
@@ -194,7 +194,7 @@ async fn test_ldap_search_filter_variations() {
     assert!(handler2.authenticate("Test User", "password123"));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore] // Requires Docker
 async fn test_ldap_concurrent_authentications() {
     use std::sync::Arc;

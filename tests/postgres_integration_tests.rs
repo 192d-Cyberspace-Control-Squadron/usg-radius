@@ -12,7 +12,7 @@
 
 use radius_server::{AuthHandler, PostgresAuthHandler, PostgresConfig};
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore] // Requires Docker
 async fn test_postgres_connection() {
     let config = PostgresConfig {
@@ -33,7 +33,7 @@ async fn test_postgres_connection() {
     // Test passes if we reach this point without panicking
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore] // Requires Docker
 async fn test_postgres_authentication_success() {
     let config = PostgresConfig {
@@ -59,7 +59,7 @@ async fn test_postgres_authentication_success() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore] // Requires Docker
 async fn test_postgres_authentication_failure_wrong_password() {
     let config = PostgresConfig {
@@ -81,7 +81,7 @@ async fn test_postgres_authentication_failure_wrong_password() {
     assert!(!result, "Authentication should fail with wrong password");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore] // Requires Docker
 async fn test_postgres_authentication_user_not_found() {
     let config = PostgresConfig {
@@ -103,7 +103,7 @@ async fn test_postgres_authentication_user_not_found() {
     assert!(!result, "Authentication should fail for non-existent user");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore] // Requires Docker
 async fn test_postgres_disabled_user() {
     let config = PostgresConfig {
@@ -126,7 +126,7 @@ async fn test_postgres_disabled_user() {
     assert!(!result, "Authentication should fail for disabled user");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore] // Requires Docker
 async fn test_postgres_multiple_users() {
     let config = PostgresConfig {
@@ -163,7 +163,7 @@ async fn test_postgres_multiple_users() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore] // Requires Docker
 async fn test_postgres_user_attributes() {
     let config = PostgresConfig {
@@ -195,7 +195,7 @@ async fn test_postgres_user_attributes() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore] // Requires Docker
 async fn test_postgres_connection_pool() {
     let config = PostgresConfig {
@@ -242,7 +242,7 @@ async fn test_postgres_connection_pool() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore] // Requires Docker
 async fn test_postgres_custom_query() {
     // Test with a more complex query joining tables
@@ -263,7 +263,7 @@ async fn test_postgres_custom_query() {
     assert!(result, "Authentication should work with custom query");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore] // Requires Docker
 async fn test_postgres_bcrypt_verification() {
     let config = PostgresConfig {
@@ -291,7 +291,7 @@ async fn test_postgres_bcrypt_verification() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore] // Requires Docker
 async fn test_postgres_connection_timeout() {
     // Test with a very short timeout to verify timeout handling

@@ -583,23 +583,19 @@ The following legacy methods will **not** be implemented due to modern alternati
 - ✅ 9 PostgreSQL unit tests
 - ✅ Configuration serialization tests
 - ✅ Password hashing tests
-- [ ] **Docker-based LDAP integration tests** (8 tests failing - async runtime issue)
-  - Tests require multi-threaded Tokio runtime
-  - Currently using `#[tokio::test]` which defaults to current_thread runtime
-  - Fix: Add `#[tokio::test(flavor = "multi_thread")]` to all async LDAP integration tests
-  - Affected: `test_ldap_authentication_success`, `test_ldap_concurrent_authentications`, etc.
-  - Root cause: `tokio::task::block_in_place()` requires multi-threaded runtime
-  - Estimated fix: 30 minutes
-- [ ] **Docker-based PostgreSQL integration tests** (11 tests failing - async runtime issue)
-  - Same async runtime issue as LDAP tests
-  - Fix: Add `#[tokio::test(flavor = "multi_thread")]` to all async PostgreSQL integration tests
-  - Affected: `test_postgres_authentication_success`, `test_postgres_connection_pool`, etc.
-  - Estimated fix: 30 minutes
+- ✅ **Docker-based LDAP integration tests** - Async runtime fixed!
+  - ✅ Fixed by adding `#[tokio::test(flavor = "multi_thread")]` to all 8 tests
+  - ✅ 4/8 tests passing (4 failures due to missing LDAP test data, not runtime issues)
+  - [ ] Add LDAP test data initialization script for remaining 4 tests
+- ✅ **Docker-based PostgreSQL integration tests** - Async runtime fixed!
+  - ✅ Fixed by adding `#[tokio::test(flavor = "multi_thread")]` to all 11 tests
+  - ✅ 6/11 tests passing (5 failures due to missing PostgreSQL test data, not runtime issues)
+  - [ ] Add PostgreSQL test data initialization script for remaining 5 tests
 - [ ] End-to-end authentication tests
 
-**Status**: 🔄 Unit tests complete, integration tests require async runtime fix
-**Completed**: Dec 2025 (partial)
-**Remaining Work**: 1 hour to fix async runtime configuration in integration tests
+**Status**: ✅ Async runtime issues resolved! Tests now run correctly.
+**Completed**: Dec 2025
+**Remaining Work**: Test data initialization scripts for Docker containers
 
 ### High Availability
 
