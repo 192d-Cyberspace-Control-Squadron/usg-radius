@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added - v0.5.0 (In Progress)
 
 #### EAP Protocol Support
+
 - **EAP-Message Attribute** (Type 79) - RFC 3579 support for EAP over RADIUS
 - **EAP Protocol Module** (`radius-proto/eap.rs`):
   - Complete EAP packet structure (Request, Response, Success, Failure)
@@ -30,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added - Accounting Protocol (RFC 2866)
 
 #### Core Accounting Features
+
 - **RADIUS Accounting Packet Types**:
   - Accounting-Request (Code 4)
   - Accounting-Response (Code 5)
@@ -52,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Acct-Output-Gigawords (53) - RFC 2869, high 32 bits for 64-bit counters
 
 #### PostgreSQL Accounting Backend
+
 - **Full-featured PostgreSQL backend** (`radius-server/accounting/postgres.rs`):
   - 1900+ lines of production-ready code
   - Async connection pooling with sqlx
@@ -84,6 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Aggregate usage calculations with SQL (SUM, COUNT, AVG, COALESCE)
 
 #### Testing & Quality
+
 - **Comprehensive Test Coverage**:
   - 6 test suites for PostgreSQL backend (500+ lines)
   - Export functionality tests (CSV and JSON validation)
@@ -93,6 +97,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - All tests passing with 100% success rate
 
 #### AccountingHandler Trait
+
 - **Trait-based design** for extensible accounting backends:
   - `start_session()` - Track session start
   - `update_session()` - Handle interim updates
@@ -104,12 +109,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `SimpleAccountingHandler` - In-memory reference implementation
 
 #### Documentation
+
 - Updated ROADMAP.md with v0.4.0 completion status (100%)
 - Comprehensive feature documentation with metrics
 - Implementation details and design rationale
 - Test coverage statistics
 
 ### Technical Details
+
 - **Total v0.4.0 Implementation**: ~6 weeks of development
 - **Code Quality**: Clean compilation, no warnings, all tests passing
 - **RFC Compliance**: Full RFC 2866 (Accounting) and partial RFC 2869 (Extensions)
@@ -120,6 +127,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added - Security & Operations
 
 #### Security Features
+
 - **Client Authorization**: IP/CIDR-based client validation
 - **Request Deduplication**: Replay attack prevention with LRU caching
 - **Rate Limiting**: Token bucket algorithm with per-client and global limits
@@ -127,12 +135,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Message-Authenticator**: HMAC-MD5 integrity protection (RFC 2869)
 
 #### Operational Features
+
 - **Structured Logging**: Configurable log levels with tracing framework
 - **Status-Server**: RFC 5997 server health monitoring
 - **Configuration Schema**: Full JSON Schema validation
 - **DoS Protection**: Multiple layers of protection against attacks
 
 #### Testing & Quality
+
 - Comprehensive test suites for all security features
 - Integration tests for rate limiting and deduplication
 - Performance benchmarks
@@ -140,6 +150,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.0] - 2024-10-01
 
 ### Added - Core Protocol
+
 - **CHAP Support**: RFC 2865 CHAP-Password and CHAP-Challenge
   - CHAP response computation and verification
   - Comprehensive test coverage
@@ -148,12 +159,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Error Handling**: Comprehensive error types with detailed messages
 
 ### Changed
+
 - Improved packet parsing performance
 - Enhanced attribute handling with zero-copy where possible
 
 ## [0.1.0] - 2024-09-01
 
 ### Added - Initial Release
+
 - **RFC 2865 Compliance**: Core RADIUS protocol implementation
 - **Authentication**: Access-Request, Access-Accept, Access-Reject, Access-Challenge
 - **Password Encryption**: MD5-based User-Password encryption per RFC 2865 Section 5.2
@@ -164,6 +177,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **radtest Compatibility**: Works with FreeRADIUS radtest utility
 
 ### Technical Foundation
+
 - Built on Tokio for async I/O
 - Trait-based extensibility (AuthHandler)
 - Comprehensive unit and integration tests

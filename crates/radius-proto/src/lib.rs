@@ -55,7 +55,9 @@ pub use auth::{
 pub use chap::{
     ChapChallenge, ChapError, ChapResponse, compute_chap_response, verify_chap_response,
 };
-pub use eap::{EapCode, EapError, EapPacket, EapType};
+pub use eap::{
+    EapCode, EapError, EapPacket, EapSession, EapSessionManager, EapState, EapType, SessionStats,
+};
 pub use message_auth::{calculate_message_authenticator, verify_message_authenticator};
 pub use packet::{Code, Packet, PacketError};
 pub use validation::{ValidationError, ValidationMode, validate_packet};

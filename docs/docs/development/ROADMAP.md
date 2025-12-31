@@ -365,13 +365,13 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 - [x] EAP packet structure (Request, Response, Success, Failure)
 - [x] EAP packet encoding/decoding
 - [x] EAP type enumeration (Identity, Notification, NAK, MD5, TLS, TTLS, PEAP, MSCHAPv2, TEAP)
-- [ ] EAP state machine
-- [ ] EAP session management
+- [x] EAP state machine with authentication flow states
+- [x] EAP session management with timeout and cleanup
 - [ ] EAP packet fragmentation (RFC 3748)
 - [ ] EAP-Message RADIUS integration helpers
 
-**Status**: ✅ Core packet handling complete (Dec 2024)
-**Estimated Effort Remaining**: 2 weeks
+**Status**: ✅ Core packet handling and session management complete (Dec 2024)
+**Estimated Effort Remaining**: 1 week
 
 ### EAP Methods
 
@@ -402,12 +402,27 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 ### Completed Features
 
 - **EAP Protocol Module** (radius-proto/eap.rs):
-  - 685 lines of production-ready code
+  - 1400+ lines of production-ready code
   - EapCode enum (Request, Response, Success, Failure)
   - EapType enum (11 method types)
   - EapPacket structure with parsing/encoding
   - Full RFC 3748 compliance for packet format
-  - 13 comprehensive unit tests (100% pass rate)
+  - 38 comprehensive unit tests (100% pass rate)
+
+- **EAP State Machine**:
+  - 9 authentication states (Initialize, IdentityRequested, IdentityReceived, MethodRequested, ChallengeRequested, ResponseReceived, Success, Failure, Timeout)
+  - State transition validation with rules enforcement
+  - Terminal state detection
+  - Support for multi-round authentication flows
+
+- **EAP Session Management** (EapSession & EapSessionManager):
+  - Session lifecycle tracking with timestamps
+  - EAP identifier management with wrapping
+  - Timeout detection and cleanup
+  - Attempt counting and max attempts enforcement
+  - Concurrent session support with HashMap-based storage
+  - Session statistics and monitoring
+  - 25 dedicated test suites for state machine and sessions
 
 - **EAP-MD5 Implementation** (radius-proto/eap/eap_md5):
   - Challenge-response authentication
@@ -417,8 +432,8 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
   - Authentication verification
   - 4 dedicated test suites including full authentication flow
 
-**Total v0.5.0 Actual Effort**: ~1 week so far (EAP framework + EAP-MD5)
-**Total v0.5.0 Estimated Remaining**: ~10 weeks
+**Total v0.5.0 Actual Effort**: ~2 weeks so far (EAP framework + EAP-MD5 + state machine + sessions)
+**Total v0.5.0 Estimated Remaining**: ~9 weeks
 
 ---
 

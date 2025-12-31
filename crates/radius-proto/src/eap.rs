@@ -462,6 +462,314 @@ pub mod eap_md5 {
     }
 }
 
+/// EAP authentication state
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EapState {
+    /// Initial state - awaiting identity request
+    Initialize,
+    /// Identity request sent, awaiting response
+    IdentityRequested,
+    /// Identity received, selecting method
+    IdentityReceived,
+    /// Authentication method selected, awaiting challenge response
+    MethodRequested,
+    /// Challenge sent, awaiting response
+    ChallengeRequested,
+    /// Response received, validating
+    ResponseReceived,
+    /// Authentication succeeded
+    Success,
+    /// Authentication failed
+    Failure,
+    /// Timeout occurred
+    Timeout,
+}
+
+impl EapState {
+    /// Check if this is a terminal state
+    pub fn is_terminal(&self) -> bool {
+        matches!(
+            self,
+            EapState::Success | EapState::Failure | EapState::Timeout
+        )
+    }
+
+    /// Check if this state can transition to another state
+    pub fn can_transition_to(&self, next: &EapState) -> bool {
+        match (self, next) {
+            // From Initialize
+            (EapState::Initialize, EapState::IdentityRequested) => true,
+
+            // From IdentityRequested
+            (EapState::IdentityRequested, EapState::IdentityReceived) => true,
+            (EapState::IdentityRequested, EapState::Failure) => true,
+            (EapState::IdentityRequested, EapState::Timeout) => true,
+
+            // From IdentityReceived
+            (EapState::IdentityReceived, EapState::MethodRequested) => true,
+            (EapState::IdentityReceived, EapState::Failure) => true,
+
+            // From MethodRequested
+            (EapState::MethodRequested, EapState::ChallengeRequested) => true,
+            (EapState::MethodRequested, EapState::Failure) => true,
+            (EapState::MethodRequested, EapState::Timeout) => true,
+
+            // From ChallengeRequested
+            (EapState::ChallengeRequested, EapState::ResponseReceived) => true,
+            (EapState::ChallengeRequested, EapState::Failure) => true,
+            (EapState::ChallengeRequested, EapState::Timeout) => true,
+
+            // From ResponseReceived
+            (EapState::ResponseReceived, EapState::Success) => true,
+            (EapState::ResponseReceived, EapState::Failure) => true,
+            (EapState::ResponseReceived, EapState::ChallengeRequested) => true, // For multi-round auth
+
+            // Terminal states can't transition
+            _ if self.is_terminal() => false,
+
+            // Default: no transition
+            _ => false,
+        }
+    }
+}
+
+/// EAP session state for tracking authentication progress
+#[derive(Debug, Clone)]
+pub struct EapSession {
+    /// Session identifier (typically username or session ID)
+    pub session_id: String,
+    /// Current authentication state
+    pub state: EapState,
+    /// Current EAP identifier (increments with each request)
+    pub current_identifier: u8,
+    /// Selected EAP method
+    pub eap_method: Option<EapType>,
+    /// User identity (from Identity response)
+    pub identity: Option<String>,
+    /// Last sent packet (for retransmission)
+    pub last_request: Option<EapPacket>,
+    /// Challenge data (method-specific)
+    pub challenge: Option<Vec<u8>>,
+    /// Session creation timestamp (Unix epoch seconds)
+    pub created_at: u64,
+    /// Last activity timestamp (Unix epoch seconds)
+    pub last_activity: u64,
+    /// Number of authentication attempts
+    pub attempt_count: u32,
+}
+
+impl EapSession {
+    /// Create a new EAP session
+    pub fn new(session_id: String) -> Self {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        Self {
+            session_id,
+            state: EapState::Initialize,
+            current_identifier: 0,
+            eap_method: None,
+            identity: None,
+            last_request: None,
+            challenge: None,
+            created_at: now,
+            last_activity: now,
+            attempt_count: 0,
+        }
+    }
+
+    /// Transition to a new state
+    pub fn transition(&mut self, new_state: EapState) -> Result<(), EapError> {
+        if !self.state.can_transition_to(&new_state) {
+            return Err(EapError::InvalidState);
+        }
+
+        self.state = new_state;
+        self.update_activity();
+        Ok(())
+    }
+
+    /// Get next identifier and increment
+    pub fn next_identifier(&mut self) -> u8 {
+        let id = self.current_identifier;
+        self.current_identifier = self.current_identifier.wrapping_add(1);
+        self.update_activity();
+        id
+    }
+
+    /// Update last activity timestamp
+    pub fn update_activity(&mut self) {
+        self.last_activity = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+    }
+
+    /// Check if session has timed out
+    pub fn is_timed_out(&self, timeout_seconds: u64) -> bool {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        now - self.last_activity > timeout_seconds
+    }
+
+    /// Get session age in seconds
+    pub fn age(&self) -> u64 {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        now - self.created_at
+    }
+
+    /// Increment attempt counter
+    pub fn increment_attempts(&mut self) {
+        self.attempt_count += 1;
+        self.update_activity();
+    }
+
+    /// Check if maximum attempts exceeded
+    pub fn is_max_attempts_exceeded(&self, max_attempts: u32) -> bool {
+        self.attempt_count >= max_attempts
+    }
+}
+
+/// EAP session manager for tracking multiple concurrent sessions
+#[derive(Debug)]
+pub struct EapSessionManager {
+    /// Active sessions indexed by session ID
+    sessions: std::collections::HashMap<String, EapSession>,
+    /// Default session timeout in seconds
+    default_timeout: u64,
+    /// Maximum authentication attempts per session
+    max_attempts: u32,
+}
+
+impl EapSessionManager {
+    /// Create a new session manager
+    pub fn new() -> Self {
+        Self {
+            sessions: std::collections::HashMap::new(),
+            default_timeout: 300, // 5 minutes default
+            max_attempts: 3,
+        }
+    }
+
+    /// Create a new session manager with custom settings
+    pub fn with_config(timeout_seconds: u64, max_attempts: u32) -> Self {
+        Self {
+            sessions: std::collections::HashMap::new(),
+            default_timeout: timeout_seconds,
+            max_attempts,
+        }
+    }
+
+    /// Create a new session
+    pub fn create_session(&mut self, session_id: String) -> &mut EapSession {
+        let session = EapSession::new(session_id.clone());
+        self.sessions.insert(session_id.clone(), session);
+        self.sessions.get_mut(&session_id).unwrap()
+    }
+
+    /// Get an existing session
+    pub fn get_session(&self, session_id: &str) -> Option<&EapSession> {
+        self.sessions.get(session_id)
+    }
+
+    /// Get a mutable reference to an existing session
+    pub fn get_session_mut(&mut self, session_id: &str) -> Option<&mut EapSession> {
+        self.sessions.get_mut(session_id)
+    }
+
+    /// Remove a session
+    pub fn remove_session(&mut self, session_id: &str) -> Option<EapSession> {
+        self.sessions.remove(session_id)
+    }
+
+    /// Get or create a session
+    pub fn get_or_create_session(&mut self, session_id: String) -> &mut EapSession {
+        if !self.sessions.contains_key(&session_id) {
+            self.create_session(session_id.clone());
+        }
+        self.sessions.get_mut(&session_id).unwrap()
+    }
+
+    /// Clean up timed out sessions
+    pub fn cleanup_timed_out(&mut self) -> usize {
+        let timeout = self.default_timeout;
+        let before_count = self.sessions.len();
+
+        self.sessions
+            .retain(|_, session| !session.is_timed_out(timeout));
+
+        before_count - self.sessions.len()
+    }
+
+    /// Clean up terminal sessions (success/failure/timeout)
+    pub fn cleanup_terminal(&mut self) -> usize {
+        let before_count = self.sessions.len();
+
+        self.sessions
+            .retain(|_, session| !session.state.is_terminal());
+
+        before_count - self.sessions.len()
+    }
+
+    /// Get number of active sessions
+    pub fn session_count(&self) -> usize {
+        self.sessions.len()
+    }
+
+    /// Get statistics about sessions
+    pub fn stats(&self) -> SessionStats {
+        let mut stats = SessionStats::default();
+
+        for session in self.sessions.values() {
+            stats.total += 1;
+
+            match session.state {
+                EapState::Initialize => stats.initialize += 1,
+                EapState::IdentityRequested => stats.identity_requested += 1,
+                EapState::IdentityReceived => stats.identity_received += 1,
+                EapState::MethodRequested => stats.method_requested += 1,
+                EapState::ChallengeRequested => stats.challenge_requested += 1,
+                EapState::ResponseReceived => stats.response_received += 1,
+                EapState::Success => stats.success += 1,
+                EapState::Failure => stats.failure += 1,
+                EapState::Timeout => stats.timeout += 1,
+            }
+        }
+
+        stats
+    }
+}
+
+impl Default for EapSessionManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Session statistics
+#[derive(Debug, Default, Clone)]
+pub struct SessionStats {
+    pub total: usize,
+    pub initialize: usize,
+    pub identity_requested: usize,
+    pub identity_received: usize,
+    pub method_requested: usize,
+    pub challenge_requested: usize,
+    pub response_received: usize,
+    pub success: usize,
+    pub failure: usize,
+    pub timeout: usize,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -686,5 +994,400 @@ mod tests {
         );
 
         assert!(is_valid);
+    }
+
+    // ===== State Machine Tests =====
+
+    #[test]
+    fn test_eap_state_transitions() {
+        // Test valid transitions
+        assert!(EapState::Initialize.can_transition_to(&EapState::IdentityRequested));
+        assert!(EapState::IdentityRequested.can_transition_to(&EapState::IdentityReceived));
+        assert!(EapState::IdentityReceived.can_transition_to(&EapState::MethodRequested));
+        assert!(EapState::MethodRequested.can_transition_to(&EapState::ChallengeRequested));
+        assert!(EapState::ChallengeRequested.can_transition_to(&EapState::ResponseReceived));
+        assert!(EapState::ResponseReceived.can_transition_to(&EapState::Success));
+        assert!(EapState::ResponseReceived.can_transition_to(&EapState::Failure));
+
+        // Test invalid transitions
+        assert!(!EapState::Initialize.can_transition_to(&EapState::Success));
+        assert!(!EapState::IdentityRequested.can_transition_to(&EapState::Success));
+        assert!(!EapState::Success.can_transition_to(&EapState::Failure));
+        assert!(!EapState::Failure.can_transition_to(&EapState::Success));
+
+        // Test terminal states
+        assert!(EapState::Success.is_terminal());
+        assert!(EapState::Failure.is_terminal());
+        assert!(EapState::Timeout.is_terminal());
+        assert!(!EapState::Initialize.is_terminal());
+        assert!(!EapState::MethodRequested.is_terminal());
+    }
+
+    #[test]
+    fn test_eap_state_multi_round_auth() {
+        // Multi-round authentication: ResponseReceived -> ChallengeRequested
+        assert!(EapState::ResponseReceived.can_transition_to(&EapState::ChallengeRequested));
+    }
+
+    #[test]
+    fn test_eap_state_failure_from_any() {
+        // Can fail from most states
+        assert!(EapState::IdentityRequested.can_transition_to(&EapState::Failure));
+        assert!(EapState::IdentityReceived.can_transition_to(&EapState::Failure));
+        assert!(EapState::MethodRequested.can_transition_to(&EapState::Failure));
+        assert!(EapState::ChallengeRequested.can_transition_to(&EapState::Failure));
+        assert!(EapState::ResponseReceived.can_transition_to(&EapState::Failure));
+    }
+
+    #[test]
+    fn test_eap_state_timeout_transitions() {
+        // Can timeout from specific states
+        assert!(EapState::IdentityRequested.can_transition_to(&EapState::Timeout));
+        assert!(EapState::MethodRequested.can_transition_to(&EapState::Timeout));
+        assert!(EapState::ChallengeRequested.can_transition_to(&EapState::Timeout));
+    }
+
+    // ===== Session Tests =====
+
+    #[test]
+    fn test_eap_session_creation() {
+        let session = EapSession::new("test_session".to_string());
+
+        assert_eq!(session.session_id, "test_session");
+        assert_eq!(session.state, EapState::Initialize);
+        assert_eq!(session.current_identifier, 0);
+        assert_eq!(session.eap_method, None);
+        assert_eq!(session.identity, None);
+        assert_eq!(session.last_request, None);
+        assert_eq!(session.challenge, None);
+        assert_eq!(session.attempt_count, 0);
+        assert!(session.created_at > 0);
+        assert!(session.last_activity > 0);
+    }
+
+    #[test]
+    fn test_eap_session_transition_valid() {
+        let mut session = EapSession::new("test".to_string());
+
+        // Valid transition
+        assert!(session.transition(EapState::IdentityRequested).is_ok());
+        assert_eq!(session.state, EapState::IdentityRequested);
+
+        assert!(session.transition(EapState::IdentityReceived).is_ok());
+        assert_eq!(session.state, EapState::IdentityReceived);
+    }
+
+    #[test]
+    fn test_eap_session_transition_invalid() {
+        let mut session = EapSession::new("test".to_string());
+
+        // Invalid transition
+        let result = session.transition(EapState::Success);
+        assert!(result.is_err());
+        assert_eq!(session.state, EapState::Initialize); // State unchanged
+    }
+
+    #[test]
+    fn test_eap_session_identifier_increment() {
+        let mut session = EapSession::new("test".to_string());
+
+        assert_eq!(session.next_identifier(), 0);
+        assert_eq!(session.next_identifier(), 1);
+        assert_eq!(session.next_identifier(), 2);
+        assert_eq!(session.current_identifier, 3);
+    }
+
+    #[test]
+    fn test_eap_session_identifier_wrapping() {
+        let mut session = EapSession::new("test".to_string());
+        session.current_identifier = 255;
+
+        assert_eq!(session.next_identifier(), 255);
+        assert_eq!(session.current_identifier, 0); // Wrapped around
+    }
+
+    #[test]
+    fn test_eap_session_timeout_check() {
+        let mut session = EapSession::new("test".to_string());
+
+        // Set last_activity to 400 seconds ago
+        session.last_activity = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            - 400;
+
+        assert!(!session.is_timed_out(500)); // Not timed out
+        assert!(session.is_timed_out(300)); // Timed out
+    }
+
+    #[test]
+    fn test_eap_session_age() {
+        let mut session = EapSession::new("test".to_string());
+
+        // Set created_at to 100 seconds ago
+        session.created_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            - 100;
+
+        let age = session.age();
+        assert!(age >= 100 && age <= 102); // Allow small timing variations
+    }
+
+    #[test]
+    fn test_eap_session_attempts() {
+        let mut session = EapSession::new("test".to_string());
+
+        assert_eq!(session.attempt_count, 0);
+        assert!(!session.is_max_attempts_exceeded(3));
+
+        session.increment_attempts();
+        assert_eq!(session.attempt_count, 1);
+
+        session.increment_attempts();
+        session.increment_attempts();
+        assert_eq!(session.attempt_count, 3);
+        assert!(session.is_max_attempts_exceeded(3));
+        assert!(!session.is_max_attempts_exceeded(5));
+    }
+
+    #[test]
+    fn test_eap_session_activity_update() {
+        let mut session = EapSession::new("test".to_string());
+        let initial_activity = session.last_activity;
+
+        // Sleep briefly to ensure time difference
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        session.update_activity();
+        assert!(session.last_activity >= initial_activity);
+    }
+
+    // ===== Session Manager Tests =====
+
+    #[test]
+    fn test_session_manager_creation() {
+        let manager = EapSessionManager::new();
+        assert_eq!(manager.session_count(), 0);
+        assert_eq!(manager.default_timeout, 300);
+        assert_eq!(manager.max_attempts, 3);
+    }
+
+    #[test]
+    fn test_session_manager_with_config() {
+        let manager = EapSessionManager::with_config(600, 5);
+        assert_eq!(manager.default_timeout, 600);
+        assert_eq!(manager.max_attempts, 5);
+    }
+
+    #[test]
+    fn test_session_manager_create_session() {
+        let mut manager = EapSessionManager::new();
+
+        let session = manager.create_session("session1".to_string());
+        assert_eq!(session.session_id, "session1");
+        assert_eq!(manager.session_count(), 1);
+    }
+
+    #[test]
+    fn test_session_manager_get_session() {
+        let mut manager = EapSessionManager::new();
+        manager.create_session("session1".to_string());
+
+        let session = manager.get_session("session1");
+        assert!(session.is_some());
+        assert_eq!(session.unwrap().session_id, "session1");
+
+        let missing = manager.get_session("nonexistent");
+        assert!(missing.is_none());
+    }
+
+    #[test]
+    fn test_session_manager_get_session_mut() {
+        let mut manager = EapSessionManager::new();
+        manager.create_session("session1".to_string());
+
+        {
+            let session = manager.get_session_mut("session1").unwrap();
+            session.increment_attempts();
+        }
+
+        let session = manager.get_session("session1").unwrap();
+        assert_eq!(session.attempt_count, 1);
+    }
+
+    #[test]
+    fn test_session_manager_remove_session() {
+        let mut manager = EapSessionManager::new();
+        manager.create_session("session1".to_string());
+        assert_eq!(manager.session_count(), 1);
+
+        let removed = manager.remove_session("session1");
+        assert!(removed.is_some());
+        assert_eq!(manager.session_count(), 0);
+
+        let missing = manager.remove_session("session1");
+        assert!(missing.is_none());
+    }
+
+    #[test]
+    fn test_session_manager_get_or_create() {
+        let mut manager = EapSessionManager::new();
+
+        // First call creates
+        let session1 = manager.get_or_create_session("session1".to_string());
+        assert_eq!(session1.session_id, "session1");
+        assert_eq!(manager.session_count(), 1);
+
+        // Second call returns existing
+        let session1_again = manager.get_or_create_session("session1".to_string());
+        assert_eq!(session1_again.session_id, "session1");
+        assert_eq!(manager.session_count(), 1); // Still 1
+    }
+
+    #[test]
+    fn test_session_manager_cleanup_timed_out() {
+        let mut manager = EapSessionManager::with_config(300, 3);
+
+        // Create sessions with different ages
+        let mut session1 = EapSession::new("session1".to_string());
+        session1.last_activity = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            - 400; // 400 seconds ago - timed out
+
+        let session2 = EapSession::new("session2".to_string());
+        // session2 has current timestamp - not timed out
+
+        manager.sessions.insert("session1".to_string(), session1);
+        manager.sessions.insert("session2".to_string(), session2);
+
+        assert_eq!(manager.session_count(), 2);
+
+        let removed = manager.cleanup_timed_out();
+        assert_eq!(removed, 1); // Removed 1 timed out session
+        assert_eq!(manager.session_count(), 1); // 1 remaining
+        assert!(manager.get_session("session2").is_some());
+        assert!(manager.get_session("session1").is_none());
+    }
+
+    #[test]
+    fn test_session_manager_cleanup_terminal() {
+        let mut manager = EapSessionManager::new();
+
+        // Create sessions with different states
+        let mut session1 = EapSession::new("session1".to_string());
+        session1.state = EapState::Success; // Terminal
+
+        let mut session2 = EapSession::new("session2".to_string());
+        session2.state = EapState::Failure; // Terminal
+
+        let mut session3 = EapSession::new("session3".to_string());
+        session3.state = EapState::ChallengeRequested; // Not terminal
+
+        manager.sessions.insert("session1".to_string(), session1);
+        manager.sessions.insert("session2".to_string(), session2);
+        manager.sessions.insert("session3".to_string(), session3);
+
+        assert_eq!(manager.session_count(), 3);
+
+        let removed = manager.cleanup_terminal();
+        assert_eq!(removed, 2); // Removed 2 terminal sessions
+        assert_eq!(manager.session_count(), 1); // 1 remaining
+        assert!(manager.get_session("session3").is_some());
+    }
+
+    #[test]
+    fn test_session_manager_stats() {
+        let mut manager = EapSessionManager::new();
+
+        // Create sessions in various states
+        let mut s1 = EapSession::new("s1".to_string());
+        s1.state = EapState::Initialize;
+
+        let mut s2 = EapSession::new("s2".to_string());
+        s2.state = EapState::IdentityRequested;
+
+        let mut s3 = EapSession::new("s3".to_string());
+        s3.state = EapState::ChallengeRequested;
+
+        let mut s4 = EapSession::new("s4".to_string());
+        s4.state = EapState::Success;
+
+        let mut s5 = EapSession::new("s5".to_string());
+        s5.state = EapState::Failure;
+
+        manager.sessions.insert("s1".to_string(), s1);
+        manager.sessions.insert("s2".to_string(), s2);
+        manager.sessions.insert("s3".to_string(), s3);
+        manager.sessions.insert("s4".to_string(), s4);
+        manager.sessions.insert("s5".to_string(), s5);
+
+        let stats = manager.stats();
+        assert_eq!(stats.total, 5);
+        assert_eq!(stats.initialize, 1);
+        assert_eq!(stats.identity_requested, 1);
+        assert_eq!(stats.challenge_requested, 1);
+        assert_eq!(stats.success, 1);
+        assert_eq!(stats.failure, 1);
+    }
+
+    #[test]
+    fn test_session_manager_multiple_sessions() {
+        let mut manager = EapSessionManager::new();
+
+        for i in 0..10 {
+            manager.create_session(format!("session_{}", i));
+        }
+
+        assert_eq!(manager.session_count(), 10);
+
+        // Verify all sessions exist
+        for i in 0..10 {
+            assert!(manager.get_session(&format!("session_{}", i)).is_some());
+        }
+    }
+
+    #[test]
+    fn test_session_full_authentication_flow() {
+        let mut manager = EapSessionManager::new();
+        let session = manager.create_session("user_session".to_string());
+
+        // Initial state
+        assert_eq!(session.state, EapState::Initialize);
+
+        // Request identity
+        assert!(session.transition(EapState::IdentityRequested).is_ok());
+        let id1 = session.next_identifier();
+        assert_eq!(id1, 0);
+
+        // Receive identity
+        assert!(session.transition(EapState::IdentityReceived).is_ok());
+        session.identity = Some("alice@example.com".to_string());
+
+        // Select method
+        assert!(session.transition(EapState::MethodRequested).is_ok());
+        session.eap_method = Some(EapType::Md5Challenge);
+
+        // Send challenge
+        assert!(session.transition(EapState::ChallengeRequested).is_ok());
+        let id2 = session.next_identifier();
+        assert_eq!(id2, 1);
+        session.challenge = Some(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+
+        // Receive response
+        assert!(session.transition(EapState::ResponseReceived).is_ok());
+
+        // Success
+        assert!(session.transition(EapState::Success).is_ok());
+
+        // Verify final state
+        assert_eq!(session.state, EapState::Success);
+        assert_eq!(session.identity, Some("alice@example.com".to_string()));
+        assert_eq!(session.eap_method, Some(EapType::Md5Challenge));
+        assert!(session.state.is_terminal());
     }
 }
