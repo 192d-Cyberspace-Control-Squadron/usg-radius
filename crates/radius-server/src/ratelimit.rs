@@ -245,10 +245,30 @@ impl RateLimiter {
     }
 
     /// Get global rate limiter statistics
-    pub fn get_global_stats(&self) -> Option<GlobalStats> {
-        // This is a bit awkward due to async Mutex, but we can provide basic info
-        if self.global_bucket.is_some() {
+    ///
+    /// Note: This method requires async access to read current token count.
+    /// Use try_get_global_stats_sync() for a non-blocking alternative.
+    pub async fn get_global_stats(&self) -> Option<GlobalStats> {
+        if let Some(ref global_bucket) = self.global_bucket {
+            let bucket = global_bucket.lock().await;
             Some(GlobalStats {
+                enabled: true,
+                current_tokens: bucket.tokens(),
+                capacity: self.config.global_burst as f64,
+                refill_rate: self.config.global_rps as f64,
+            })
+        } else {
+            None
+        }
+    }
+
+    /// Try to get global rate limiter statistics without blocking
+    ///
+    /// Returns basic stats without current token count to avoid async lock contention.
+    /// Use this in performance-critical paths where you don't need exact token counts.
+    pub fn try_get_global_stats_sync(&self) -> Option<GlobalStatsBasic> {
+        if self.global_bucket.is_some() {
+            Some(GlobalStatsBasic {
                 enabled: true,
                 capacity: self.config.global_burst as f64,
                 refill_rate: self.config.global_rps as f64,
@@ -374,6 +394,66 @@ impl RateLimiter {
     pub fn client_count(&self) -> usize {
         self.client_buckets.len()
     }
+
+    /// Get comprehensive rate limiter statistics
+    ///
+    /// This provides a snapshot of the rate limiter state including:
+    /// - Number of tracked clients
+    /// - Total active connections across all clients
+    /// - Number of clients with bandwidth tracking
+    /// - Configuration settings
+    pub fn get_stats(&self) -> RateLimiterStats {
+        // Count total active connections
+        let active_connections: usize = self
+            .connection_trackers
+            .iter()
+            .map(|entry| entry.value().active_connections as usize)
+            .sum();
+
+        RateLimiterStats {
+            tracked_clients: self.client_buckets.len(),
+            active_connections,
+            total_bandwidth_tracked: self.bandwidth_trackers.len(),
+            per_client_config: ClientRateLimitConfig {
+                rps: self.config.per_client_rps,
+                burst: self.config.per_client_burst,
+                max_connections: self.config.max_concurrent_connections,
+                max_bandwidth_bps: self.config.max_bandwidth_bps,
+            },
+            global_config: GlobalRateLimitConfig {
+                enabled: self.global_bucket.is_some(),
+                rps: self.config.global_rps,
+                burst: self.config.global_burst,
+            },
+        }
+    }
+
+    /// Get list of all tracked client IPs
+    ///
+    /// Useful for monitoring and debugging rate limit state.
+    pub fn get_tracked_clients(&self) -> Vec<IpAddr> {
+        self.client_buckets.iter().map(|entry| *entry.key()).collect()
+    }
+
+    /// Get detailed statistics for all tracked clients
+    ///
+    /// Returns a map of IP addresses to their current rate limit stats.
+    /// This can be expensive for many clients, use sparingly.
+    pub fn get_all_client_stats(&self) -> Vec<(IpAddr, ClientStats)> {
+        self.client_buckets
+            .iter()
+            .map(|entry| {
+                let ip = *entry.key();
+                let bucket = entry.value();
+                let stats = ClientStats {
+                    current_tokens: bucket.tokens(),
+                    capacity: bucket.capacity,
+                    refill_rate: bucket.refill_rate,
+                };
+                (ip, stats)
+            })
+            .collect()
+    }
 }
 
 /// Bandwidth usage statistics
@@ -392,12 +472,48 @@ pub struct ClientStats {
     pub refill_rate: f64,
 }
 
-/// Global rate limit statistics
+/// Global rate limit statistics (with current token count)
 #[derive(Debug, Clone)]
 pub struct GlobalStats {
     pub enabled: bool,
+    pub current_tokens: f64,
     pub capacity: f64,
     pub refill_rate: f64,
+}
+
+/// Basic global rate limit statistics (without current token count)
+#[derive(Debug, Clone)]
+pub struct GlobalStatsBasic {
+    pub enabled: bool,
+    pub capacity: f64,
+    pub refill_rate: f64,
+}
+
+/// Comprehensive rate limiter statistics
+#[derive(Debug, Clone)]
+pub struct RateLimiterStats {
+    pub tracked_clients: usize,
+    pub active_connections: usize,
+    pub total_bandwidth_tracked: usize,
+    pub per_client_config: ClientRateLimitConfig,
+    pub global_config: GlobalRateLimitConfig,
+}
+
+/// Per-client rate limit configuration
+#[derive(Debug, Clone)]
+pub struct ClientRateLimitConfig {
+    pub rps: u32,
+    pub burst: u32,
+    pub max_connections: u32,
+    pub max_bandwidth_bps: u64,
+}
+
+/// Global rate limit configuration
+#[derive(Debug, Clone)]
+pub struct GlobalRateLimitConfig {
+    pub enabled: bool,
+    pub rps: u32,
+    pub burst: u32,
 }
 
 #[cfg(test)]
