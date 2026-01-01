@@ -203,6 +203,10 @@ pub struct Config {
     /// PostgreSQL configuration for database-backed authentication
     #[serde(default)]
     pub postgres: Option<crate::postgres_auth::PostgresConfig>,
+
+    /// Proxy configuration for RADIUS proxying
+    #[serde(default)]
+    pub proxy: Option<crate::proxy::ProxyConfig>,
 }
 
 fn default_listen_address() -> String {
@@ -246,6 +250,7 @@ impl Default for Config {
             max_bandwidth_bps: None,
             ldap: None,
             postgres: None,
+            proxy: None,
         }
     }
 }
@@ -415,6 +420,7 @@ impl Config {
             max_bandwidth_bps: Some(1_000_000), // 1 MB/s
             ldap: None,
             postgres: None,
+            proxy: None,
         }
     }
 }
