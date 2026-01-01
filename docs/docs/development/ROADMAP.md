@@ -664,24 +664,6 @@ The following legacy methods will **not** be implemented due to modern alternati
 **Status**: ✅ **ALL TESTING COMPLETE!**
 **Completed**: Dec 2025
 
-### High Availability
-
-- [ ] Multi-server deployment support
-- [ ] Shared session state (Redis/database)
-- [ ] Health checks
-- [ ] Failover mechanisms
-- [ ] Load balancing recommendations
-
-**Estimated Effort**: 3 weeks
-
-### Additional Backend Support
-
-- [ ] Redis caching backend
-- [ ] REST API authentication backend
-- [ ] Multi-backend fallback chains
-
-**Estimated Effort**: 3 weeks
-
 ### Performance Optimization ✅ COMPLETED
 
 - ✅ **LDAP connection pooling** - **COMPLETED (Dec 31, 2025)**
@@ -840,7 +822,6 @@ let config = RevocationConfig::disabled();
 **Total v0.6.0 Effort**:
 
 - ✅ Completed: ~4 weeks (LDAP, PostgreSQL, docs, tests)
-- ⏳ Remaining: ~14-16 weeks (HA, additional backends, optimization, CRL/OCSP)
 
 ---
 
@@ -1027,6 +1008,24 @@ let config = RevocationConfig::disabled();
 - [ ] Nonce support for replay protection
 - [ ] OCSP stapling (RFC 6066)
 - [ ] Response caching with TTL
+
+### Phase 3: High Availability
+
+- [ ] Multi-server deployment support
+- [ ] Shared session state (Redis/database)
+- [ ] Health checks
+- [ ] Failover mechanisms
+- [ ] Load balancing recommendations
+
+**Estimated Effort**: 3 weeks
+
+### Phase 4: Additional Backend Support
+
+- [ ] Redis caching backend
+- [ ] REST API authentication backend
+- [ ] Multi-backend fallback chains
+
+**Estimated Effort**: 3 weeks
 
 ## v0.8.0 - RadSec (RADIUS over TLS) (Q1 2026)
 
