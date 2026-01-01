@@ -696,6 +696,7 @@ The following legacy methods will **not** be implemented due to modern alternati
 **Status**: ✅ **COMPLETE**
 **Completed**: Dec 31, 2025 (All core performance work done!)
 **Result**:
+
 - Request cache: Background cleanup eliminates hot-path overhead
 - Rate limiter: Comprehensive monitoring without lock contention
 - PostgreSQL: O(log n) indexed queries vs O(n) table scans
@@ -852,6 +853,7 @@ let config = RevocationConfig::disabled();
 - ✅ Default realm configuration
 
 **Load Balancing Strategies Implemented**:
+
 - ✅ Round-robin (even distribution)
 - ✅ Least-outstanding (optimal load)
 - ✅ Failover (primary/backup)
@@ -884,11 +886,6 @@ let config = RevocationConfig::disabled();
 
 **Total v0.7.0 Actual Effort**: 5 weeks (2 weeks faster than estimated!)
 
-**Features Not Implemented** (deferred to future releases):
-
-- Dynamic routing rules - planned for v0.7.2
-- Automatic server removal/addition - planned for v0.7.2
-
 ---
 
 ## v0.7.1 - Health Monitoring (Complete)
@@ -917,6 +914,80 @@ let config = RevocationConfig::disabled();
 - Dead servers can recover automatically
 - Atomic statistics tracking (lock-free)
 - Full test coverage (6 unit tests)
+
+---
+
+## v0.7.2 - Health Checker Integration (Complete)
+
+**Goal**: Integrate health monitoring into server lifecycle
+**Priority**: HIGH
+**Status**: ✅ COMPLETE
+
+### Health Checker Integration
+
+- ✅ Automatic health checker initialization in RadiusServer startup
+- ✅ Home server collection from all pools
+- ✅ Background health check task management
+- ✅ Separate UDP socket for health checks (ephemeral port)
+- ✅ Integration with retry manager and proxy handler
+- ✅ IPv4/IPv6 socket binding support
+
+**Actual Effort**: 0.3 weeks
+
+**Implementation Details**:
+
+- Added `health_checker` field to ServerConfig
+- Added `home_servers` field to RadiusServer for health monitoring
+- Modified `initialize_proxy()` to create and return HealthChecker
+- Health checker starts automatically in `run()` method
+- Binds separate socket on 0.0.0.0:0 (IPv4) or [::]:0 (IPv6)
+- Full integration with existing proxy infrastructure
+
+**Testing**: All 134 tests passing
+
+---
+
+## v0.7.3 - Proxy Statistics API (Complete)
+
+**Goal**: Runtime statistics collection and export
+**Priority**: MEDIUM
+**Status**: ✅ COMPLETE
+
+### Statistics API Implementation
+
+- ✅ ProxyStats aggregation from all pools and servers
+- ✅ Per-pool statistics (requests, responses, availability)
+- ✅ Per-server statistics (state, traffic, health checks)
+- ✅ JSON export capability
+- ✅ Real-time statistics via `get_proxy_stats()` method
+- ✅ Health check statistics integration
+
+**Actual Effort**: 0.4 weeks
+
+**Implementation Details**:
+
+- Created `proxy/stats.rs` module (263 lines)
+- ProxyStats, PoolStatSnapshot, ServerStatSnapshot structures
+- Added `pools` Vec to RadiusServer for statistics access
+- Modified `initialize_proxy()` to return pools alongside servers
+- Added public `get_proxy_stats()` method to RadiusServer
+- Statistics include all health check data
+
+**Configuration Updates**:
+
+- Fixed `proxy_config.json` health_check example
+- Removed unused "method" field
+- Updated timeout from 5 to 10 seconds (matches defaults)
+- Added proper `failures_before_down` and `successes_before_up` parameters
+
+**Documentation**:
+
+- Added "Runtime Statistics API" section to proxy README
+- Documented ProxyStats structure and all fields
+- Example code showing statistics retrieval and JSON export
+- Updated proxy_server.rs example with statistics usage
+
+**Testing**: All 136 tests passing (2 new stats tests)
 
 ---
 
@@ -1061,14 +1132,8 @@ let config = RevocationConfig::disabled();
 
 ## Development Priorities
 
-### Critical Path (Must Have for Production)
-
-1. v0.5.0 - EAP Support
-2. v0.6.0 - Database Integration
-
 ### Nice to Have
 
-1. v0.7.0 - Proxy
 2. v0.8.0 - RadSec
 3. v0.9.0 - CoA
 
@@ -1080,11 +1145,7 @@ We welcome community contributions! Priority areas:
 
 **High Priority**:
 
-- EAP methods
-
 **Medium Priority**:
-
-- Performance optimizations
 
 **Documentation**:
 
@@ -1103,9 +1164,9 @@ We welcome community contributions! Priority areas:
 | v0.2.0 | Q4 2025 | Security & Production | ✅ Done |
 | v0.3.0 | Q4 2025 | Auth Methods | ✅ Done |
 | v0.4.0 | Q4 2025 | Accounting | ✅ Done |
-| v0.5.0 | Q4 2025 | EAP Support | 11 |
+| v0.5.0 | Q4 2025 | EAP Support | ✅ Done  |
 | v0.6.0 | Q1 2026 | Enterprise Features | 11 |
-| v0.7.0 | Q2 2026 | Proxy | 7 |
+| v0.7.0 | Q2 2026 | Proxy | ✅ Done  |
 | v0.8.0 | Q3 2026 | RadSec | 6 |
 | v0.9.0 | Q4 2026 | CoA | 5 |
 | v1.0.0 | 2027 | Production Release | 10 |
