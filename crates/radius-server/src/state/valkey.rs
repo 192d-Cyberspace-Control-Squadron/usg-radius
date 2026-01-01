@@ -108,10 +108,12 @@ impl ValkeyStateBackend {
 impl StateBackend for ValkeyStateBackend {
     async fn get(&self, key: &str) -> Result<Option<Vec<u8>>, StateError> {
         let prefixed_key = self.prefixed_key(key);
-        let mut conn = self.conn.clone();
+        let conn = self.conn.clone();
 
         self.with_retry(|| {
-            Box::pin(async {
+            let prefixed_key = prefixed_key.clone();
+            let mut conn = conn.clone();
+            Box::pin(async move {
                 conn.get(&prefixed_key).await
             })
         })
@@ -120,11 +122,13 @@ impl StateBackend for ValkeyStateBackend {
 
     async fn set(&self, key: &str, value: &[u8], ttl: Option<Duration>) -> Result<(), StateError> {
         let prefixed_key = self.prefixed_key(key);
-        let mut conn = self.conn.clone();
+        let conn = self.conn.clone();
         let value = value.to_vec();
 
         self.with_retry(|| {
             let value = value.clone();
+            let prefixed_key = prefixed_key.clone();
+            let mut conn = conn.clone();
             Box::pin(async move {
                 if let Some(ttl) = ttl {
                     // SET with expiration (EX for seconds)
@@ -147,10 +151,12 @@ impl StateBackend for ValkeyStateBackend {
 
     async fn delete(&self, key: &str) -> Result<(), StateError> {
         let prefixed_key = self.prefixed_key(key);
-        let mut conn = self.conn.clone();
+        let conn = self.conn.clone();
 
         self.with_retry(|| {
-            Box::pin(async {
+            let prefixed_key = prefixed_key.clone();
+            let mut conn = conn.clone();
+            Box::pin(async move {
                 conn.del(&prefixed_key).await
             })
         })
@@ -159,10 +165,12 @@ impl StateBackend for ValkeyStateBackend {
 
     async fn exists(&self, key: &str) -> Result<bool, StateError> {
         let prefixed_key = self.prefixed_key(key);
-        let mut conn = self.conn.clone();
+        let conn = self.conn.clone();
 
         self.with_retry(|| {
-            Box::pin(async {
+            let prefixed_key = prefixed_key.clone();
+            let mut conn = conn.clone();
+            Box::pin(async move {
                 conn.exists(&prefixed_key).await
             })
         })
@@ -171,11 +179,13 @@ impl StateBackend for ValkeyStateBackend {
 
     async fn keys(&self, pattern: &str) -> Result<Vec<String>, StateError> {
         let prefixed_pattern = self.prefixed_key(pattern);
-        let mut conn = self.conn.clone();
+        let conn = self.conn.clone();
 
         let keys: Vec<String> = self
             .with_retry(|| {
-                Box::pin(async {
+                let prefixed_pattern = prefixed_pattern.clone();
+                let mut conn = conn.clone();
+                Box::pin(async move {
                     conn.keys(&prefixed_pattern).await
                 })
             })
@@ -192,11 +202,13 @@ impl StateBackend for ValkeyStateBackend {
 
     async fn set_nx(&self, key: &str, value: &[u8], ttl: Option<Duration>) -> Result<bool, StateError> {
         let prefixed_key = self.prefixed_key(key);
-        let mut conn = self.conn.clone();
+        let conn = self.conn.clone();
         let value = value.to_vec();
 
         self.with_retry(|| {
             let value = value.clone();
+            let prefixed_key = prefixed_key.clone();
+            let mut conn = conn.clone();
             Box::pin(async move {
                 if let Some(ttl) = ttl {
                     // SET NX with expiration
@@ -220,10 +232,12 @@ impl StateBackend for ValkeyStateBackend {
 
     async fn incr(&self, key: &str) -> Result<i64, StateError> {
         let prefixed_key = self.prefixed_key(key);
-        let mut conn = self.conn.clone();
+        let conn = self.conn.clone();
 
         self.with_retry(|| {
-            Box::pin(async {
+            let prefixed_key = prefixed_key.clone();
+            let mut conn = conn.clone();
+            Box::pin(async move {
                 conn.incr(&prefixed_key, 1).await
             })
         })
@@ -232,11 +246,13 @@ impl StateBackend for ValkeyStateBackend {
 
     async fn expire(&self, key: &str, ttl: Duration) -> Result<bool, StateError> {
         let prefixed_key = self.prefixed_key(key);
-        let mut conn = self.conn.clone();
+        let conn = self.conn.clone();
         let ttl_secs = ttl.as_secs().max(1);
 
         self.with_retry(|| {
-            Box::pin(async {
+            let prefixed_key = prefixed_key.clone();
+            let mut conn = conn.clone();
+            Box::pin(async move {
                 conn.expire(&prefixed_key, ttl_secs as i64).await
             })
         })
@@ -244,10 +260,11 @@ impl StateBackend for ValkeyStateBackend {
     }
 
     async fn ping(&self) -> Result<(), StateError> {
-        let mut conn = self.conn.clone();
+        let conn = self.conn.clone();
 
         self.with_retry(|| {
-            Box::pin(async {
+            let mut conn = conn.clone();
+            Box::pin(async move {
                 redis::cmd("PING").query_async(&mut conn).await
             })
         })
