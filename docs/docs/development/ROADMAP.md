@@ -1173,10 +1173,17 @@ let config = RevocationConfig::disabled();
 - [ ] Migrate EAP session storage to use state backend
 - [ ] Integrate SharedSessionManager with AccountingHandler
 - [ ] Migrate accounting session storage to use state backend
-- [ ] Update request cache to use cluster-wide deduplication
-- [ ] Update rate limiter to use distributed counters
+- ✅ Update request cache to use cluster-wide deduplication
+  - SharedRequestCache implementation (360 lines, 8 tests)
+  - Atomic SET NX for race-free duplicate detection
+  - Key format: req_cache:{ip}:{id}:{auth_prefix_hex}
+- ✅ Update rate limiter to use distributed counters
+  - SharedRateLimiter implementation (479 lines, 9 tests)
+  - Atomic INCR operations for distributed counters
+  - Per-client and global rate limits
+  - Sliding window approach with automatic TTL cleanup
 
-**Estimated Effort**: 1 week
+**Estimated Effort**: 1 week (50% complete)
 
 #### Phase 3C: Health Checks & Monitoring (Week 3/3)
 
