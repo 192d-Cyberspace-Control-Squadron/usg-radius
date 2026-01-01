@@ -43,7 +43,10 @@ impl RealmMatcher {
             "suffix" => Ok(RealmMatcher::Suffix(config.pattern.clone())),
             "regex" => {
                 let regex = Regex::new(&config.pattern).map_err(|e| {
-                    ProxyError::InvalidRealmPattern(format!("Invalid regex pattern '{}': {}", config.pattern, e))
+                    ProxyError::InvalidRealmPattern(format!(
+                        "Invalid regex pattern '{}': {}",
+                        config.pattern, e
+                    ))
                 })?;
                 Ok(RealmMatcher::Regex(regex))
             }
@@ -86,7 +89,9 @@ impl RealmConfig {
     /// Validate configuration
     pub fn validate(&self) -> ProxyResult<()> {
         if self.name.is_empty() {
-            return Err(ProxyError::Configuration("Realm name cannot be empty".to_string()));
+            return Err(ProxyError::Configuration(
+                "Realm name cannot be empty".to_string(),
+            ));
         }
 
         if self.pool.is_empty() {
@@ -206,14 +211,23 @@ mod tests {
 
     #[test]
     fn test_extract_realm_suffix() {
-        assert_eq!(extract_realm("user@example.com"), Some("example.com".to_string()));
-        assert_eq!(extract_realm("john.doe@corporate.local"), Some("corporate.local".to_string()));
+        assert_eq!(
+            extract_realm("user@example.com"),
+            Some("example.com".to_string())
+        );
+        assert_eq!(
+            extract_realm("john.doe@corporate.local"),
+            Some("corporate.local".to_string())
+        );
         assert_eq!(extract_realm("admin@"), None); // Empty realm
     }
 
     #[test]
     fn test_extract_realm_prefix() {
-        assert_eq!(extract_realm("CORPORATE\\john"), Some("CORPORATE".to_string()));
+        assert_eq!(
+            extract_realm("CORPORATE\\john"),
+            Some("CORPORATE".to_string())
+        );
         assert_eq!(extract_realm("DOMAIN\\admin"), Some("DOMAIN".to_string()));
         assert_eq!(extract_realm("\\user"), None); // Empty realm
     }

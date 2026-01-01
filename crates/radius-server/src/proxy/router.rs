@@ -3,9 +3,9 @@
 //! The router determines where to forward RADIUS requests based on realm matching.
 
 use crate::proxy::home_server::HomeServer;
-use crate::proxy::realm::{extract_realm, strip_realm, Realm};
-use radius_proto::attributes::AttributeType;
+use crate::proxy::realm::{Realm, extract_realm, strip_realm};
 use radius_proto::Packet;
+use radius_proto::attributes::AttributeType;
 use std::sync::Arc;
 use tracing::{debug, warn};
 
@@ -197,8 +197,8 @@ mod tests {
     use crate::proxy::home_server::HomeServerConfig;
     use crate::proxy::pool::{HomeServerPool, HomeServerPoolConfig, LoadBalanceStrategy};
     use crate::proxy::realm::{Realm, RealmConfig, RealmMatchConfig};
-    use radius_proto::attributes::Attribute;
     use radius_proto::Code;
+    use radius_proto::attributes::Attribute;
 
     fn create_test_pool(name: &str, server_name: &str) -> Arc<HomeServerPool> {
         let config = HomeServerPoolConfig {
@@ -218,9 +218,7 @@ mod tests {
 
     fn create_test_request(username: &str) -> Packet {
         let mut packet = Packet::new(Code::AccessRequest, 1, [0u8; 16]);
-        packet.add_attribute(
-            Attribute::string(AttributeType::UserName as u8, username).unwrap(),
-        );
+        packet.add_attribute(Attribute::string(AttributeType::UserName as u8, username).unwrap());
         packet
     }
 

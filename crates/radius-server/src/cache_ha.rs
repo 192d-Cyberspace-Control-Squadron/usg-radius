@@ -3,7 +3,7 @@
 //! Provides distributed duplicate detection across a RADIUS server cluster
 //! using SharedSessionManager for coordination.
 
-use crate::cache::{RequestFingerprint, CacheStats};
+use crate::cache::{CacheStats, RequestFingerprint};
 use crate::state::SharedSessionManager;
 use std::sync::Arc;
 use std::time::Duration;
@@ -90,7 +90,11 @@ impl SharedRequestCache {
     ///
     /// Uses SET NX to ensure atomic check-and-set operation. This prevents race
     /// conditions when multiple servers receive the same request simultaneously.
-    pub async fn is_duplicate(&self, fingerprint: RequestFingerprint, authenticator: [u8; 16]) -> bool {
+    pub async fn is_duplicate(
+        &self,
+        fingerprint: RequestFingerprint,
+        authenticator: [u8; 16],
+    ) -> bool {
         let key = self.fingerprint_to_key(&fingerprint);
 
         // Serialize the cache entry (just store timestamp)
@@ -105,7 +109,12 @@ impl SharedRequestCache {
         value.extend_from_slice(&authenticator);
 
         // Atomic SET NX with TTL
-        match self.session_manager.backend.set_nx(&key, &value, Some(self.ttl)).await {
+        match self
+            .session_manager
+            .backend
+            .set_nx(&key, &value, Some(self.ttl))
+            .await
+        {
             Ok(true) => {
                 // SET NX succeeded - this is the first time we've seen this request
                 debug!(
@@ -163,13 +172,20 @@ impl SharedRequestCache {
     pub async fn clear(&self) -> Result<(), String> {
         let pattern = "req_cache:*";
 
-        let keys = self.session_manager.backend.keys(pattern).await
+        let keys = self
+            .session_manager
+            .backend
+            .keys(pattern)
+            .await
             .map_err(|e| format!("Failed to list cache keys: {}", e))?;
 
         let count = keys.len();
 
         for key in keys {
-            self.session_manager.backend.delete(&key).await
+            self.session_manager
+                .backend
+                .delete(&key)
+                .await
                 .map_err(|e| format!("Failed to delete key {}: {}", key, e))?;
         }
 
@@ -181,16 +197,15 @@ impl SharedRequestCache {
     fn fingerprint_to_key(&self, fingerprint: &RequestFingerprint) -> String {
         // Format: req_cache:{source_ip}:{identifier}:{auth_prefix_hex}
         // Use uppercase hex encoding for consistency
-        let auth_hex = fingerprint.auth_prefix
+        let auth_hex = fingerprint
+            .auth_prefix
             .iter()
             .map(|b| format!("{:02x}", b))
             .collect::<String>();
 
         format!(
             "req_cache:{}:{}:{}",
-            fingerprint.source_ip,
-            fingerprint.identifier,
-            auth_hex
+            fingerprint.source_ip, fingerprint.identifier, auth_hex
         )
     }
 }
@@ -208,7 +223,11 @@ mod tests {
         let cache = SharedRequestCache::new(session_manager, Duration::from_secs(60));
 
         let ip: IpAddr = "192.168.1.1".parse().unwrap();
-        let fingerprint = RequestFingerprint::new(ip, 42, &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+        let fingerprint = RequestFingerprint::new(
+            ip,
+            42,
+            &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+        );
 
         let key = cache.fingerprint_to_key(&fingerprint);
         assert_eq!(key, "req_cache:192.168.1.1:42:0102030405060708");

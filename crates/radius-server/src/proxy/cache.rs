@@ -8,8 +8,8 @@ use crate::proxy::home_server::HomeServer;
 use dashmap::DashMap;
 use radius_proto::Packet;
 use std::net::SocketAddr;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use tokio::time;
 use tracing::debug;
@@ -374,7 +374,9 @@ mod tests {
         let cache = ProxyCache::new_no_background(Duration::from_secs(60), 1000);
         let home_server = create_test_home_server();
 
-        cache.insert(create_test_entry(home_server.clone())).unwrap();
+        cache
+            .insert(create_test_entry(home_server.clone()))
+            .unwrap();
         cache.insert(create_test_entry(home_server)).unwrap();
         assert_eq!(cache.len(), 2);
 

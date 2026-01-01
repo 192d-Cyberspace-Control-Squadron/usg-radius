@@ -39,8 +39,8 @@
 use radius_server::{
     RadiusServer, ServerConfig, SimpleAuthHandler,
     cache_ha::SharedRequestCache,
-    ratelimit_ha::{SharedRateLimiter, SharedRateLimitConfig},
-    state::{SharedSessionManager, ValkeyStateBackend, ValkeyConfig, MemoryStateBackend},
+    ratelimit_ha::{SharedRateLimitConfig, SharedRateLimiter},
+    state::{MemoryStateBackend, SharedSessionManager, ValkeyConfig, ValkeyStateBackend},
 };
 use std::env;
 use std::net::SocketAddr;
@@ -65,8 +65,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|p| p.parse::<u16>().ok())
         .unwrap_or(1812);
 
-    let valkey_url = env::var("VALKEY_URL")
-        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    let valkey_url =
+        env::var("VALKEY_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
 
     let use_ha = env::var("DISABLE_HA").is_err();
 
@@ -80,7 +80,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create shared state backend
     let (session_manager, cluster_cache, cluster_limiter) = if use_ha {
-        info!("Configuring High Availability mode with Valkey: {}", valkey_url);
+        info!(
+            "Configuring High Availability mode with Valkey: {}",
+            valkey_url
+        );
 
         // Connect to Valkey
         let valkey_config = ValkeyConfig::new(&valkey_url)
@@ -111,8 +114,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Create cluster-wide rate limiter
         let limiter_config = SharedRateLimitConfig {
-            per_client_limit: 100,      // 100 requests per window per client
-            global_limit: 1000,         // 1000 requests per window globally
+            per_client_limit: 100,                   // 100 requests per window per client
+            global_limit: 1000,                      // 1000 requests per window globally
             window_duration: Duration::from_secs(1), // 1 second window
         };
         let limiter = SharedRateLimiter::new(Arc::clone(&session_manager), limiter_config);
@@ -136,8 +139,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(ref limiter) = cluster_limiter {
         let stats = limiter.get_stats();
         info!("Rate limiting configured:");
-        info!("  Per-client: {} requests/{} seconds", stats.per_client_limit, stats.window_duration_secs);
-        info!("  Global: {} requests/{} seconds", stats.global_limit, stats.window_duration_secs);
+        info!(
+            "  Per-client: {} requests/{} seconds",
+            stats.per_client_limit, stats.window_duration_secs
+        );
+        info!(
+            "  Global: {} requests/{} seconds",
+            stats.global_limit, stats.window_duration_secs
+        );
     }
 
     if cluster_cache.is_some() {

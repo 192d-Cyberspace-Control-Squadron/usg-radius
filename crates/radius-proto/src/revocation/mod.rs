@@ -297,9 +297,7 @@ pub mod ocsp_cache;
 pub mod verifier;
 
 // Re-export public types
-pub use config::{
-    CrlConfig, FallbackBehavior, OcspConfig, RevocationCheckMode, RevocationConfig,
-};
+pub use config::{CrlConfig, FallbackBehavior, OcspConfig, RevocationCheckMode, RevocationConfig};
 pub use error::RevocationError;
 
 #[cfg(feature = "revocation")]

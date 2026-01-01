@@ -3,12 +3,12 @@ use crate::audit::{AuditEntry, AuditEventType, AuditLogger};
 use crate::buffer_pool::BufferPool;
 use crate::cache::{RequestCache, RequestFingerprint};
 use crate::config::Config;
+use crate::proxy::ProxyConfig;
 use crate::proxy::handler::ProxyHandler;
 use crate::proxy::pool::HomeServerPool;
 use crate::proxy::realm::Realm;
 use crate::proxy::retry::RetryManager;
 use crate::proxy::router::{Router, RoutingDecision};
-use crate::proxy::ProxyConfig;
 use crate::ratelimit::{RateLimitConfig, RateLimiter};
 use radius_proto::accounting::{AccountingError, AcctStatusType};
 use radius_proto::attributes::{Attribute, AttributeType};
@@ -409,8 +409,14 @@ impl RadiusServer {
                     info!("Initializing RADIUS proxy");
 
                     // Create proxy components
-                    let (router, proxy_handler, retry_manager, health_checker, servers, server_pools) =
-                        Self::initialize_proxy(proxy_config, Arc::clone(&socket)).await?;
+                    let (
+                        router,
+                        proxy_handler,
+                        retry_manager,
+                        health_checker,
+                        servers,
+                        server_pools,
+                    ) = Self::initialize_proxy(proxy_config, Arc::clone(&socket)).await?;
 
                     config.router = Some(Arc::new(router));
                     config.proxy_handler = Some(Arc::new(proxy_handler));
@@ -436,36 +442,54 @@ impl RadiusServer {
     async fn initialize_proxy(
         proxy_config: &ProxyConfig,
         socket: Arc<UdpSocket>,
-    ) -> Result<(Router, ProxyHandler, RetryManager, Option<crate::proxy::health::HealthChecker>, Vec<Arc<crate::proxy::home_server::HomeServer>>, Vec<Arc<crate::proxy::pool::HomeServerPool>>), ServerError> {
+    ) -> Result<
+        (
+            Router,
+            ProxyHandler,
+            RetryManager,
+            Option<crate::proxy::health::HealthChecker>,
+            Vec<Arc<crate::proxy::home_server::HomeServer>>,
+            Vec<Arc<crate::proxy::pool::HomeServerPool>>,
+        ),
+        ServerError,
+    > {
         use crate::proxy::cache::ProxyCache;
         use crate::proxy::health::HealthChecker;
 
         // Create home server pools
         let mut pools = std::collections::HashMap::new();
         for pool_config in &proxy_config.pools {
-            let pool = HomeServerPool::new(pool_config.clone())
-                .map_err(|e| ServerError::Io(std::io::Error::new(
+            let pool = HomeServerPool::new(pool_config.clone()).map_err(|e| {
+                ServerError::Io(std::io::Error::new(
                     std::io::ErrorKind::InvalidInput,
-                    format!("Failed to create pool '{}': {}", pool_config.name, e)
-                )))?;
+                    format!("Failed to create pool '{}': {}", pool_config.name, e),
+                ))
+            })?;
             pools.insert(pool_config.name.clone(), Arc::new(pool));
         }
 
         // Create realms
         let mut realms = Vec::new();
         for realm_config in &proxy_config.realms {
-            let pool = pools.get(&realm_config.pool)
-                .ok_or_else(|| ServerError::Io(std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    format!("Realm '{}' references unknown pool '{}'", realm_config.name, realm_config.pool)
-                )))?
+            let pool = pools
+                .get(&realm_config.pool)
+                .ok_or_else(|| {
+                    ServerError::Io(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        format!(
+                            "Realm '{}' references unknown pool '{}'",
+                            realm_config.name, realm_config.pool
+                        ),
+                    ))
+                })?
                 .clone();
 
-            let realm = Realm::new(realm_config.clone(), pool)
-                .map_err(|e| ServerError::Io(std::io::Error::new(
+            let realm = Realm::new(realm_config.clone(), pool).map_err(|e| {
+                ServerError::Io(std::io::Error::new(
                     std::io::ErrorKind::InvalidInput,
-                    format!("Failed to create realm '{}': {}", realm_config.name, e)
-                )))?;
+                    format!("Failed to create realm '{}': {}", realm_config.name, e),
+                ))
+            })?;
             realms.push(realm);
         }
 
@@ -479,10 +503,12 @@ impl RadiusServer {
         // Create proxy handler
         let proxy_handler = ProxyHandler::new(Arc::clone(&proxy_cache), socket.local_addr()?)
             .await
-            .map_err(|e| ServerError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("Failed to create proxy handler: {}", e)
-            )))?;
+            .map_err(|e| {
+                ServerError::Io(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("Failed to create proxy handler: {}", e),
+                ))
+            })?;
 
         // Create retry manager
         let retry_timeout = Duration::from_secs(proxy_config.proxy_timeout);
@@ -496,10 +522,12 @@ impl RadiusServer {
         // Create a second proxy handler for the server (both share the same cache)
         let server_proxy_handler = ProxyHandler::new(proxy_cache, socket.local_addr()?)
             .await
-            .map_err(|e| ServerError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("Failed to create proxy handler: {}", e)
-            )))?;
+            .map_err(|e| {
+                ServerError::Io(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("Failed to create proxy handler: {}", e),
+                ))
+            })?;
 
         // Collect all home servers and pools from all pools
         let mut all_servers = Vec::new();
@@ -520,12 +548,15 @@ impl RadiusServer {
                     std::net::SocketAddr::V6(_) => "[::]:0".parse().unwrap(),
                 };
 
-                let checker = HealthChecker::new(proxy_config.health_check.clone(), health_bind_addr)
-                    .await
-                    .map_err(|e| ServerError::Io(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        format!("Failed to create health checker: {}", e)
-                    )))?;
+                let checker =
+                    HealthChecker::new(proxy_config.health_check.clone(), health_bind_addr)
+                        .await
+                        .map_err(|e| {
+                            ServerError::Io(std::io::Error::new(
+                                std::io::ErrorKind::Other,
+                                format!("Failed to create health checker: {}", e),
+                            ))
+                        })?;
 
                 info!(
                     server_count = all_servers.len(),
@@ -542,7 +573,14 @@ impl RadiusServer {
             None
         };
 
-        Ok((router, server_proxy_handler, retry_manager, health_checker, all_servers, all_pools))
+        Ok((
+            router,
+            server_proxy_handler,
+            retry_manager,
+            health_checker,
+            all_servers,
+            all_pools,
+        ))
     }
 
     /// Get the local address the server is listening on
@@ -576,7 +614,10 @@ impl RadiusServer {
         // Start health checker if proxy is enabled
         let _health_task = if let Some(ref health_checker) = self.config.health_checker {
             if !self.home_servers.is_empty() {
-                info!("Starting health checker for {} home servers", self.home_servers.len());
+                info!(
+                    "Starting health checker for {} home servers",
+                    self.home_servers.len()
+                );
                 Some(health_checker.start(self.home_servers.clone()))
             } else {
                 None
@@ -813,7 +854,10 @@ impl RadiusServer {
             let routing_decision = router.route_request(request);
 
             match routing_decision {
-                RoutingDecision::Proxy { home_server, stripped_username } => {
+                RoutingDecision::Proxy {
+                    home_server,
+                    stripped_username,
+                } => {
                     // Proxy the request
                     debug!(
                         home_server = %home_server.name,
@@ -824,12 +868,12 @@ impl RadiusServer {
                     let mut forwarded_request = request.clone();
                     if let Some(stripped) = stripped_username {
                         // Replace User-Name attribute with stripped version
-                        forwarded_request.attributes.retain(|attr| {
-                            attr.attr_type != AttributeType::UserName as u8
-                        });
+                        forwarded_request
+                            .attributes
+                            .retain(|attr| attr.attr_type != AttributeType::UserName as u8);
                         forwarded_request.add_attribute(
                             Attribute::string(AttributeType::UserName as u8, &stripped)
-                                .map_err(|_| ServerError::AuthFailed)?
+                                .map_err(|_| ServerError::AuthFailed)?,
                         );
                     }
 
@@ -845,7 +889,7 @@ impl RadiusServer {
                             warn!("Proxy forwarding failed: {}", e);
                             ServerError::Io(std::io::Error::new(
                                 std::io::ErrorKind::Other,
-                                format!("Proxy forwarding failed: {}", e)
+                                format!("Proxy forwarding failed: {}", e),
                             ))
                         })?;
 
@@ -856,7 +900,7 @@ impl RadiusServer {
                     // This needs architectural refinement - the proxy response is async
                     return Err(ServerError::Io(std::io::Error::new(
                         std::io::ErrorKind::Other,
-                        "Request forwarded to proxy - response will be sent asynchronously"
+                        "Request forwarded to proxy - response will be sent asynchronously",
                     )));
                 }
                 RoutingDecision::Reject => {

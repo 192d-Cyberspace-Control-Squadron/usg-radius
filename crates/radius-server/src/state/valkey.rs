@@ -60,9 +60,9 @@ impl ValkeyStateBackend {
             .map_err(|e| StateError::ConfigError(format!("Invalid Valkey URL: {}", e)))?;
 
         // Create connection manager (handles pooling and reconnection)
-        let conn = ConnectionManager::new(client)
-            .await
-            .map_err(|e| StateError::ConnectionError(format!("Failed to connect to Valkey: {}", e)))?;
+        let conn = ConnectionManager::new(client).await.map_err(|e| {
+            StateError::ConnectionError(format!("Failed to connect to Valkey: {}", e))
+        })?;
 
         Ok(Self { conn, config })
     }
@@ -82,7 +82,9 @@ impl ValkeyStateBackend {
     /// Execute a command with retry logic
     async fn with_retry<F, T>(&self, mut f: F) -> Result<T, StateError>
     where
-        F: FnMut() -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, RedisError>> + Send>>,
+        F: FnMut() -> std::pin::Pin<
+            Box<dyn std::future::Future<Output = Result<T, RedisError>> + Send>,
+        >,
     {
         let mut last_error = None;
 
@@ -113,9 +115,7 @@ impl StateBackend for ValkeyStateBackend {
         self.with_retry(|| {
             let prefixed_key = prefixed_key.clone();
             let mut conn = conn.clone();
-            Box::pin(async move {
-                conn.get(&prefixed_key).await
-            })
+            Box::pin(async move { conn.get(&prefixed_key).await })
         })
         .await
     }
@@ -156,9 +156,7 @@ impl StateBackend for ValkeyStateBackend {
         self.with_retry(|| {
             let prefixed_key = prefixed_key.clone();
             let mut conn = conn.clone();
-            Box::pin(async move {
-                conn.del(&prefixed_key).await
-            })
+            Box::pin(async move { conn.del(&prefixed_key).await })
         })
         .await
     }
@@ -170,9 +168,7 @@ impl StateBackend for ValkeyStateBackend {
         self.with_retry(|| {
             let prefixed_key = prefixed_key.clone();
             let mut conn = conn.clone();
-            Box::pin(async move {
-                conn.exists(&prefixed_key).await
-            })
+            Box::pin(async move { conn.exists(&prefixed_key).await })
         })
         .await
     }
@@ -185,22 +181,22 @@ impl StateBackend for ValkeyStateBackend {
             .with_retry(|| {
                 let prefixed_pattern = prefixed_pattern.clone();
                 let mut conn = conn.clone();
-                Box::pin(async move {
-                    conn.keys(&prefixed_pattern).await
-                })
+                Box::pin(async move { conn.keys(&prefixed_pattern).await })
             })
             .await?;
 
         // Remove prefix from returned keys
-        let unprefixed_keys = keys
-            .into_iter()
-            .map(|k| self.unprefixed_key(&k))
-            .collect();
+        let unprefixed_keys = keys.into_iter().map(|k| self.unprefixed_key(&k)).collect();
 
         Ok(unprefixed_keys)
     }
 
-    async fn set_nx(&self, key: &str, value: &[u8], ttl: Option<Duration>) -> Result<bool, StateError> {
+    async fn set_nx(
+        &self,
+        key: &str,
+        value: &[u8],
+        ttl: Option<Duration>,
+    ) -> Result<bool, StateError> {
         let prefixed_key = self.prefixed_key(key);
         let conn = self.conn.clone();
         let value = value.to_vec();
@@ -237,9 +233,7 @@ impl StateBackend for ValkeyStateBackend {
         self.with_retry(|| {
             let prefixed_key = prefixed_key.clone();
             let mut conn = conn.clone();
-            Box::pin(async move {
-                conn.incr(&prefixed_key, 1).await
-            })
+            Box::pin(async move { conn.incr(&prefixed_key, 1).await })
         })
         .await
     }
@@ -252,9 +246,7 @@ impl StateBackend for ValkeyStateBackend {
         self.with_retry(|| {
             let prefixed_key = prefixed_key.clone();
             let mut conn = conn.clone();
-            Box::pin(async move {
-                conn.expire(&prefixed_key, ttl_secs as i64).await
-            })
+            Box::pin(async move { conn.expire(&prefixed_key, ttl_secs as i64).await })
         })
         .await
     }
@@ -264,9 +256,7 @@ impl StateBackend for ValkeyStateBackend {
 
         self.with_retry(|| {
             let mut conn = conn.clone();
-            Box::pin(async move {
-                redis::cmd("PING").query_async(&mut conn).await
-            })
+            Box::pin(async move { redis::cmd("PING").query_async(&mut conn).await })
         })
         .await
     }
@@ -290,8 +280,7 @@ mod tests {
     // Or: redis-server
 
     async fn create_test_backend() -> ValkeyStateBackend {
-        let config = ValkeyConfig::new("redis://localhost:6379")
-            .with_key_prefix("test:");
+        let config = ValkeyConfig::new("redis://localhost:6379").with_key_prefix("test:");
 
         ValkeyStateBackend::new(config).await.unwrap()
     }
@@ -400,7 +389,10 @@ mod tests {
 
         backend.set("exp_key", b"value", None).await.unwrap();
 
-        let result = backend.expire("exp_key", Duration::from_secs(1)).await.unwrap();
+        let result = backend
+            .expire("exp_key", Duration::from_secs(1))
+            .await
+            .unwrap();
         assert!(result);
 
         // Wait for expiration

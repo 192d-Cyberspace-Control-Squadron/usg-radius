@@ -23,8 +23,8 @@ pub struct SharedRateLimitConfig {
 impl Default for SharedRateLimitConfig {
     fn default() -> Self {
         SharedRateLimitConfig {
-            per_client_limit: 100,              // 100 requests per window per client
-            global_limit: 1000,                 // 1000 requests per window globally
+            per_client_limit: 100,                   // 100 requests per window per client
+            global_limit: 1000,                      // 1000 requests per window globally
             window_duration: Duration::from_secs(1), // 1 second window
         }
     }
@@ -164,8 +164,7 @@ impl SharedRateLimiter {
         // Try to get the value as a string first
         match self.session_manager.backend.get(&client_key).await {
             Ok(Some(bytes)) => {
-                let s = String::from_utf8(bytes)
-                    .map_err(|e| format!("Invalid UTF-8: {}", e))?;
+                let s = String::from_utf8(bytes).map_err(|e| format!("Invalid UTF-8: {}", e))?;
                 s.parse::<i64>()
                     .map_err(|e| format!("Invalid integer: {}", e))
             }
@@ -181,8 +180,7 @@ impl SharedRateLimiter {
 
         match self.session_manager.backend.get(&global_key).await {
             Ok(Some(bytes)) => {
-                let s = String::from_utf8(bytes)
-                    .map_err(|e| format!("Invalid UTF-8: {}", e))?;
+                let s = String::from_utf8(bytes).map_err(|e| format!("Invalid UTF-8: {}", e))?;
                 s.parse::<i64>()
                     .map_err(|e| format!("Invalid integer: {}", e))
             }
@@ -220,7 +218,11 @@ impl SharedRateLimiter {
     /// Uses INCR for atomic increment, then sets TTL if this is the first increment.
     async fn increment_counter(&self, key: &str) -> Result<i64, String> {
         // Atomic increment
-        let count = self.session_manager.backend.incr(key).await
+        let count = self
+            .session_manager
+            .backend
+            .incr(key)
+            .await
             .map_err(|e| format!("INCR failed: {}", e))?;
 
         // Set TTL if this is the first increment (count == 1)
@@ -229,7 +231,10 @@ impl SharedRateLimiter {
             // Add a buffer to TTL to ensure cleanup even if clocks drift slightly
             let ttl = self.config.window_duration + Duration::from_secs(60);
 
-            self.session_manager.backend.expire(key, ttl).await
+            self.session_manager
+                .backend
+                .expire(key, ttl)
+                .await
                 .map_err(|e| format!("EXPIRE failed: {}", e))?;
         }
 
@@ -266,11 +271,18 @@ mod tests {
 
         // Should allow 5 requests
         for i in 1..=5 {
-            assert!(limiter.check_rate_limit(ip).await, "Request {} should be allowed", i);
+            assert!(
+                limiter.check_rate_limit(ip).await,
+                "Request {} should be allowed",
+                i
+            );
         }
 
         // 6th request should be denied
-        assert!(!limiter.check_rate_limit(ip).await, "Request 6 should be denied");
+        assert!(
+            !limiter.check_rate_limit(ip).await,
+            "Request 6 should be denied"
+        );
     }
 
     #[tokio::test]

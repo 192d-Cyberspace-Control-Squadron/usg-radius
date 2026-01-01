@@ -241,7 +241,8 @@ impl LdapPool {
 
     /// Record a successful connection to a server
     fn record_success(&self, url: &str) {
-        let mut entry = self.server_health
+        let mut entry = self
+            .server_health
             .entry(url.to_string())
             .or_insert_with(ServerHealthInfo::default);
 
@@ -250,7 +251,9 @@ impl LdapPool {
         entry.last_success = Some(std::time::Instant::now());
 
         // Transition to Up state if enough successes
-        if entry.state == ServerHealth::Down && entry.consecutive_successes >= self.successes_before_up {
+        if entry.state == ServerHealth::Down
+            && entry.consecutive_successes >= self.successes_before_up
+        {
             info!(url = %url, "LDAP server recovered");
             entry.state = ServerHealth::Up;
         }
@@ -258,7 +261,8 @@ impl LdapPool {
 
     /// Record a failed connection to a server
     fn record_failure(&self, url: &str) {
-        let mut entry = self.server_health
+        let mut entry = self
+            .server_health
             .entry(url.to_string())
             .or_insert_with(ServerHealthInfo::default);
 
@@ -267,7 +271,9 @@ impl LdapPool {
         entry.last_failure = Some(std::time::Instant::now());
 
         // Transition to Down state if enough failures
-        if entry.state == ServerHealth::Up && entry.consecutive_failures >= self.failures_before_down {
+        if entry.state == ServerHealth::Up
+            && entry.consecutive_failures >= self.failures_before_down
+        {
             warn!(url = %url, "LDAP server marked as down after {} failures", self.failures_before_down);
             entry.state = ServerHealth::Down;
         }
@@ -308,13 +314,11 @@ impl LdapPool {
     pub async fn acquire(&self) -> Result<LdapConnection, LdapError> {
         // Acquire permit from semaphore (blocks if pool is full)
         let acquire_timeout = Duration::from_secs(self.config.acquire_timeout);
-        let permit = tokio::time::timeout(
-            acquire_timeout,
-            Arc::clone(&self.semaphore).acquire_owned()
-        )
-            .await
-            .map_err(|_| LdapError::Connection("Connection pool timeout".to_string()))?
-            .map_err(|e| LdapError::Connection(format!("Failed to acquire permit: {}", e)))?;
+        let permit =
+            tokio::time::timeout(acquire_timeout, Arc::clone(&self.semaphore).acquire_owned())
+                .await
+                .map_err(|_| LdapError::Connection("Connection pool timeout".to_string()))?
+                .map_err(|e| LdapError::Connection(format!("Failed to acquire permit: {}", e)))?;
 
         debug!("Acquired LDAP connection from pool");
 
@@ -347,13 +351,14 @@ impl LdapPool {
         }
 
         // All servers failed
-        Err(last_error.unwrap_or_else(|| LdapError::Connection("No LDAP servers configured".to_string())))
+        Err(last_error
+            .unwrap_or_else(|| LdapError::Connection("No LDAP servers configured".to_string())))
     }
 
     /// Try to connect to a specific server and bind with service account
     async fn try_connect_and_bind(&self, server_url: &str) -> Result<ldap3::Ldap, LdapError> {
-        let settings = LdapConnSettings::new()
-            .set_conn_timeout(Duration::from_secs(self.config.timeout));
+        let settings =
+            LdapConnSettings::new().set_conn_timeout(Duration::from_secs(self.config.timeout));
 
         let (conn, mut ldap) = LdapConnAsync::with_settings(settings, server_url)
             .await
@@ -394,7 +399,11 @@ impl LdapPool {
     /// User authentication requires binding with user credentials, so we create
     /// a separate connection that doesn't affect the pool.
     /// Automatically tries servers in order with failover support.
-    pub async fn connect_for_auth(&self, user_dn: &str, password: &str) -> Result<ldap3::Ldap, LdapError> {
+    pub async fn connect_for_auth(
+        &self,
+        user_dn: &str,
+        password: &str,
+    ) -> Result<ldap3::Ldap, LdapError> {
         debug!(dn = %user_dn, "Creating LDAP connection for user authentication");
 
         // Try servers in prioritized order (healthy first)
@@ -404,8 +413,8 @@ impl LdapPool {
         for server_url in servers {
             debug!(url = %server_url, dn = %user_dn, "Attempting user authentication");
 
-            let settings = LdapConnSettings::new()
-                .set_conn_timeout(Duration::from_secs(self.config.timeout));
+            let settings =
+                LdapConnSettings::new().set_conn_timeout(Duration::from_secs(self.config.timeout));
 
             match LdapConnAsync::with_settings(settings, &server_url).await {
                 Ok((conn, mut ldap)) => {
@@ -451,7 +460,8 @@ impl LdapPool {
         }
 
         // All servers failed
-        Err(last_error.unwrap_or_else(|| LdapError::Connection("No LDAP servers configured".to_string())))
+        Err(last_error
+            .unwrap_or_else(|| LdapError::Connection("No LDAP servers configured".to_string())))
     }
 }
 
@@ -543,7 +553,8 @@ impl LdapAuthHandler {
         let user_dn = entry.dn.clone();
 
         // Cache user attributes for later retrieval
-        self.user_attrs_cache.insert(username.to_string(), entry.attrs.clone());
+        self.user_attrs_cache
+            .insert(username.to_string(), entry.attrs.clone());
 
         debug!(
             username = %username,

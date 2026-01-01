@@ -101,8 +101,9 @@ impl SharedSessionManager {
         ttl: Option<Duration>,
     ) -> Result<(), StateError> {
         // Serialize session
-        let bytes = serde_json::to_vec(session)
-            .map_err(|e| StateError::SerializationError(format!("Failed to serialize EAP session: {}", e)))?;
+        let bytes = serde_json::to_vec(session).map_err(|e| {
+            StateError::SerializationError(format!("Failed to serialize EAP session: {}", e))
+        })?;
 
         // Store in backend
         let key = format!("eap_session:{}", session_id);
@@ -123,8 +124,12 @@ impl SharedSessionManager {
         if let Some(cached) = self.local_cache.get(&key) {
             if !cached.is_expired(self.cache_ttl) {
                 // Cache hit - deserialize and return
-                let session = serde_json::from_slice(&cached.session)
-                    .map_err(|e| StateError::SerializationError(format!("Failed to deserialize EAP session: {}", e)))?;
+                let session = serde_json::from_slice(&cached.session).map_err(|e| {
+                    StateError::SerializationError(format!(
+                        "Failed to deserialize EAP session: {}",
+                        e
+                    ))
+                })?;
                 return Ok(Some(session));
             } else {
                 // Expired - remove from cache
@@ -135,8 +140,9 @@ impl SharedSessionManager {
 
         // 2. Cache miss - fetch from backend
         if let Some(bytes) = self.backend.get(&key).await? {
-            let session = serde_json::from_slice(&bytes)
-                .map_err(|e| StateError::SerializationError(format!("Failed to deserialize EAP session: {}", e)))?;
+            let session = serde_json::from_slice(&bytes).map_err(|e| {
+                StateError::SerializationError(format!("Failed to deserialize EAP session: {}", e))
+            })?;
 
             // 3. Update local cache
             self.local_cache.insert(key, CachedSession::new(bytes));
@@ -169,8 +175,9 @@ impl SharedSessionManager {
         ttl: Option<Duration>,
     ) -> Result<(), StateError> {
         // Serialize session
-        let bytes = serde_json::to_vec(session)
-            .map_err(|e| StateError::SerializationError(format!("Failed to serialize accounting session: {}", e)))?;
+        let bytes = serde_json::to_vec(session).map_err(|e| {
+            StateError::SerializationError(format!("Failed to serialize accounting session: {}", e))
+        })?;
 
         // Store in backend
         let key = format!("acct_session:{}", session_id);
@@ -190,8 +197,12 @@ impl SharedSessionManager {
         if let Some(cached) = self.local_cache.get(&key) {
             if !cached.is_expired(self.cache_ttl) {
                 // Cache hit - deserialize and return
-                let session = serde_json::from_slice(&cached.session)
-                    .map_err(|e| StateError::SerializationError(format!("Failed to deserialize accounting session: {}", e)))?;
+                let session = serde_json::from_slice(&cached.session).map_err(|e| {
+                    StateError::SerializationError(format!(
+                        "Failed to deserialize accounting session: {}",
+                        e
+                    ))
+                })?;
                 return Ok(Some(session));
             } else {
                 // Expired - remove from cache
@@ -202,8 +213,12 @@ impl SharedSessionManager {
 
         // 2. Cache miss - fetch from backend
         if let Some(bytes) = self.backend.get(&key).await? {
-            let session = serde_json::from_slice(&bytes)
-                .map_err(|e| StateError::SerializationError(format!("Failed to deserialize accounting session: {}", e)))?;
+            let session = serde_json::from_slice(&bytes).map_err(|e| {
+                StateError::SerializationError(format!(
+                    "Failed to deserialize accounting session: {}",
+                    e
+                ))
+            })?;
 
             // 3. Update local cache
             self.local_cache.insert(key, CachedSession::new(bytes));
@@ -230,7 +245,11 @@ impl SharedSessionManager {
     /// Check if a request is a duplicate (cluster-wide deduplication)
     ///
     /// Uses atomic SET NX to ensure cluster-wide uniqueness.
-    pub async fn is_duplicate_request(&self, fingerprint: &str, ttl: Duration) -> Result<bool, StateError> {
+    pub async fn is_duplicate_request(
+        &self,
+        fingerprint: &str,
+        ttl: Duration,
+    ) -> Result<bool, StateError> {
         let key = format!("req_cache:{}", fingerprint);
 
         // Atomic SET NX (only set if not exists)

@@ -5,8 +5,8 @@
 
 use dashmap::DashMap;
 use std::net::IpAddr;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use tokio::time;
 use tracing::debug;

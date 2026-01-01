@@ -355,7 +355,10 @@ async fn test_e2e_simple_auth_accept_attributes() {
         .attributes
         .iter()
         .find(|attr| attr.attr_type == AttributeType::ServiceType as u8);
-    assert!(service_type.is_some(), "Service-Type attribute should be present");
+    assert!(
+        service_type.is_some(),
+        "Service-Type attribute should be present"
+    );
 
     // Check for Session-Timeout attribute (type 27)
     let session_timeout = response

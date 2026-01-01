@@ -149,7 +149,12 @@ impl StateBackend for MemoryStateBackend {
         Ok(matching_keys)
     }
 
-    async fn set_nx(&self, key: &str, value: &[u8], ttl: Option<Duration>) -> Result<bool, StateError> {
+    async fn set_nx(
+        &self,
+        key: &str,
+        value: &[u8],
+        ttl: Option<Duration>,
+    ) -> Result<bool, StateError> {
         let mut store = self.store.write().await;
 
         // Check if key exists and is not expired
@@ -270,7 +275,10 @@ mod tests {
         let backend = MemoryStateBackend::new();
 
         // Set with 100ms TTL
-        backend.set("key1", b"value1", Some(Duration::from_millis(100))).await.unwrap();
+        backend
+            .set("key1", b"value1", Some(Duration::from_millis(100)))
+            .await
+            .unwrap();
 
         // Should exist immediately
         assert!(backend.exists("key1").await.unwrap());
@@ -320,7 +328,10 @@ mod tests {
         let backend = MemoryStateBackend::new();
 
         // Set with short TTL
-        backend.set("key1", b"value1", Some(Duration::from_millis(50))).await.unwrap();
+        backend
+            .set("key1", b"value1", Some(Duration::from_millis(50)))
+            .await
+            .unwrap();
 
         // Wait for expiration
         tokio::time::sleep(Duration::from_millis(100)).await;
@@ -358,7 +369,10 @@ mod tests {
         backend.set("key1", b"value1", None).await.unwrap();
 
         // Add expiration
-        let result = backend.expire("key1", Duration::from_millis(100)).await.unwrap();
+        let result = backend
+            .expire("key1", Duration::from_millis(100))
+            .await
+            .unwrap();
         assert!(result);
 
         // Should exist immediately
@@ -375,7 +389,10 @@ mod tests {
     async fn test_expire_nonexistent() {
         let backend = MemoryStateBackend::new();
 
-        let result = backend.expire("nonexistent", Duration::from_secs(60)).await.unwrap();
+        let result = backend
+            .expire("nonexistent", Duration::from_secs(60))
+            .await
+            .unwrap();
         assert!(!result);
     }
 
@@ -383,7 +400,10 @@ mod tests {
     async fn test_cleanup_expired() {
         let backend = MemoryStateBackend::new();
 
-        backend.set("key1", b"v1", Some(Duration::from_millis(50))).await.unwrap();
+        backend
+            .set("key1", b"v1", Some(Duration::from_millis(50)))
+            .await
+            .unwrap();
         backend.set("key2", b"v2", None).await.unwrap();
 
         assert_eq!(backend.len().await, 2);

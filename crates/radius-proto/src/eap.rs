@@ -1532,9 +1532,9 @@ pub mod eap_tls {
         /// # Ok::<(), Box<dyn std::error::Error>>(())
         /// ```
         pub fn get_connection_mut(&mut self) -> Result<&mut rustls::ServerConnection, EapError> {
-            self.connection
-                .as_mut()
-                .ok_or(EapError::TlsError("TLS connection not initialized".to_string()))
+            self.connection.as_mut().ok_or(EapError::TlsError(
+                "TLS connection not initialized".to_string(),
+            ))
         }
 
         /// Verify client certificate identity matches EAP identity

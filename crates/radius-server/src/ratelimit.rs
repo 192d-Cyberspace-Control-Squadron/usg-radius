@@ -432,7 +432,10 @@ impl RateLimiter {
     ///
     /// Useful for monitoring and debugging rate limit state.
     pub fn get_tracked_clients(&self) -> Vec<IpAddr> {
-        self.client_buckets.iter().map(|entry| *entry.key()).collect()
+        self.client_buckets
+            .iter()
+            .map(|entry| *entry.key())
+            .collect()
     }
 
     /// Get detailed statistics for all tracked clients

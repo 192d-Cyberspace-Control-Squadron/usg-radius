@@ -10,8 +10,8 @@ use crate::proxy::error::{ProxyError, ProxyResult};
 use crate::proxy::home_server::{HomeServer, HomeServerConfig};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// Load balancing strategy
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -179,31 +179,19 @@ impl HomeServerPool {
     /// Get pool statistics
     pub fn stats(&self) -> PoolStats {
         let total_servers = self.servers.len();
-        let available_servers = self
-            .servers
-            .iter()
-            .filter(|s| s.is_available())
-            .count();
+        let available_servers = self.servers.iter().filter(|s| s.is_available()).count();
         let servers_with_capacity = self
             .servers
             .iter()
             .filter(|s| s.is_available() && s.has_capacity())
             .count();
-        let total_requests: u64 = self
-            .servers
-            .iter()
-            .map(|s| s.stats().requests_sent())
-            .sum();
+        let total_requests: u64 = self.servers.iter().map(|s| s.stats().requests_sent()).sum();
         let total_responses: u64 = self
             .servers
             .iter()
             .map(|s| s.stats().responses_received())
             .sum();
-        let total_outstanding: u64 = self
-            .servers
-            .iter()
-            .map(|s| s.stats().outstanding())
-            .sum();
+        let total_outstanding: u64 = self.servers.iter().map(|s| s.stats().outstanding()).sum();
 
         PoolStats {
             total_servers,
@@ -237,7 +225,11 @@ pub struct PoolStats {
 mod tests {
     use super::*;
 
-    fn create_test_pool_config(name: &str, num_servers: usize, strategy: LoadBalanceStrategy) -> HomeServerPoolConfig {
+    fn create_test_pool_config(
+        name: &str,
+        num_servers: usize,
+        strategy: LoadBalanceStrategy,
+    ) -> HomeServerPoolConfig {
         let servers = (0..num_servers)
             .map(|i| HomeServerConfig {
                 address: format!("127.0.0.1:180{}", i),
@@ -366,6 +358,9 @@ mod tests {
 
     #[test]
     fn test_load_balance_strategy_default() {
-        assert_eq!(LoadBalanceStrategy::default(), LoadBalanceStrategy::RoundRobin);
+        assert_eq!(
+            LoadBalanceStrategy::default(),
+            LoadBalanceStrategy::RoundRobin
+        );
     }
 }

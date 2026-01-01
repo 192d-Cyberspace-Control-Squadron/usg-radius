@@ -1,6 +1,6 @@
 //! Proxy handler for request forwarding and response routing
 
-use crate::proxy::cache::{generate_proxy_state_key, ProxyCache, ProxyCacheEntry, ProxyStateKey};
+use crate::proxy::cache::{ProxyCache, ProxyCacheEntry, ProxyStateKey, generate_proxy_state_key};
 use crate::proxy::error::{ProxyError, ProxyResult};
 use crate::proxy::home_server::HomeServer;
 use radius_proto::attributes::{Attribute, AttributeType};
@@ -81,8 +81,9 @@ impl ProxyHandler {
 
         // Add Proxy-State attribute to request
         request.add_attribute(
-            Attribute::new(AttributeType::ProxyState as u8, proxy_state.to_vec())
-                .map_err(|e| ProxyError::Configuration(format!("Failed to create Proxy-State attribute: {}", e)))?,
+            Attribute::new(AttributeType::ProxyState as u8, proxy_state.to_vec()).map_err(|e| {
+                ProxyError::Configuration(format!("Failed to create Proxy-State attribute: {}", e))
+            })?,
         );
 
         // Create cache entry
@@ -101,7 +102,9 @@ impl ProxyHandler {
 
         // Encode and send request to home server
         let request_data = request.encode()?;
-        self.socket.send_to(&request_data, home_server.address).await?;
+        self.socket
+            .send_to(&request_data, home_server.address)
+            .await?;
 
         // Record statistics
         home_server.stats().record_request();
@@ -229,9 +232,7 @@ mod tests {
 
     fn create_test_request() -> Packet {
         let mut packet = Packet::new(Code::AccessRequest, 1, [0u8; 16]);
-        packet.add_attribute(
-            Attribute::string(AttributeType::UserName as u8, "testuser").unwrap(),
-        );
+        packet.add_attribute(Attribute::string(AttributeType::UserName as u8, "testuser").unwrap());
         packet
     }
 
@@ -257,7 +258,12 @@ mod tests {
 
         // Forward request
         let proxy_state = handler
-            .forward_request(request.clone(), source, home_server, b"test_secret".to_vec())
+            .forward_request(
+                request.clone(),
+                source,
+                home_server,
+                b"test_secret".to_vec(),
+            )
             .await
             .unwrap();
 
@@ -289,7 +295,9 @@ mod tests {
         let source: SocketAddr = "192.168.1.100:12345".parse().unwrap();
 
         // Should detect loop
-        let result = handler.forward_request(request, source, home_server, b"test_secret".to_vec()).await;
+        let result = handler
+            .forward_request(request, source, home_server, b"test_secret".to_vec())
+            .await;
         assert!(result.is_err());
         match result {
             Err(ProxyError::ProxyLoop(count, limit)) => {
@@ -312,13 +320,23 @@ mod tests {
 
         // First request should succeed
         let result = handler
-            .forward_request(create_test_request(), source, home_server.clone(), b"test_secret".to_vec())
+            .forward_request(
+                create_test_request(),
+                source,
+                home_server.clone(),
+                b"test_secret".to_vec(),
+            )
             .await;
         assert!(result.is_ok());
 
         // Second request should fail (cache full)
         let result = handler
-            .forward_request(create_test_request(), source, home_server, b"test_secret".to_vec())
+            .forward_request(
+                create_test_request(),
+                source,
+                home_server,
+                b"test_secret".to_vec(),
+            )
             .await;
         assert!(result.is_err());
         match result {

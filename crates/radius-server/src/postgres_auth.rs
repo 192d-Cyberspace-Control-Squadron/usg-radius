@@ -38,7 +38,7 @@ use crate::server::AuthHandler;
 use dashmap::DashMap;
 use radius_proto::attributes::Attribute;
 use serde::{Deserialize, Serialize};
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use sqlx::Row;
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use std::sync::Arc;

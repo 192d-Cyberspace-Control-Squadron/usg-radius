@@ -176,12 +176,19 @@ fn test_config_json_serialization() {
 /// This test uses the generated test PKI in tests/pki/ to verify CRL parsing
 #[test]
 fn test_real_crl_parsing() {
-    use std::path::Path;
     use std::fs;
+    use std::path::Path;
 
     // Ensure test PKI exists (relative to workspace root)
     let workspace_root = std::env::var("CARGO_MANIFEST_DIR")
-        .map(|p| Path::new(&p).parent().unwrap().parent().unwrap().to_path_buf())
+        .map(|p| {
+            Path::new(&p)
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .to_path_buf()
+        })
         .unwrap();
     let crl_path = workspace_root.join("tests/pki/crls/intermediate-ca-empty.crl.der");
     assert!(
@@ -227,21 +234,24 @@ fn test_real_crl_parsing() {
 /// revoked certificates by their serial number.
 #[test]
 fn test_revoked_certificate_detection() {
-    use std::path::Path;
     use std::fs;
+    use std::path::Path;
 
     // Ensure test PKI exists (relative to workspace root)
     let workspace_root = std::env::var("CARGO_MANIFEST_DIR")
-        .map(|p| Path::new(&p).parent().unwrap().parent().unwrap().to_path_buf())
+        .map(|p| {
+            Path::new(&p)
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .to_path_buf()
+        })
         .unwrap();
     let crl_path = workspace_root.join("tests/pki/crls/intermediate-ca.crl.der");
     let revoked_cert_path = workspace_root.join("tests/pki/certs/client-revoked.crt.der");
 
-    assert!(
-        crl_path.exists(),
-        "Test CRL not found at {:?}",
-        crl_path
-    );
+    assert!(crl_path.exists(), "Test CRL not found at {:?}", crl_path);
     assert!(
         revoked_cert_path.exists(),
         "Test revoked certificate not found at {:?}",
@@ -269,14 +279,11 @@ fn test_revoked_certificate_detection() {
 
     // Verify the certificate's serial is in the CRL
     let cert_serial = cert.serial.to_bytes_be();
-    let is_revoked = revoked_certs.iter().any(|revoked| {
-        revoked.raw_serial() == cert_serial.as_slice()
-    });
+    let is_revoked = revoked_certs
+        .iter()
+        .any(|revoked| revoked.raw_serial() == cert_serial.as_slice());
 
-    assert!(
-        is_revoked,
-        "Revoked certificate serial should be in CRL"
-    );
+    assert!(is_revoked, "Revoked certificate serial should be in CRL");
 }
 
 /// Integration test with CRL caching
@@ -466,12 +473,12 @@ fn test_production_ocsp_configuration_example() {
         },
         ocsp_config: OcspConfig {
             enabled: true,
-            http_timeout_secs: 5,      // 5 second timeout for OCSP
-            cache_ttl_secs: 3600,      // Cache responses for 1 hour
-            max_cache_entries: 100,    // Cache up to 100 responses
-            enable_nonce: true,        // Enable replay protection
+            http_timeout_secs: 5,   // 5 second timeout for OCSP
+            cache_ttl_secs: 3600,   // Cache responses for 1 hour
+            max_cache_entries: 100, // Cache up to 100 responses
+            enable_nonce: true,     // Enable replay protection
             max_response_size_bytes: 1 * 1024 * 1024, // 1 MB limit
-            prefer_ocsp: true,         // Prefer OCSP over CRL
+            prefer_ocsp: true,      // Prefer OCSP over CRL
         },
     };
 
@@ -496,12 +503,19 @@ fn test_production_ocsp_configuration_example() {
 #[test]
 fn test_ocsp_request_building() {
     use radius_proto::revocation::ocsp::OcspRequestBuilder;
-    use std::path::Path;
     use std::fs;
+    use std::path::Path;
 
     // Use test PKI if available
     let workspace_root = std::env::var("CARGO_MANIFEST_DIR")
-        .map(|p| Path::new(&p).parent().unwrap().parent().unwrap().to_path_buf())
+        .map(|p| {
+            Path::new(&p)
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .to_path_buf()
+        })
         .unwrap();
     let cert_path = workspace_root.join("tests/pki/certs/client.crt.der");
     let issuer_path = workspace_root.join("tests/pki/certs/intermediate-ca.crt.der");
@@ -534,12 +548,19 @@ fn test_ocsp_request_building() {
 #[test]
 fn test_ocsp_url_extraction() {
     use radius_proto::revocation::ocsp::OcspClient;
-    use std::path::Path;
     use std::fs;
+    use std::path::Path;
 
     // Use test PKI if available
     let workspace_root = std::env::var("CARGO_MANIFEST_DIR")
-        .map(|p| Path::new(&p).parent().unwrap().parent().unwrap().to_path_buf())
+        .map(|p| {
+            Path::new(&p)
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .to_path_buf()
+        })
         .unwrap();
     let cert_path = workspace_root.join("tests/pki/certs/client.crt.der");
 
@@ -589,7 +610,7 @@ fn test_ocsp_response_parsing() {
 /// Integration test for OCSP cache
 #[test]
 fn test_ocsp_cache_integration() {
-    use radius_proto::revocation::ocsp::{OcspResponse, OcspResponseStatus, CertificateStatus};
+    use radius_proto::revocation::ocsp::{CertificateStatus, OcspResponse, OcspResponseStatus};
     use radius_proto::revocation::ocsp_cache::OcspCache;
     use std::time::SystemTime;
 
@@ -627,4 +648,3 @@ fn test_ocsp_cache_integration() {
 // - test_ocsp_fallback_to_crl: Test PreferOcsp mode fallback behavior
 // - test_ocsp_and_crl_both: Test Both mode with conflicting results
 // - test_ocsp_signature_verification: Test response signature validation (when implemented)
-

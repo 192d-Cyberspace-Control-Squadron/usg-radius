@@ -42,9 +42,15 @@ impl HomeServerConfig {
     /// Validate configuration
     pub fn validate(&self) -> ProxyResult<()> {
         // Parse address to validate format
-        let _: SocketAddr = self.address.parse().map_err(|e: std::net::AddrParseError| {
-            ProxyError::Configuration(format!("Invalid home server address '{}': {}", self.address, e))
-        })?;
+        let _: SocketAddr = self
+            .address
+            .parse()
+            .map_err(|e: std::net::AddrParseError| {
+                ProxyError::Configuration(format!(
+                    "Invalid home server address '{}': {}",
+                    self.address, e
+                ))
+            })?;
 
         if self.secret.is_empty() {
             return Err(ProxyError::Configuration(
@@ -148,10 +154,7 @@ impl HomeServerStats {
 
     /// Get time since last response
     pub fn time_since_last_response(&self) -> Option<Duration> {
-        self.last_response
-            .read()
-            .unwrap()
-            .map(|t| t.elapsed())
+        self.last_response.read().unwrap().map(|t| t.elapsed())
     }
 }
 
@@ -181,9 +184,7 @@ impl HomeServer {
         config.validate()?;
 
         let address: SocketAddr = config.address.parse()?;
-        let name = config
-            .name
-            .unwrap_or_else(|| config.address.clone());
+        let name = config.name.unwrap_or_else(|| config.address.clone());
 
         Ok(HomeServer {
             name,

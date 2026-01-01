@@ -1092,7 +1092,10 @@ impl EapTeapServer {
                                 let mut tlv_for_mac = cb_tlv_data.clone();
                                 tlv_for_mac.compound_mac = vec![0u8; 32];
                                 let tlv_bytes = tlv_for_mac.to_tlv().to_bytes();
-                                let compound_mac = CryptoBinding::calculate_compound_mac(&crypto_binding.cmk, &tlv_bytes);
+                                let compound_mac = CryptoBinding::calculate_compound_mac(
+                                    &crypto_binding.cmk,
+                                    &tlv_bytes,
+                                );
 
                                 let cb_tlv = CryptoBindingTlv {
                                     compound_mac,
@@ -1124,7 +1127,8 @@ impl EapTeapServer {
                                     // Send crypto-binding
                                     let session_key_seed = vec![0u8; 32];
                                     let imsk = vec![0u8; 32];
-                                    let crypto_binding = CryptoBinding::new(&session_key_seed, &imsk);
+                                    let crypto_binding =
+                                        CryptoBinding::new(&session_key_seed, &imsk);
 
                                     // Create Crypto-Binding TLV Request
                                     let cb_tlv_data = CryptoBindingTlv {
@@ -1139,7 +1143,10 @@ impl EapTeapServer {
                                     let mut tlv_for_mac = cb_tlv_data.clone();
                                     tlv_for_mac.compound_mac = vec![0u8; 32];
                                     let tlv_bytes = tlv_for_mac.to_tlv().to_bytes();
-                                    let compound_mac = CryptoBinding::calculate_compound_mac(&crypto_binding.cmk, &tlv_bytes);
+                                    let compound_mac = CryptoBinding::calculate_compound_mac(
+                                        &crypto_binding.cmk,
+                                        &tlv_bytes,
+                                    );
 
                                     let cb_tlv = CryptoBindingTlv {
                                         compound_mac,
@@ -2306,7 +2313,9 @@ mod tests {
 
         // Step 2: Identity response -> Password request
         let identity_response = IdentityType::User.to_tlv();
-        let result2 = server.process_phase2_tlvs_test(&[identity_response]).unwrap();
+        let result2 = server
+            .process_phase2_tlvs_test(&[identity_response])
+            .unwrap();
         assert!(result2.is_some());
         let tlvs2 = TeapTlv::parse_tlvs(&result2.unwrap()).unwrap();
         assert_eq!(tlvs2[0].get_type(), Some(TlvType::BasicPasswordAuthReq));
@@ -2319,7 +2328,9 @@ mod tests {
         value.extend_from_slice(b"secret");
         let password_response = TeapTlv::new(TlvType::BasicPasswordAuthResp, true, value);
 
-        let result3 = server.process_phase2_tlvs_test(&[password_response]).unwrap();
+        let result3 = server
+            .process_phase2_tlvs_test(&[password_response])
+            .unwrap();
         assert!(result3.is_some());
         assert_eq!(server.phase, TeapPhase::Phase2InnerAuth);
 
@@ -2650,7 +2661,9 @@ mod tests {
         let password_response = TeapTlv::new(TlvType::BasicPasswordAuthResp, true, value);
 
         // This should send crypto-binding request
-        let _result = server.process_phase2_tlvs_test(&[password_response]).unwrap();
+        let _result = server
+            .process_phase2_tlvs_test(&[password_response])
+            .unwrap();
 
         // Server should have crypto-binding context
         assert!(server.crypto_binding.is_some());
@@ -2720,7 +2733,9 @@ mod tests {
         let password_response = TeapTlv::new(TlvType::BasicPasswordAuthResp, true, value);
 
         // This should send crypto-binding request
-        let _result = server.process_phase2_tlvs_test(&[password_response]).unwrap();
+        let _result = server
+            .process_phase2_tlvs_test(&[password_response])
+            .unwrap();
 
         // Create INVALID crypto-binding response (wrong MAC)
         let cb_response = CryptoBindingTlv {
@@ -3001,7 +3016,9 @@ mod tests {
         );
         let identity_payload_tlv = EapPayloadTlv::new(identity_response.to_bytes()).to_tlv();
 
-        let result3 = server.process_phase2_tlvs_test(&[identity_payload_tlv]).unwrap();
+        let result3 = server
+            .process_phase2_tlvs_test(&[identity_payload_tlv])
+            .unwrap();
         assert!(result3.is_some());
         let tlvs3 = TeapTlv::parse_tlvs(&result3.unwrap()).unwrap();
         assert_eq!(tlvs3[0].get_type(), Some(TlvType::EapPayload));

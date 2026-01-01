@@ -267,7 +267,8 @@ mod tests {
     use std::time::SystemTime;
 
     fn create_test_response(next_update_secs: Option<u64>) -> OcspResponse {
-        let next_update = next_update_secs.map(|secs| SystemTime::now() + Duration::from_secs(secs));
+        let next_update =
+            next_update_secs.map(|secs| SystemTime::now() + Duration::from_secs(secs));
 
         OcspResponse {
             status: OcspResponseStatus::Successful,

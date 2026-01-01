@@ -48,18 +48,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config: Config = serde_json::from_str(&config_data)?;
 
     println!("✓ Configuration loaded");
-    println!("  Proxy enabled: {:?}", config.proxy.as_ref().map(|p| p.enabled));
+    println!(
+        "  Proxy enabled: {:?}",
+        config.proxy.as_ref().map(|p| p.enabled)
+    );
 
     if let Some(ref proxy) = config.proxy {
         if proxy.enabled {
             println!("  Pools configured: {}", proxy.pools.len());
             for pool in &proxy.pools {
-                println!("    - {}: {} servers ({})",
+                println!(
+                    "    - {}: {} servers ({})",
                     pool.name,
                     pool.servers.len(),
                     match pool.strategy {
-                        radius_server::proxy::pool::LoadBalanceStrategy::RoundRobin => "round-robin",
-                        radius_server::proxy::pool::LoadBalanceStrategy::LeastOutstanding => "least-outstanding",
+                        radius_server::proxy::pool::LoadBalanceStrategy::RoundRobin =>
+                            "round-robin",
+                        radius_server::proxy::pool::LoadBalanceStrategy::LeastOutstanding =>
+                            "least-outstanding",
                         radius_server::proxy::pool::LoadBalanceStrategy::Failover => "failover",
                         radius_server::proxy::pool::LoadBalanceStrategy::Random => "random",
                     }

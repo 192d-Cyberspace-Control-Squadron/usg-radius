@@ -40,9 +40,9 @@ pub mod session_manager;
 #[cfg(feature = "ha")]
 pub mod valkey;
 
-pub use config::{StateBackendType, StateConfig};
 #[cfg(feature = "ha")]
 pub use config::ValkeyConfig;
+pub use config::{StateBackendType, StateConfig};
 pub use error::StateError;
 pub use memory::MemoryStateBackend;
 pub use session_manager::{CacheStats, SharedSessionManager};
@@ -120,7 +120,12 @@ pub trait StateBackend: Send + Sync {
     /// Returns `true` if the key was set, `false` if it already existed.
     ///
     /// Used for distributed locking and request deduplication.
-    async fn set_nx(&self, key: &str, value: &[u8], ttl: Option<Duration>) -> Result<bool, StateError>;
+    async fn set_nx(
+        &self,
+        key: &str,
+        value: &[u8],
+        ttl: Option<Duration>,
+    ) -> Result<bool, StateError>;
 
     /// Atomic increment
     ///

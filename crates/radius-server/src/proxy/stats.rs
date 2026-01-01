@@ -156,9 +156,7 @@ impl ServerStatSnapshot {
             responses_received: stats.responses_received(),
             timeouts: stats.timeouts(),
             outstanding: stats.outstanding(),
-            time_since_last_response: stats
-                .time_since_last_response()
-                .map(|d| d.as_secs()),
+            time_since_last_response: stats.time_since_last_response().map(|d| d.as_secs()),
             health: ServerHealthStats {
                 total_checks: health_stats.total_checks(),
                 total_successes: health_stats.total_successes(),

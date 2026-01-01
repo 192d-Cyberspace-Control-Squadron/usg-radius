@@ -87,8 +87,8 @@
 use crate::revocation::error::RevocationError;
 use sha2::{Digest, Sha256};
 use std::time::{Duration, SystemTime};
-use x509_parser::prelude::*;
 use x509_parser::oid_registry::asn1_rs::oid;
+use x509_parser::prelude::*;
 
 /// OCSP response status (RFC 6960 Section 2.3)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -168,12 +168,14 @@ impl OcspRequestBuilder {
     /// - Issuer public key (for key hash)
     pub fn new(cert: &[u8], issuer: &[u8]) -> Result<Self, RevocationError> {
         // Parse the certificate to check
-        let (_, cert_parsed) = parse_x509_certificate(cert)
-            .map_err(|e| RevocationError::ParseError(format!("Failed to parse certificate: {}", e)))?;
+        let (_, cert_parsed) = parse_x509_certificate(cert).map_err(|e| {
+            RevocationError::ParseError(format!("Failed to parse certificate: {}", e))
+        })?;
 
         // Parse the issuer certificate
-        let (_, issuer_parsed) = parse_x509_certificate(issuer)
-            .map_err(|e| RevocationError::ParseError(format!("Failed to parse issuer certificate: {}", e)))?;
+        let (_, issuer_parsed) = parse_x509_certificate(issuer).map_err(|e| {
+            RevocationError::ParseError(format!("Failed to parse issuer certificate: {}", e))
+        })?;
 
         // Extract serial number from the certificate
         let serial_number = cert_parsed.serial.to_bytes_be();
@@ -512,22 +514,28 @@ impl OcspResponse {
         //     responseBytes   [0] EXPLICIT ResponseBytes OPTIONAL
         // }
 
-        let (_rem, ocsp_resp_seq) = der_parser::parse_der(der_bytes)
-            .map_err(|e| RevocationError::ParseError(format!("Failed to parse OCSP response: {:?}", e)))?;
+        let (_rem, ocsp_resp_seq) = der_parser::parse_der(der_bytes).map_err(|e| {
+            RevocationError::ParseError(format!("Failed to parse OCSP response: {:?}", e))
+        })?;
 
-        let ocsp_resp_seq = ocsp_resp_seq.as_sequence()
-            .map_err(|_| RevocationError::ParseError("OCSP response is not a SEQUENCE".to_string()))?;
+        let ocsp_resp_seq = ocsp_resp_seq.as_sequence().map_err(|_| {
+            RevocationError::ParseError("OCSP response is not a SEQUENCE".to_string())
+        })?;
 
         if ocsp_resp_seq.len() < 1 {
-            return Err(RevocationError::ParseError("OCSP response SEQUENCE is empty".to_string()));
+            return Err(RevocationError::ParseError(
+                "OCSP response SEQUENCE is empty".to_string(),
+            ));
         }
 
         // Extract responseStatus (ENUMERATED)
-        let status_int = ocsp_resp_seq[0].as_u32()
+        let status_int = ocsp_resp_seq[0]
+            .as_u32()
             .map_err(|_| RevocationError::ParseError("Invalid responseStatus".to_string()))?;
 
-        let status = OcspResponseStatus::from_u8(status_int as u8)
-            .ok_or_else(|| RevocationError::ParseError(format!("Unknown OCSP response status: {}", status_int)))?;
+        let status = OcspResponseStatus::from_u8(status_int as u8).ok_or_else(|| {
+            RevocationError::ParseError(format!("Unknown OCSP response status: {}", status_int))
+        })?;
 
         // If status is not Successful, return early with no cert status
         if status != OcspResponseStatus::Successful {
@@ -544,25 +552,31 @@ impl OcspResponse {
 
         // Parse responseBytes [0] EXPLICIT ResponseBytes
         if ocsp_resp_seq.len() < 2 {
-            return Err(RevocationError::ParseError("OCSP response missing responseBytes".to_string()));
+            return Err(RevocationError::ParseError(
+                "OCSP response missing responseBytes".to_string(),
+            ));
         }
 
         // responseBytes is [0] EXPLICIT, so it's a tagged structure
         let response_bytes = &ocsp_resp_seq[1];
 
         // Extract the content (should be a SEQUENCE)
-        let response_bytes_seq = response_bytes.as_sequence()
-            .map_err(|_| RevocationError::ParseError("responseBytes is not a SEQUENCE".to_string()))?;
+        let response_bytes_seq = response_bytes.as_sequence().map_err(|_| {
+            RevocationError::ParseError("responseBytes is not a SEQUENCE".to_string())
+        })?;
 
         if response_bytes_seq.len() < 2 {
-            return Err(RevocationError::ParseError("responseBytes SEQUENCE too short".to_string()));
+            return Err(RevocationError::ParseError(
+                "responseBytes SEQUENCE too short".to_string(),
+            ));
         }
 
         // responseType is an OID (should be BasicOCSPResponse: 1.3.6.1.5.5.7.48.1.1)
-        let response_type = response_bytes_seq[0].as_oid()
+        let response_type = response_bytes_seq[0]
+            .as_oid()
             .map_err(|_| RevocationError::ParseError("Invalid responseType OID".to_string()))?;
 
-        let basic_ocsp_oid = oid!(1.3.6 .1 .5 .5 .7 .48 .1 .1);
+        let basic_ocsp_oid = oid!(1.3.6.1.5.5.7.48.1.1);
         if *response_type != basic_ocsp_oid {
             return Err(RevocationError::ParseError(format!(
                 "Unsupported OCSP response type: {}",
@@ -571,23 +585,29 @@ impl OcspResponse {
         }
 
         // response is an OCTET STRING containing DER-encoded BasicOCSPResponse
-        let basic_resp_bytes = response_bytes_seq[1].as_slice()
+        let basic_resp_bytes = response_bytes_seq[1]
+            .as_slice()
             .map_err(|_| RevocationError::ParseError("Invalid response bytes".to_string()))?;
 
         // Parse BasicOCSPResponse from the OCTET STRING
-        let (_, basic_resp_der) = der_parser::parse_der(basic_resp_bytes)
-            .map_err(|e| RevocationError::ParseError(format!("Failed to parse BasicOCSPResponse: {:?}", e)))?;
+        let (_, basic_resp_der) = der_parser::parse_der(basic_resp_bytes).map_err(|e| {
+            RevocationError::ParseError(format!("Failed to parse BasicOCSPResponse: {:?}", e))
+        })?;
 
-        let basic_resp_seq = basic_resp_der.as_sequence()
-            .map_err(|_| RevocationError::ParseError("BasicOCSPResponse is not a SEQUENCE".to_string()))?;
+        let basic_resp_seq = basic_resp_der.as_sequence().map_err(|_| {
+            RevocationError::ParseError("BasicOCSPResponse is not a SEQUENCE".to_string())
+        })?;
 
         if basic_resp_seq.len() < 3 {
-            return Err(RevocationError::ParseError("BasicOCSPResponse SEQUENCE too short".to_string()));
+            return Err(RevocationError::ParseError(
+                "BasicOCSPResponse SEQUENCE too short".to_string(),
+            ));
         }
 
         // Extract tbsResponseData (SEQUENCE)
-        let tbs_response_data = basic_resp_seq[0].as_sequence()
-            .map_err(|_| RevocationError::ParseError("tbsResponseData is not a SEQUENCE".to_string()))?;
+        let tbs_response_data = basic_resp_seq[0].as_sequence().map_err(|_| {
+            RevocationError::ParseError("tbsResponseData is not a SEQUENCE".to_string())
+        })?;
 
         // Parse ResponseData
         // ResponseData ::= SEQUENCE {
@@ -609,25 +629,32 @@ impl OcspResponse {
         idx += 1;
 
         // producedAt (GeneralizedTime)
-        let produced_at_str = tbs_response_data[idx].as_str()
+        let produced_at_str = tbs_response_data[idx]
+            .as_str()
             .map_err(|_| RevocationError::ParseError("Invalid producedAt".to_string()))?;
         let produced_at = parse_generalized_time(produced_at_str)?;
         idx += 1;
 
         // responses SEQUENCE OF SingleResponse
-        let responses = tbs_response_data[idx].as_sequence()
+        let responses = tbs_response_data[idx]
+            .as_sequence()
             .map_err(|_| RevocationError::ParseError("responses is not a SEQUENCE".to_string()))?;
 
         if responses.is_empty() {
-            return Err(RevocationError::ParseError("No SingleResponse in OCSP response".to_string()));
+            return Err(RevocationError::ParseError(
+                "No SingleResponse in OCSP response".to_string(),
+            ));
         }
 
         // Parse first SingleResponse
-        let single_resp = responses[0].as_sequence()
-            .map_err(|_| RevocationError::ParseError("SingleResponse is not a SEQUENCE".to_string()))?;
+        let single_resp = responses[0].as_sequence().map_err(|_| {
+            RevocationError::ParseError("SingleResponse is not a SEQUENCE".to_string())
+        })?;
 
         if single_resp.len() < 3 {
-            return Err(RevocationError::ParseError("SingleResponse SEQUENCE too short".to_string()));
+            return Err(RevocationError::ParseError(
+                "SingleResponse SEQUENCE too short".to_string(),
+            ));
         }
 
         // certID (skip for now - we trust the responder)
@@ -636,7 +663,8 @@ impl OcspResponse {
         let cert_status = parse_cert_status(cert_status_der)?;
 
         // thisUpdate (GeneralizedTime)
-        let this_update_str = single_resp[2].as_str()
+        let this_update_str = single_resp[2]
+            .as_str()
             .map_err(|_| RevocationError::ParseError("Invalid thisUpdate".to_string()))?;
         let this_update = parse_generalized_time(this_update_str)?;
 
@@ -725,10 +753,7 @@ impl OcspResponse {
 
     /// Check if the certificate is revoked according to this response
     pub fn is_revoked(&self) -> bool {
-        matches!(
-            self.cert_status,
-            Some(CertificateStatus::Revoked { .. })
-        )
+        matches!(self.cert_status, Some(CertificateStatus::Revoked { .. }))
     }
 }
 
@@ -745,7 +770,9 @@ impl OcspResponse {
 ///     unknown     [2] IMPLICIT UnknownInfo
 /// }
 /// ```
-fn parse_cert_status(der: &der_parser::der::DerObject) -> Result<CertificateStatus, RevocationError> {
+fn parse_cert_status(
+    der: &der_parser::der::DerObject,
+) -> Result<CertificateStatus, RevocationError> {
     // Context-specific tags use the pattern: tag class (0b10) + tag number
     // [0] = 0x80, [1] = 0x81, [2] = 0x82
     match der.header.tag().0 {
@@ -758,14 +785,18 @@ fn parse_cert_status(der: &der_parser::der::DerObject) -> Result<CertificateStat
             //     revocationTime  GeneralizedTime,
             //     revocationReason [0] EXPLICIT CRLReason OPTIONAL
             // }
-            let revoked_seq = der.as_sequence()
-                .map_err(|_| RevocationError::ParseError("RevokedInfo is not a SEQUENCE".to_string()))?;
+            let revoked_seq = der.as_sequence().map_err(|_| {
+                RevocationError::ParseError("RevokedInfo is not a SEQUENCE".to_string())
+            })?;
 
             if revoked_seq.is_empty() {
-                return Err(RevocationError::ParseError("RevokedInfo SEQUENCE is empty".to_string()));
+                return Err(RevocationError::ParseError(
+                    "RevokedInfo SEQUENCE is empty".to_string(),
+                ));
             }
 
-            let revocation_time_str = revoked_seq[0].as_str()
+            let revocation_time_str = revoked_seq[0]
+                .as_str()
                 .map_err(|_| RevocationError::ParseError("Invalid revocationTime".to_string()))?;
             let revocation_time = parse_generalized_time(revocation_time_str)?;
 
@@ -806,7 +837,12 @@ fn parse_generalized_time(time_str: &str) -> Result<SystemTime, RevocationError>
     // Format: YYYYMMDDHHMMSS[.fff]Z or YYYYMMDDHHMMSS[.fff]+0000
     let datetime = DateTime::parse_from_str(time_str, "%Y%m%d%H%M%SZ")
         .or_else(|_| DateTime::parse_from_str(time_str, "%Y%m%d%H%M%S%.fZ"))
-        .map_err(|e| RevocationError::ParseError(format!("Failed to parse GeneralizedTime '{}': {}", time_str, e)))?;
+        .map_err(|e| {
+            RevocationError::ParseError(format!(
+                "Failed to parse GeneralizedTime '{}': {}",
+                time_str, e
+            ))
+        })?;
 
     let utc_datetime: DateTime<Utc> = datetime.into();
 
@@ -816,13 +852,16 @@ fn parse_generalized_time(time_str: &str) -> Result<SystemTime, RevocationError>
 /// Extract nonce from OCSP response extensions
 ///
 /// Returns Some(nonce_value) if nonce extension is found, None otherwise
-fn extract_nonce_from_extensions(extensions_seq: &[der_parser::der::DerObject]) -> Result<Option<Vec<u8>>, RevocationError> {
+fn extract_nonce_from_extensions(
+    extensions_seq: &[der_parser::der::DerObject],
+) -> Result<Option<Vec<u8>>, RevocationError> {
     // Nonce extension OID: 1.3.6.1.5.5.7.48.1.2
-    let nonce_oid = oid!(1.3.6 .1 .5 .5 .7 .48 .1 .2);
+    let nonce_oid = oid!(1.3.6.1.5.5.7.48.1.2);
 
     for ext_der in extensions_seq {
         // Each extension is a SEQUENCE
-        let ext_seq = ext_der.as_sequence()
+        let ext_seq = ext_der
+            .as_sequence()
             .map_err(|_| RevocationError::ParseError("Extension is not a SEQUENCE".to_string()))?;
 
         if ext_seq.len() < 2 {
@@ -830,21 +869,26 @@ fn extract_nonce_from_extensions(extensions_seq: &[der_parser::der::DerObject]) 
         }
 
         // extnID (OID)
-        let extn_id = ext_seq[0].as_oid()
+        let extn_id = ext_seq[0]
+            .as_oid()
             .map_err(|_| RevocationError::ParseError("Invalid extension OID".to_string()))?;
 
         if *extn_id == nonce_oid {
             // extnValue is an OCTET STRING containing the nonce
             // The nonce itself is also an OCTET STRING inside
-            let extn_value_bytes = ext_seq.last().unwrap().as_slice()
-                .map_err(|_| RevocationError::ParseError("Invalid extension value".to_string()))?;
+            let extn_value_bytes =
+                ext_seq.last().unwrap().as_slice().map_err(|_| {
+                    RevocationError::ParseError("Invalid extension value".to_string())
+                })?;
 
             // Parse the inner OCTET STRING
-            let (_, nonce_der) = der_parser::parse_der(extn_value_bytes)
-                .map_err(|e| RevocationError::ParseError(format!("Failed to parse nonce value: {:?}", e)))?;
+            let (_, nonce_der) = der_parser::parse_der(extn_value_bytes).map_err(|e| {
+                RevocationError::ParseError(format!("Failed to parse nonce value: {:?}", e))
+            })?;
 
-            let nonce_value = nonce_der.as_slice()
-                .map_err(|_| RevocationError::ParseError("Nonce value is not an OCTET STRING".to_string()))?;
+            let nonce_value = nonce_der.as_slice().map_err(|_| {
+                RevocationError::ParseError("Nonce value is not an OCTET STRING".to_string())
+            })?;
 
             return Ok(Some(nonce_value.to_vec()));
         }
@@ -892,9 +936,15 @@ impl OcspClient {
     ///
     /// # Returns
     /// DER-encoded OCSP response or error
-    pub fn query(&self, url: &str, request: &[u8], max_response_size: usize) -> Result<Vec<u8>, RevocationError> {
+    pub fn query(
+        &self,
+        url: &str,
+        request: &[u8],
+        max_response_size: usize,
+    ) -> Result<Vec<u8>, RevocationError> {
         // Send HTTP POST request
-        let response = self.http_client
+        let response = self
+            .http_client
             .post(url)
             .header("Content-Type", "application/ocsp-request")
             .header("Accept", "application/ocsp-response")
@@ -923,8 +973,9 @@ impl OcspClient {
         }
 
         // Read response body with size limit
-        let bytes = response.bytes()
-            .map_err(|e| RevocationError::HttpError(format!("Failed to read OCSP response body: {}", e)))?;
+        let bytes = response.bytes().map_err(|e| {
+            RevocationError::HttpError(format!("Failed to read OCSP response body: {}", e))
+        })?;
 
         if bytes.len() > max_response_size {
             return Err(RevocationError::HttpError(format!(
@@ -948,11 +999,12 @@ impl OcspClient {
     /// OCSP responder URL or error if not found
     pub fn extract_ocsp_url(cert: &[u8]) -> Result<String, RevocationError> {
         // Parse certificate
-        let (_, cert_parsed) = parse_x509_certificate(cert)
-            .map_err(|e| RevocationError::ParseError(format!("Failed to parse certificate: {}", e)))?;
+        let (_, cert_parsed) = parse_x509_certificate(cert).map_err(|e| {
+            RevocationError::ParseError(format!("Failed to parse certificate: {}", e))
+        })?;
 
         // Find Authority Information Access extension (OID 1.3.6.1.5.5.7.1.1)
-        let aia_oid = oid!(1.3.6 .1 .5 .5 .7 .1 .1);
+        let aia_oid = oid!(1.3.6.1.5.5.7.1.1);
 
         for ext in cert_parsed.extensions() {
             if ext.oid == aia_oid {
@@ -965,10 +1017,10 @@ impl OcspClient {
                 // OCSP access method OID is 1.3.6.1.5.5.7.48.1
 
                 // Use x509-parser's parsing
-                use x509_parser::extensions::{AuthorityInfoAccess, ParsedExtension, GeneralName};
+                use x509_parser::extensions::{AuthorityInfoAccess, GeneralName, ParsedExtension};
 
                 if let ParsedExtension::AuthorityInfoAccess(aia) = ext.parsed_extension() {
-                    let ocsp_oid = oid!(1.3.6 .1 .5 .5 .7 .48 .1);
+                    let ocsp_oid = oid!(1.3.6.1.5.5.7.48.1);
 
                     for access_desc in aia.accessdescs.iter() {
                         if access_desc.access_method == ocsp_oid {
@@ -983,7 +1035,7 @@ impl OcspClient {
         }
 
         Err(RevocationError::ParseError(
-            "No OCSP URL found in certificate AIA extension".to_string()
+            "No OCSP URL found in certificate AIA extension".to_string(),
         ))
     }
 }

@@ -15,8 +15,8 @@ use radius_proto::auth::{encrypt_user_password, generate_request_authenticator};
 use radius_proto::{Attribute, AttributeType, Code, Packet};
 use radius_server::{RadiusServer, ServerConfig, SimpleAuthHandler};
 use std::net::SocketAddr;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use tokio::net::UdpSocket;
 

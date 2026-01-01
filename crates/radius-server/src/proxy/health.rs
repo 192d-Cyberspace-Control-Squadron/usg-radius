@@ -8,8 +8,8 @@ use crate::proxy::home_server::{HomeServer, HomeServerState};
 use radius_proto::attributes::{Attribute, AttributeType};
 use radius_proto::{Code, Packet};
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 use tokio::net::UdpSocket;
 use tokio::time;
@@ -237,11 +237,10 @@ impl HealthChecker {
         let mut request = Packet::new(Code::StatusServer, 1, [0u8; 16]);
 
         // Add Message-Authenticator (required for Status-Server)
-        request
-            .add_attribute(
-                Attribute::new(AttributeType::MessageAuthenticator as u8, vec![0u8; 16])
-                    .expect("Failed to create Message-Authenticator"),
-            );
+        request.add_attribute(
+            Attribute::new(AttributeType::MessageAuthenticator as u8, vec![0u8; 16])
+                .expect("Failed to create Message-Authenticator"),
+        );
 
         // Encode the request
         let request_data = match request.encode() {

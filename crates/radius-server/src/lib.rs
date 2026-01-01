@@ -67,7 +67,7 @@ pub use eap_auth::EapAuthHandler;
 pub use ldap_auth::{LdapAuthHandler, LdapConfig, LdapError};
 pub use postgres_auth::{PostgresAuthHandler, PostgresConfig, PostgresError};
 pub use ratelimit::{RateLimitConfig, RateLimiter};
-pub use ratelimit_ha::{SharedRateLimiter, SharedRateLimitConfig};
+pub use ratelimit_ha::{SharedRateLimitConfig, SharedRateLimiter};
 pub use server::{
     AuthHandler, AuthResult, RadiusServer, ServerConfig, ServerError, SimpleAuthHandler,
 };

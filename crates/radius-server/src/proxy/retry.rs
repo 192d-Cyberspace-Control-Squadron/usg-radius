@@ -19,8 +19,8 @@ use radius_proto::attributes::{Attribute, AttributeType};
 use radius_proto::auth::calculate_response_authenticator;
 use radius_proto::{Code, Packet};
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::net::UdpSocket;
 use tokio::time;
@@ -129,17 +129,14 @@ impl RetryManager {
                 // Get all timed-out entries
                 let timed_out = cache.get_timed_out(timeout);
 
-                debug!(timed_out_count = timed_out.len(), "Checking for timed-out requests");
+                debug!(
+                    timed_out_count = timed_out.len(),
+                    "Checking for timed-out requests"
+                );
 
                 for entry in timed_out {
-                    if let Err(e) = Self::handle_timeout(
-                        &cache,
-                        &handler,
-                        &socket,
-                        &config,
-                        entry,
-                    )
-                    .await
+                    if let Err(e) =
+                        Self::handle_timeout(&cache, &handler, &socket, &config, entry).await
                     {
                         warn!(error = %e, "Failed to handle timeout");
                     }
@@ -212,9 +209,7 @@ impl RetryManager {
         // Re-forward the request (keeping the same Proxy-State)
         // Note: The original Proxy-State is already in the packet
         let request_data = entry.original_request.encode()?;
-        socket
-            .send_to(&request_data, home_server.address)
-            .await?;
+        socket.send_to(&request_data, home_server.address).await?;
 
         // Update entry with new home server and timestamp
         entry.home_server = home_server.clone();
@@ -243,7 +238,9 @@ impl RetryManager {
                 AttributeType::ReplyMessage as u8,
                 "Request timed out after maximum retries",
             )
-            .map_err(|e| ProxyError::Configuration(format!("Failed to create Reply-Message: {}", e)))?,
+            .map_err(|e| {
+                ProxyError::Configuration(format!("Failed to create Reply-Message: {}", e))
+            })?,
         );
 
         // Calculate response authenticator (use empty secret for reject from proxy)

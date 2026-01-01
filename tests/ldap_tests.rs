@@ -355,7 +355,8 @@ fn test_ldap_failover_active_directory_config() {
         "verify_tls": true
     }"#;
 
-    let config: LdapConfig = serde_json::from_str(json).expect("Failed to parse AD failover config");
+    let config: LdapConfig =
+        serde_json::from_str(json).expect("Failed to parse AD failover config");
 
     assert_eq!(config.urls.len(), 3);
     assert!(config.urls[0].starts_with("ldaps://dc1"));

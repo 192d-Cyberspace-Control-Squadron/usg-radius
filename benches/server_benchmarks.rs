@@ -11,15 +11,15 @@ fn bench_cache_duplicate_check(c: &mut Criterion) {
 
     let cache = RequestCache::new(Duration::from_secs(60), 10000);
     let test_authenticator = [1u8; 16];
-    let test_fingerprint = RequestFingerprint::new(
-        "192.168.1.100".parse().unwrap(),
-        1,
-        &test_authenticator,
-    );
+    let test_fingerprint =
+        RequestFingerprint::new("192.168.1.100".parse().unwrap(), 1, &test_authenticator);
 
     group.bench_function("first_request", |b| {
         b.iter(|| {
-            cache.is_duplicate(black_box(test_fingerprint.clone()), black_box(test_authenticator));
+            cache.is_duplicate(
+                black_box(test_fingerprint.clone()),
+                black_box(test_authenticator),
+            );
         });
     });
 
@@ -230,9 +230,6 @@ criterion_group!(
     bench_ratelimit_burst
 );
 
-criterion_group!(
-    password_benches,
-    bench_bcrypt_verification
-);
+criterion_group!(password_benches, bench_bcrypt_verification);
 
 criterion_main!(cache_benches, ratelimit_benches, password_benches);

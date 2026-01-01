@@ -10,7 +10,7 @@
 //!   cargo run --example ocsp_check -- client.pem ca.pem
 
 use radius_proto::revocation::{
-    OcspClient, OcspRequestBuilder, OcspResponse, OcspResponseStatus, CertificateStatus,
+    CertificateStatus, OcspClient, OcspRequestBuilder, OcspResponse, OcspResponseStatus,
     RevocationError,
 };
 use std::fs;
@@ -80,7 +80,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("\n✅ Certificate is VALID (not revoked)");
             Ok(())
         }
-        Some(CertificateStatus::Revoked { revocation_time, reason }) => {
+        Some(CertificateStatus::Revoked {
+            revocation_time,
+            reason,
+        }) => {
             println!("\n❌ Certificate is REVOKED");
             println!("   Revocation time: {:?}", revocation_time);
             if let Some(r) = reason {
@@ -109,7 +112,9 @@ fn display_response(response: &OcspResponse, expected_nonce: &[u8]) -> Result<()
         println!("\n❌ OCSP response indicates an error:");
         match response.status {
             OcspResponseStatus::MalformedRequest => println!("   The request was malformed"),
-            OcspResponseStatus::InternalError => println!("   The responder encountered an internal error"),
+            OcspResponseStatus::InternalError => {
+                println!("   The responder encountered an internal error")
+            }
             OcspResponseStatus::TryLater => println!("   The responder is temporarily unavailable"),
             OcspResponseStatus::SigRequired => println!("   The request must be signed"),
             OcspResponseStatus::Unauthorized => println!("   The request is unauthorized"),
