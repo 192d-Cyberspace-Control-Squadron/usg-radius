@@ -35,6 +35,7 @@
 pub mod config;
 pub mod error;
 pub mod memory;
+pub mod session_manager;
 
 #[cfg(feature = "ha")]
 pub mod valkey;
@@ -44,6 +45,7 @@ pub use config::{StateBackendType, StateConfig};
 pub use config::ValkeyConfig;
 pub use error::StateError;
 pub use memory::MemoryStateBackend;
+pub use session_manager::{CacheStats, SharedSessionManager};
 
 #[cfg(feature = "ha")]
 pub use valkey::ValkeyStateBackend;
