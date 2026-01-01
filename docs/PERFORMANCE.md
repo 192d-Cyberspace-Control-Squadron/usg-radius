@@ -229,6 +229,69 @@ Real-world performance will vary based on:
 - Hardware specifications
 - Concurrent client count
 
+## OCSP Performance (v0.7.4+)
+
+### OCSP Latency Targets
+
+Based on internal testing and RFC recommendations:
+
+| Metric | Target | Notes |
+|--------|--------|-------|
+| OCSP Latency | < 100ms | Includes HTTP round-trip |
+| Cache Hit Rate | > 90% | For typical cert lifetimes |
+| Memory per Response | < 10KB | Typical response size |
+| Cache Size | ~1MB | 100 cached responses |
+
+### OCSP Configuration
+
+```json
+{
+  "revocation": {
+    "check_mode": "prefer_ocsp",
+    "fallback_behavior": "fail_closed",
+    "ocsp_config": {
+      "enabled": true,
+      "http_timeout_secs": 5,
+      "cache_ttl_secs": 3600,
+      "max_cache_entries": 100,
+      "enable_nonce": true,
+      "max_response_size_bytes": 1048576,
+      "prefer_ocsp": true
+    }
+  }
+}
+```
+
+### OCSP vs CRL Performance
+
+| Operation | OCSP | CRL |
+|-----------|------|-----|
+| **Latency** | ~50-100ms | ~200-500ms |
+| **Bandwidth** | ~2-5KB per check | ~50-500KB download |
+| **Memory** | ~10KB per response | ~100KB-5MB parsed |
+| **Cache Hit** | Single cert | All certs in CRL |
+| **Freshness** | Real-time | Hours to days |
+
+**When to use OCSP:**
+- Real-time revocation checking required
+- Low memory footprint needed
+- Checking small number of certificates
+- Short-lived sessions
+
+**When to use CRL:**
+- Batch validation of many certificates
+- Offline operation required
+- Stable, infrequent revocations
+- CRL distribution points are fast/local
+
+### OCSP Optimization Tips
+
+1. **Enable Caching**: Use `cache_ttl_secs` to avoid repeated queries
+2. **Adjust Timeouts**: Lower `http_timeout_secs` for faster failover
+3. **Fallback Strategy**: Use `prefer_ocsp` with CRL fallback for resilience
+4. **Nonce Trade-off**: Disable `enable_nonce` if responder doesn't support it
+5. **Monitor Cache Hit Rate**: Increase `max_cache_entries` if hit rate < 90%
+
 ## Troubleshooting
 
 ### High Memory Usage
