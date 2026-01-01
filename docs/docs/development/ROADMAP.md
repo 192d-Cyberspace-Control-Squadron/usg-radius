@@ -1125,7 +1125,7 @@ let config = RevocationConfig::disabled();
 
 **Estimated Effort**: 4 weeks
 
-### Documentation
+### Zensical Documentation in docs/ folder
 
 - [ ] Complete API documentation
 - [ ] Deployment guides
