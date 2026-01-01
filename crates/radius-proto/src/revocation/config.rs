@@ -15,6 +15,10 @@ pub struct RevocationConfig {
 
     /// CRL-specific configuration
     pub crl_config: CrlConfig,
+
+    /// OCSP-specific configuration
+    #[serde(default)]
+    pub ocsp_config: OcspConfig,
 }
 
 impl RevocationConfig {
@@ -24,6 +28,17 @@ impl RevocationConfig {
             check_mode: RevocationCheckMode::CrlOnly,
             fallback_behavior,
             crl_config,
+            ocsp_config: OcspConfig::default(),
+        }
+    }
+
+    /// Create a new revocation configuration with OCSP checking only
+    pub fn ocsp_only(ocsp_config: OcspConfig, fallback_behavior: FallbackBehavior) -> Self {
+        Self {
+            check_mode: RevocationCheckMode::OcspOnly,
+            fallback_behavior,
+            crl_config: CrlConfig::default(),
+            ocsp_config,
         }
     }
 
@@ -37,6 +52,7 @@ impl RevocationConfig {
                 enable_http_fetch: false,
                 ..CrlConfig::default()
             },
+            ocsp_config: OcspConfig::default(),
         }
     }
 
@@ -46,6 +62,7 @@ impl RevocationConfig {
             check_mode: RevocationCheckMode::Disabled,
             fallback_behavior: FallbackBehavior::FailOpen,
             crl_config: CrlConfig::default(),
+            ocsp_config: OcspConfig::default(),
         }
     }
 }
@@ -204,6 +221,91 @@ fn default_max_cache_entries() -> usize {
 
 fn default_max_crl_size() -> usize {
     10 * 1024 * 1024 // 10 MB
+}
+
+/// OCSP-specific configuration
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct OcspConfig {
+    /// Enable OCSP checking
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// HTTP request timeout in seconds
+    #[serde(default = "default_http_timeout")]
+    pub http_timeout_secs: u64,
+
+    /// OCSP response cache TTL (time-to-live) in seconds
+    ///
+    /// Cached responses are reused until this TTL expires or nextUpdate is reached.
+    #[serde(default = "default_cache_ttl")]
+    pub cache_ttl_secs: u64,
+
+    /// Maximum number of OCSP responses to cache
+    #[serde(default = "default_max_cache_entries")]
+    pub max_cache_entries: usize,
+
+    /// Enable nonce extension for replay protection (RFC 8954)
+    ///
+    /// Recommended for production use.
+    #[serde(default = "default_true")]
+    pub enable_nonce: bool,
+
+    /// Maximum OCSP response size in bytes (default 1 MB)
+    ///
+    /// Protects against memory exhaustion from malicious/large responses.
+    #[serde(default = "default_max_ocsp_response_size")]
+    pub max_response_size_bytes: usize,
+
+    /// Prefer OCSP over CRL when both are available
+    ///
+    /// Only relevant when check_mode is Both or PreferOcsp.
+    #[serde(default = "default_true")]
+    pub prefer_ocsp: bool,
+}
+
+impl OcspConfig {
+    /// Create a new OCSP configuration with HTTP fetching enabled
+    pub fn http_fetch(
+        http_timeout_secs: u64,
+        cache_ttl_secs: u64,
+        max_cache_entries: usize,
+    ) -> Self {
+        Self {
+            enabled: true,
+            http_timeout_secs,
+            cache_ttl_secs,
+            max_cache_entries,
+            enable_nonce: true,
+            max_response_size_bytes: default_max_ocsp_response_size(),
+            prefer_ocsp: true,
+        }
+    }
+
+    /// Create a disabled OCSP configuration
+    pub fn disabled() -> Self {
+        Self {
+            enabled: false,
+            ..Default::default()
+        }
+    }
+}
+
+impl Default for OcspConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            http_timeout_secs: default_http_timeout(),
+            cache_ttl_secs: default_cache_ttl(),
+            max_cache_entries: default_max_cache_entries(),
+            enable_nonce: true,
+            max_response_size_bytes: default_max_ocsp_response_size(),
+            prefer_ocsp: true,
+        }
+    }
+}
+
+fn default_max_ocsp_response_size() -> usize {
+    1 * 1024 * 1024 // 1 MB
 }
 
 #[cfg(test)]

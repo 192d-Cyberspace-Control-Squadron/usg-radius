@@ -290,10 +290,14 @@ pub(crate) mod crl;
 #[cfg(feature = "revocation")]
 pub(crate) mod fetch;
 #[cfg(feature = "revocation")]
+pub mod ocsp;
+#[cfg(feature = "revocation")]
 pub mod verifier;
 
 // Re-export public types
-pub use config::{CrlConfig, FallbackBehavior, RevocationCheckMode, RevocationConfig};
+pub use config::{
+    CrlConfig, FallbackBehavior, OcspConfig, RevocationCheckMode, RevocationConfig,
+};
 pub use error::RevocationError;
 
 #[cfg(feature = "revocation")]
