@@ -6,19 +6,34 @@ Production-grade certificate revocation checking for EAP-TLS mutual authenticati
 
 This module provides CRL (Certificate Revocation List) support according to RFC 5280. It integrates seamlessly with rustls to enable revocation checking during the TLS handshake for EAP-TLS authentication.
 
-**Version**: 0.6.0 (Phase 1: CRL Support Complete)
+**Version**: 0.7.4 (Phase 2: OCSP Support Complete)
 **Status**: ✅ Production Ready
-**OCSP Support**: Planned for v0.7.0
+**OCSP Support**: ✅ Available (v0.7.4+)
 
 ## Features
+
+### CRL Support
 
 - ✅ **CRL Parsing**: Full DER/PEM parsing with x509-parser
 - ✅ **HTTP Fetching**: Automatic download from certificate distribution points
 - ✅ **Thread-Safe Caching**: TTL-based caching with LRU eviction
-- ✅ **Fail-Open/Fail-Closed**: Configurable error handling policies
 - ✅ **Static CRL Files**: Support for air-gapped environments
 - ✅ **O(1) Lookups**: HashSet-based serial number checking
+
+### OCSP Support (v0.7.4+)
+
+- ✅ **OCSP Request Building**: ASN.1 DER encoding with manual construction
+- ✅ **HTTP POST Queries**: RFC 6960-compliant OCSP responder communication
+- ✅ **Response Parsing**: Full BasicOCSPResponse parsing
+- ✅ **Nonce Support**: RFC 8954 replay protection
+- ✅ **Response Caching**: TTL-based caching with automatic expiry
+- ✅ **Multiple Check Modes**: OcspOnly, CrlOnly, PreferOcsp, Both
+
+### Common Features
+
+- ✅ **Fail-Open/Fail-Closed**: Configurable error handling policies
 - ✅ **rustls Integration**: Custom ClientCertVerifier implementation
+- ✅ **Thread-Safe**: Concurrent access via DashMap and Arc
 
 ## Quick Start
 
@@ -113,6 +128,76 @@ let config = RevocationConfig::crl_only(
     FallbackBehavior::FailOpen,  // Allow auth on CRL fetch failures
 );
 ```
+
+## OCSP Configuration (v0.7.4+)
+
+OCSP provides real-time certificate revocation checking with lower latency and bandwidth than CRL.
+
+### OCSP Only Mode
+
+Use when OCSP is the primary revocation method:
+
+```rust
+use radius_proto::revocation::{RevocationConfig, OcspConfig, FallbackBehavior};
+
+let config = RevocationConfig::ocsp_only(
+    OcspConfig::http_fetch(
+        5,      // 5 second HTTP timeout
+        3600,   // 1 hour cache TTL
+        100,    // Max 100 cached responses
+    ),
+    FallbackBehavior::FailClosed,
+);
+```
+
+### Prefer OCSP with CRL Fallback (Recommended)
+
+Best of both worlds - try OCSP first, fallback to CRL if OCSP fails:
+
+```rust
+use radius_proto::revocation::{
+    RevocationConfig, RevocationCheckMode, OcspConfig, CrlConfig, FallbackBehavior
+};
+
+let config = RevocationConfig {
+    check_mode: RevocationCheckMode::PreferOcsp,
+    fallback_behavior: FallbackBehavior::FailClosed,
+    ocsp_config: OcspConfig {
+        enabled: true,
+        http_timeout_secs: 5,
+        cache_ttl_secs: 3600,
+        max_cache_entries: 100,
+        enable_nonce: true,              // Replay protection
+        max_response_size_bytes: 1024 * 1024,  // 1 MB limit
+        prefer_ocsp: true,
+    },
+    crl_config: CrlConfig::http_fetch(5, 3600, 100),
+};
+```
+
+### Check Both Methods
+
+Maximum security - certificate must pass both OCSP and CRL checks:
+
+```rust
+let config = RevocationConfig {
+    check_mode: RevocationCheckMode::Both,
+    fallback_behavior: FallbackBehavior::FailClosed,
+    ocsp_config: OcspConfig::http_fetch(5, 3600, 100),
+    crl_config: CrlConfig::http_fetch(5, 3600, 100),
+};
+```
+
+### OCSP vs CRL Decision Matrix
+
+| Requirement | Recommended Mode | Rationale |
+|-------------|------------------|-----------|
+| Real-time revocation needed | `OcspOnly` or `PreferOcsp` | OCSP provides near real-time status |
+| Low bandwidth environment | `OcspOnly` | ~2-5KB per check vs 50-500KB CRL |
+| Maximum security | `Both` | Redundant validation |
+| High availability required | `PreferOcsp` | Automatic CRL fallback |
+| Offline/air-gapped | `CrlOnly` with static files | OCSP requires internet access |
+| Large certificate population | `CrlOnly` | CRL cache benefits many certs |
 
 ## Configuration Guide
 
