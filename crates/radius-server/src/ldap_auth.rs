@@ -244,7 +244,7 @@ impl LdapPool {
         let mut entry = self
             .server_health
             .entry(url.to_string())
-            .or_insert_with(ServerHealthInfo::default);
+            .or_default();
 
         entry.consecutive_successes += 1;
         entry.consecutive_failures = 0;
@@ -264,7 +264,7 @@ impl LdapPool {
         let mut entry = self
             .server_health
             .entry(url.to_string())
-            .or_insert_with(ServerHealthInfo::default);
+            .or_default();
 
         entry.consecutive_failures += 1;
         entry.consecutive_successes = 0;

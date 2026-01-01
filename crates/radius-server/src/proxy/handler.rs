@@ -5,7 +5,7 @@ use crate::proxy::error::{ProxyError, ProxyResult};
 use crate::proxy::home_server::HomeServer;
 use radius_proto::attributes::{Attribute, AttributeType};
 use radius_proto::auth::calculate_response_authenticator;
-use radius_proto::{Code, Packet};
+use radius_proto::Packet;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Instant;
@@ -141,8 +141,7 @@ impl ProxyHandler {
         let proxy_state_attr = response
             .attributes
             .iter()
-            .filter(|attr| attr.attr_type == AttributeType::ProxyState as u8)
-            .last()
+            .rfind(|attr| attr.attr_type == AttributeType::ProxyState as u8)
             .ok_or(ProxyError::CorrelationFailed)?;
 
         // Convert to ProxyStateKey
@@ -217,6 +216,7 @@ impl ProxyHandler {
 mod tests {
     use super::*;
     use crate::proxy::home_server::HomeServerConfig;
+    use radius_proto::Code;
     use std::time::Duration;
 
     fn create_test_home_server() -> Arc<HomeServer> {

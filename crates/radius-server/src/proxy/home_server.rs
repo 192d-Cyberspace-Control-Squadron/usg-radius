@@ -69,20 +69,15 @@ impl HomeServerConfig {
 }
 
 /// Home server state
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum HomeServerState {
     /// Server is operational and accepting requests
+    #[default]
     Up,
     /// Server is down (health checks failing)
     Down,
     /// Server is permanently unavailable (requires manual intervention)
     Dead,
-}
-
-impl Default for HomeServerState {
-    fn default() -> Self {
-        HomeServerState::Up
-    }
 }
 
 /// Home server statistics

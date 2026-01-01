@@ -14,10 +14,11 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// Load balancing strategy
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum LoadBalanceStrategy {
     /// Round-robin selection
+    #[default]
     RoundRobin,
     /// Select server with fewest outstanding requests
     LeastOutstanding,
@@ -25,12 +26,6 @@ pub enum LoadBalanceStrategy {
     Failover,
     /// Random selection
     Random,
-}
-
-impl Default for LoadBalanceStrategy {
-    fn default() -> Self {
-        LoadBalanceStrategy::RoundRobin
-    }
 }
 
 /// Home server pool configuration
@@ -147,7 +142,7 @@ impl HomeServerPool {
             .iter()
             .filter(|s| s.is_available() && s.has_capacity())
             .min_by_key(|s| s.stats().outstanding())
-            .map(|s| Arc::clone(s))
+            .map(Arc::clone)
     }
 
     /// Failover selection: use first server, fall back to others if unavailable
@@ -156,7 +151,7 @@ impl HomeServerPool {
         self.servers
             .iter()
             .find(|s| s.is_available() && s.has_capacity())
-            .map(|s| Arc::clone(s))
+            .map(Arc::clone)
     }
 
     /// Random selection: randomly choose from available servers

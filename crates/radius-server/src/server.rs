@@ -403,31 +403,30 @@ impl RadiusServer {
         let mut pools = Vec::new();
 
         // Initialize proxy components if enabled
-        if let Some(ref full_config) = config.config {
-            if let Some(ref proxy_config) = full_config.proxy {
-                if proxy_config.enabled {
-                    info!("Initializing RADIUS proxy");
+        if let Some(ref full_config) = config.config
+            && let Some(ref proxy_config) = full_config.proxy
+            && proxy_config.enabled
+        {
+            info!("Initializing RADIUS proxy");
 
-                    // Create proxy components
-                    let (
-                        router,
-                        proxy_handler,
-                        retry_manager,
-                        health_checker,
-                        servers,
-                        server_pools,
-                    ) = Self::initialize_proxy(proxy_config, Arc::clone(&socket)).await?;
+            // Create proxy components
+            let (
+                router,
+                proxy_handler,
+                retry_manager,
+                health_checker,
+                servers,
+                server_pools,
+            ) = Self::initialize_proxy(proxy_config, Arc::clone(&socket)).await?;
 
-                    config.router = Some(Arc::new(router));
-                    config.proxy_handler = Some(Arc::new(proxy_handler));
-                    config.retry_manager = Some(Arc::new(retry_manager));
-                    config.health_checker = health_checker.map(Arc::new);
-                    home_servers = servers;
-                    pools = server_pools;
+            config.router = Some(Arc::new(router));
+            config.proxy_handler = Some(Arc::new(proxy_handler));
+            config.retry_manager = Some(Arc::new(retry_manager));
+            config.health_checker = health_checker.map(Arc::new);
+            home_servers = servers;
+            pools = server_pools;
 
-                    info!("RADIUS proxy initialized");
-                }
-            }
+            info!("RADIUS proxy initialized");
         }
 
         Ok(RadiusServer {
@@ -504,10 +503,10 @@ impl RadiusServer {
         let proxy_handler = ProxyHandler::new(Arc::clone(&proxy_cache), socket.local_addr()?)
             .await
             .map_err(|e| {
-                ServerError::Io(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("Failed to create proxy handler: {}", e),
-                ))
+                ServerError::Io(std::io::Error::other(format!(
+                    "Failed to create proxy handler: {}",
+                    e
+                )))
             })?;
 
         // Create retry manager
@@ -523,10 +522,10 @@ impl RadiusServer {
         let server_proxy_handler = ProxyHandler::new(proxy_cache, socket.local_addr()?)
             .await
             .map_err(|e| {
-                ServerError::Io(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("Failed to create proxy handler: {}", e),
-                ))
+                ServerError::Io(std::io::Error::other(format!(
+                    "Failed to create proxy handler: {}",
+                    e
+                )))
             })?;
 
         // Collect all home servers and pools from all pools
@@ -552,10 +551,10 @@ impl RadiusServer {
                     HealthChecker::new(proxy_config.health_check.clone(), health_bind_addr)
                         .await
                         .map_err(|e| {
-                            ServerError::Io(std::io::Error::new(
-                                std::io::ErrorKind::Other,
-                                format!("Failed to create health checker: {}", e),
-                            ))
+                            ServerError::Io(std::io::Error::other(format!(
+                                "Failed to create health checker: {}",
+                                e
+                            )))
                         })?;
 
                 info!(
@@ -605,26 +604,28 @@ impl RadiusServer {
     /// Start the server and handle incoming requests
     pub async fn run(&self) -> Result<(), ServerError> {
         // Start retry manager if proxy is enabled
-        let _retry_task = if let Some(ref retry_manager) = self.config.retry_manager {
-            Some(retry_manager.start())
-        } else {
-            None
-        };
+        let _retry_task = self
+            .config
+            .retry_manager
+            .as_ref()
+            .map(|retry_manager| retry_manager.start());
 
         // Start health checker if proxy is enabled
-        let _health_task = if let Some(ref health_checker) = self.config.health_checker {
-            if !self.home_servers.is_empty() {
-                info!(
-                    "Starting health checker for {} home servers",
-                    self.home_servers.len()
-                );
-                Some(health_checker.start(self.home_servers.clone()))
-            } else {
-                None
-            }
-        } else {
-            None
-        };
+        let _health_task = self
+            .config
+            .health_checker
+            .as_ref()
+            .and_then(|health_checker| {
+                if !self.home_servers.is_empty() {
+                    info!(
+                        "Starting health checker for {} home servers",
+                        self.home_servers.len()
+                    );
+                    Some(health_checker.start(self.home_servers.clone()))
+                } else {
+                    None
+                }
+            });
 
         // Start response listener task if proxy is enabled
         let _response_task = if let Some(ref proxy_handler) = self.config.proxy_handler {
@@ -887,10 +888,10 @@ impl RadiusServer {
                         .await
                         .map_err(|e| {
                             warn!("Proxy forwarding failed: {}", e);
-                            ServerError::Io(std::io::Error::new(
-                                std::io::ErrorKind::Other,
-                                format!("Proxy forwarding failed: {}", e),
-                            ))
+                            ServerError::Io(std::io::Error::other(format!(
+                                "Proxy forwarding failed: {}",
+                                e
+                            )))
                         })?;
 
                     // Return empty response - actual response will come from proxy handler
@@ -898,8 +899,7 @@ impl RadiusServer {
                     // In a real implementation, we'd need a different approach
                     // For now, we'll just continue to local auth which will handle the response
                     // This needs architectural refinement - the proxy response is async
-                    return Err(ServerError::Io(std::io::Error::new(
-                        std::io::ErrorKind::Other,
+                    return Err(ServerError::Io(std::io::Error::other(
                         "Request forwarded to proxy - response will be sent asynchronously",
                     )));
                 }

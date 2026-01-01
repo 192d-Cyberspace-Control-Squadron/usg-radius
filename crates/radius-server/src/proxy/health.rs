@@ -135,6 +135,12 @@ impl HealthCheckStats {
     }
 }
 
+impl Default for HealthCheckStats {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Health checker for home servers
 pub struct HealthChecker {
     /// Health check configuration

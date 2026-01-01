@@ -17,11 +17,8 @@
 //! - Realm stripping
 //! - Retry and timeout handling
 
-use radius_server::{
-    AuthHandler, AuthResult, Config, RadiusServer, ServerConfig, SimpleAuthHandler,
-};
+use radius_server::{Config, RadiusServer, ServerConfig, SimpleAuthHandler};
 use std::sync::Arc;
-use tokio;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -53,28 +50,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         config.proxy.as_ref().map(|p| p.enabled)
     );
 
-    if let Some(ref proxy) = config.proxy {
-        if proxy.enabled {
-            println!("  Pools configured: {}", proxy.pools.len());
-            for pool in &proxy.pools {
-                println!(
-                    "    - {}: {} servers ({})",
-                    pool.name,
-                    pool.servers.len(),
-                    match pool.strategy {
-                        radius_server::proxy::pool::LoadBalanceStrategy::RoundRobin =>
-                            "round-robin",
-                        radius_server::proxy::pool::LoadBalanceStrategy::LeastOutstanding =>
-                            "least-outstanding",
-                        radius_server::proxy::pool::LoadBalanceStrategy::Failover => "failover",
-                        radius_server::proxy::pool::LoadBalanceStrategy::Random => "random",
-                    }
-                );
-            }
-            println!("  Realms configured: {}", proxy.realms.len());
-            for realm in &proxy.realms {
-                println!("    - {} -> {}", realm.name, realm.pool);
-            }
+    if let Some(ref proxy) = config.proxy && proxy.enabled {
+        println!("  Pools configured: {}", proxy.pools.len());
+        for pool in &proxy.pools {
+            println!(
+                "    - {}: {} servers ({})",
+                pool.name,
+                pool.servers.len(),
+                match pool.strategy {
+                    radius_server::proxy::pool::LoadBalanceStrategy::RoundRobin => "round-robin",
+                    radius_server::proxy::pool::LoadBalanceStrategy::LeastOutstanding =>
+                        "least-outstanding",
+                    radius_server::proxy::pool::LoadBalanceStrategy::Failover => "failover",
+                    radius_server::proxy::pool::LoadBalanceStrategy::Random => "random",
+                }
+            );
+        }
+        println!("  Realms configured: {}", proxy.realms.len());
+        for realm in &proxy.realms {
+            println!("    - {} -> {}", realm.name, realm.pool);
         }
     }
 

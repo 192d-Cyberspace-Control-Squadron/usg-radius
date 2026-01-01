@@ -4,21 +4,16 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 /// Type of state backend to use
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum StateBackendType {
     /// In-memory state backend (default, no HA)
+    #[default]
     InMemory,
 
     /// Valkey/Redis state backend (for HA)
     #[cfg(feature = "ha")]
     Valkey,
-}
-
-impl Default for StateBackendType {
-    fn default() -> Self {
-        StateBackendType::InMemory
-    }
 }
 
 /// Configuration for state backend

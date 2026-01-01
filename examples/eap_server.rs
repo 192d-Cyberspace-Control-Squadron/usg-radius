@@ -95,7 +95,8 @@
 
 #[cfg(feature = "tls")]
 use radius_proto::eap::eap_tls::TlsCertificateConfig;
-#[cfg(feature = "tls")]
+#[cfg(all(feature = "tls", feature = "revocation"))]
+#[allow(unused_imports)] // Optional revocation configuration examples
 use radius_proto::revocation::{
     CrlConfig, FallbackBehavior, OcspConfig, RevocationCheckMode, RevocationConfig,
 };
@@ -132,7 +133,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Configure TLS certificates
         // In production, you would load these from secure storage
-        let mut cert_config = TlsCertificateConfig::new(
+        let cert_config = TlsCertificateConfig::new(
             "server.pem".to_string(),
             "server-key.pem".to_string(),
             Some("ca.pem".to_string()), // CA for verifying client certificates

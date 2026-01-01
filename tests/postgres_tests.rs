@@ -30,6 +30,7 @@ fn test_postgres_config_serialization() {
             "SELECT attribute_type, attribute_value FROM user_attributes WHERE username = $1"
                 .to_string(),
         ),
+        ..Default::default()
     };
 
     // Test serialization

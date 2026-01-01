@@ -158,10 +158,10 @@ impl StateBackend for MemoryStateBackend {
         let mut store = self.store.write().await;
 
         // Check if key exists and is not expired
-        if let Some(existing) = store.get(key) {
-            if !existing.is_expired() {
-                return Ok(false); // Key already exists
-            }
+        if let Some(existing) = store.get(key)
+            && !existing.is_expired()
+        {
+            return Ok(false); // Key already exists
         }
 
         // Set the key

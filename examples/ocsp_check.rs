@@ -147,7 +147,7 @@ fn display_response(response: &OcspResponse, expected_nonce: &[u8]) -> Result<()
             if now > next {
                 println!("⚠️  Response has expired!");
             } else {
-                let remaining = next.duration_since(now).unwrap_or(Duration::ZERO);
+                let remaining = next.duration_since(now).unwrap_or_default();
                 println!("Response fresh for: {} seconds", remaining.as_secs());
             }
         }

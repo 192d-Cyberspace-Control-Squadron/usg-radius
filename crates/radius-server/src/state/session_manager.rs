@@ -3,7 +3,7 @@
 use super::{StateBackend, StateError};
 use crate::accounting::Session;
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant};
 
 #[cfg(feature = "ha")]
 use radius_proto::eap::EapSession;
@@ -323,7 +323,7 @@ pub struct CacheStats {
 mod tests {
     use super::*;
     use crate::state::MemoryStateBackend;
-    use std::net::IpAddr;
+    use std::{net::IpAddr, time::SystemTime};
 
     fn create_test_session() -> Session {
         Session {

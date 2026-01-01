@@ -133,7 +133,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = ServerConfig::new(addr, b"testing123", Arc::new(auth_handler));
 
     // Create and configure server
-    let mut server = RadiusServer::new(config).await?;
+    let server = RadiusServer::new(config).await?;
 
     // Print HA status
     if let Some(ref limiter) = cluster_limiter {

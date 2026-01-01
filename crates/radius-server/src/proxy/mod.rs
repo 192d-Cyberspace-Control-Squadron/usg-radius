@@ -170,13 +170,14 @@ impl ProxyConfig {
         }
 
         // Validate default realm
-        if let Some(ref default_realm) = self.default_realm {
-            if default_realm != "local" && !self.pools.iter().any(|p| &p.name == default_realm) {
-                return Err(ProxyError::Configuration(format!(
-                    "Default realm '{}' is not 'local' and does not reference a valid pool",
-                    default_realm
-                )));
-            }
+        if let Some(ref default_realm) = self.default_realm
+            && default_realm != "local"
+            && !self.pools.iter().any(|p| &p.name == default_realm)
+        {
+            return Err(ProxyError::Configuration(format!(
+                "Default realm '{}' is not 'local' and does not reference a valid pool",
+                default_realm
+            )));
         }
 
         Ok(())
