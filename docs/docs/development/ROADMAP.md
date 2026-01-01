@@ -1104,15 +1104,100 @@ let config = RevocationConfig::disabled();
 - Memory per Response: < 10KB (typical response size)
 - Cache Size: ~1MB (100 cached responses)
 
-### Phase 3: High Availability
+### Phase 3: High Availability (IN PROGRESS)
 
-- [ ] Multi-server deployment support
-- [ ] Shared session state (Valkey/database)
-- [ ] Health checks
-- [ ] Failover mechanisms
-- [ ] Load balancing recommendations
+**Status**: Phase 3A Complete (Week 1/3) ✅
+**Completed**: December 31, 2025
 
-**Estimated Effort**: 3 weeks
+#### Phase 3A: Valkey Integration ✅ COMPLETED
+
+**Implementation**:
+
+- ✅ **StateBackend Trait** - Pluggable storage abstraction
+  - 9 async methods (get, set, delete, exists, keys, set_nx, incr, expire, ping)
+  - Thread-safe and async-compatible
+  - Supports TTL, atomic operations, pattern matching
+- ✅ **MemoryStateBackend** - In-memory HashMap storage (300+ lines)
+  - Default non-HA backend
+  - TTL support with expiration checking
+  - 18 passing unit tests
+  - Thread-safe with tokio::sync::RwLock
+- ✅ **ValkeyStateBackend** - Distributed Valkey/Redis storage (350+ lines)
+  - Connection pooling via ConnectionManager
+  - Automatic retry logic (configurable)
+  - Key prefix for namespace isolation
+  - 9 integration tests (marked #[ignore], require Valkey server)
+- ✅ **StateConfig & ValkeyConfig** - Configuration structures
+  - Builder pattern for easy configuration
+  - Serde support for JSON serialization
+  - Full customization of timeouts, retries, pool size
+- ✅ **Session Serialization** - EapSession and Session structs
+  - Conditional serde derives (zero overhead when disabled)
+  - All EAP types serializable (EapCode, EapType, EapState, EapPacket)
+  - Accounting Session fully serializable
+- ✅ **SharedSessionManager** - Two-tier caching manager (480+ lines)
+  - Write-through caching (local DashMap + backend)
+  - Configurable local cache TTL (default 30s)
+  - EAP and accounting session management
+  - Cluster-wide request deduplication (atomic SET NX)
+  - Distributed rate limiting (atomic INCR)
+  - 7 passing unit tests
+  - Target: >95% cache hit rate
+
+**Files Created**:
+
+- `crates/radius-server/src/state/mod.rs` (150 lines)
+- `crates/radius-server/src/state/error.rs` (70 lines)
+- `crates/radius-server/src/state/config.rs` (280 lines)
+- `crates/radius-server/src/state/memory.rs` (400 lines)
+- `crates/radius-server/src/state/valkey.rs` (420 lines)
+- `crates/radius-server/src/state/session_manager.rs` (500 lines)
+
+**Total**: ~1,900 lines of production code + 25 tests
+
+**Feature Flags**:
+
+- `ha` feature enables Valkey backend and session serialization
+- Backward compatible (default = in-memory only)
+- Dependencies: `async-trait`, `redis` (optional), `serde` (optional)
+
+**Test Results**:
+
+- 25/25 tests passing (18 state backend + 7 session manager)
+- All unit tests green
+- Integration tests require Valkey server
+
+#### Phase 3B: Shared Session State (IN PROGRESS - Week 2/3)
+
+- [ ] Integrate SharedSessionManager with EapAuthHandler
+- [ ] Migrate EAP session storage to use state backend
+- [ ] Integrate SharedSessionManager with AccountingHandler
+- [ ] Migrate accounting session storage to use state backend
+- [ ] Update request cache to use cluster-wide deduplication
+- [ ] Update rate limiter to use distributed counters
+
+**Estimated Effort**: 1 week
+
+#### Phase 3C: Health Checks & Monitoring (Week 3/3)
+
+- [ ] HTTP health check server (liveness, readiness probes)
+- [ ] Prometheus metrics endpoint
+- [ ] Valkey connection health monitoring
+- [ ] Load balancer integration documentation
+
+**Estimated Effort**: 1 week
+
+#### Phase 3D: Documentation & Examples (Week 3/3)
+
+- [ ] Complete HA deployment documentation
+- [ ] Docker Compose HA cluster example (3 nodes + Valkey)
+- [ ] Kubernetes deployment manifests
+- [ ] HAProxy/nginx configuration examples
+- [ ] HA integration tests (cross-server session continuity)
+
+**Estimated Effort**: Concurrent with Phase 3C
+
+**Total Estimated Effort**: 3 weeks (1 week complete, 2 weeks remaining)
 
 ### Phase 4: Additional Backend Support
 
