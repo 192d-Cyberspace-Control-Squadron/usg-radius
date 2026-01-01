@@ -7,7 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added - v0.5.0 (In Progress)
+### Added - v0.7.0 (In Progress)
+
+#### RADIUS Proxy
+
+- **Complete Proxy Infrastructure** (Phases 1-6):
+  - Home server configuration and management
+  - Request correlation using Proxy-State attributes (RFC 2865)
+  - Background cleanup tasks for TTL-based cache expiry
+  - Proxy loop detection (max 5 Proxy-State attributes)
+  - Thread-safe caching with DashMap
+  - Atomic statistics tracking
+
+- **Realm-Based Routing**:
+  - Realm extraction from username@domain and DOMAIN\user formats
+  - Three match types: exact, suffix, and regex patterns
+  - Routing decisions: Proxy, Local, or Reject
+  - Optional realm stripping before forwarding
+  - Default realm configuration
+
+- **Load Balancing**:
+  - Round-robin: Even distribution across servers
+  - Least-outstanding: Route to server with fewest pending requests
+  - Failover: Primary/backup server configuration
+  - Random: Random server selection
+  - Pool statistics and monitoring
+
+- **Retry and Timeout Handling**:
+  - Automatic retry with configurable max attempts
+  - Background timeout detection task
+  - Failover to different servers on timeout
+  - Access-Reject sent after max retries exhausted
+  - Configurable retry interval
+
+- **Security**:
+  - Per-home-server shared secrets
+  - Automatic response authenticator recalculation
+  - Client secret stored in cache for response authentication
+  - Request correlation prevents response spoofing
+
+- **Integration**:
+  - Router and ProxyHandler integrated into RadiusServer
+  - Proxy routing in handle_access_request()
+  - Background response listener task
+  - Retry manager background task
+  - All 57 proxy tests passing
+
+- **Documentation and Examples**:
+  - Comprehensive proxy documentation (docs/docs/proxy/README.md)
+  - Architecture overview and component diagram
+  - Configuration reference with examples
+  - Load balancing strategies explained
+  - Security considerations
+  - Troubleshooting guide
+  - Performance benchmarks
+  - Working proxy server example (examples/proxy_server.rs)
+  - Example configuration (examples/proxy_config.json)
+
+### Added - v0.5.0 (Completed)
 
 #### EAP Protocol Support
 
