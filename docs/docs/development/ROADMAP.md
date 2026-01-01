@@ -652,9 +652,16 @@ The following legacy methods will **not** be implemented due to modern alternati
     - Created `tests/test-data/init-postgres.sh` for automated initialization
     - Test data includes all three password hashing types (bcrypt, argon2, pbkdf2)
     - Includes user_attributes table with RADIUS attribute mappings
-- [ ] End-to-end authentication tests
+- ✅ **End-to-end authentication tests** (**Dec 31, 2025**)
+  - Created comprehensive e2e test suite (backend_e2e_tests.rs)
+  - Tests cover PAP and CHAP authentication methods
+  - Tests verify complete RADIUS packet flow (client → server → handler → response)
+  - Tests verify attribute injection in Access-Accept packets
+  - 7 end-to-end tests covering success/failure scenarios
+  - All tests passing with SimpleAuthHandler
+  - PostgreSQL and LDAP e2e tests exist in their integration test files
 
-**Status**: ✅ Test data initialization scripts complete!
+**Status**: ✅ **ALL TESTING COMPLETE!**
 **Completed**: Dec 2025
 
 ### High Availability
@@ -714,8 +721,7 @@ The following legacy methods will **not** be implemented due to modern alternati
 - ✅ **Performance benchmarking framework** - Criterion-based benchmarks
   - Packet encoding/decoding benchmarks (existing)
   - Server performance benchmarks (cache, rate limiter, password verification)
-- [ ] Memory profiling and optimization (Future work)
-- [ ] CPU profiling and hot path optimization (Future work)
+
 
 **Status**: ✅ **COMPLETE**
 **Completed**: Dec 31, 2025 (All core performance work done!)
@@ -754,16 +760,6 @@ Production-grade certificate revocation checking for EAP-TLS mutual authenticati
 - ✅ CRL size limits (10 MB default) and validation
 - ✅ Multi-distribution point fallback
 - ✅ LRU cache eviction
-
-**Phase 2: OCSP Support** (planned for v0.7.0)
-
-- [ ] OCSP request building (ASN.1 DER encoding)
-- [ ] OCSP HTTP POST requests to responders
-- [ ] OCSP response parsing and validation
-- [ ] OCSP signature verification
-- [ ] Nonce support for replay protection
-- [ ] OCSP stapling (RFC 6066)
-- [ ] Response caching with TTL
 
 **Implementation Details**:
 
@@ -1014,6 +1010,23 @@ let config = RevocationConfig::disabled();
 **Testing**: All 136 tests passing (2 new stats tests)
 
 ---
+
+## v0.7.4 - Additional Work deferred from previous version
+
+### Phase 1: Performance Optimization
+
+- [ ] Memory profiling and optimization (Future work)
+- [ ] CPU profiling and hot path optimization (Future work)
+
+### Phase 2: OCSP Support
+
+- [ ] OCSP request building (ASN.1 DER encoding)
+- [ ] OCSP HTTP POST requests to responders
+- [ ] OCSP response parsing and validation
+- [ ] OCSP signature verification
+- [ ] Nonce support for replay protection
+- [ ] OCSP stapling (RFC 6066)
+- [ ] Response caching with TTL
 
 ## v0.8.0 - RadSec (RADIUS over TLS) (Q1 2026)
 
