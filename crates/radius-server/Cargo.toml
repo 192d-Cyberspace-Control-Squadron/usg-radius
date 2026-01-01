@@ -33,6 +33,12 @@ pbkdf2.workspace = true
 sha2.workspace = true
 rustls = { workspace = true, optional = true }
 
+# Async traits (always needed for StateBackend)
+async-trait.workspace = true
+
+# High Availability dependencies
+redis = { workspace = true, optional = true, features = ["tokio-comp", "connection-manager"] }
+
 [dev-dependencies]
 hex.workspace = true
 tempfile.workspace = true
@@ -40,3 +46,4 @@ tempfile.workspace = true
 [features]
 default = []
 tls = ["radius-proto/tls", "dep:rustls"]
+ha = ["dep:redis"]

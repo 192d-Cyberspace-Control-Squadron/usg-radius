@@ -43,6 +43,12 @@ ipnetwork = "0.21"
 # Caching and concurrency
 dashmap = "6.1"
 
+# Async traits
+async-trait = "0.1"
+
+# State backends
+redis = { version = "0.27", default-features = false }
+
 # Regular expressions
 regex = "1.10"
 
@@ -97,6 +103,7 @@ tracing-subscriber.workspace = true
 [features]
 default = []
 tls = ["radius-proto/tls", "radius-server/tls"]
+ha = ["radius-server/ha"]
 
 [dev-dependencies]
 criterion.workspace = true

@@ -54,6 +54,7 @@ pub mod postgres_auth;
 pub mod proxy;
 pub mod ratelimit;
 pub mod server;
+pub mod state;
 
 pub use accounting::{AccountingHandler, AccountingResult, Session, SimpleAccountingHandler};
 pub use audit::{AuditEntry, AuditEventType, AuditLogger};

@@ -1107,7 +1107,7 @@ let config = RevocationConfig::disabled();
 ### Phase 3: High Availability
 
 - [ ] Multi-server deployment support
-- [ ] Shared session state (Redis/database)
+- [ ] Shared session state (Valkey/database)
 - [ ] Health checks
 - [ ] Failover mechanisms
 - [ ] Load balancing recommendations
@@ -1116,7 +1116,7 @@ let config = RevocationConfig::disabled();
 
 ### Phase 4: Additional Backend Support
 
-- [ ] Redis caching backend
+- [ ] Valkey caching backend
 - [ ] REST API authentication backend
 - [ ] Multi-backend fallback chains
 
