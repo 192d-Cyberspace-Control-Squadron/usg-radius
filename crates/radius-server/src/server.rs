@@ -244,6 +244,8 @@ pub struct ServerConfig {
     pub proxy_handler: Option<Arc<ProxyHandler>>,
     /// Retry manager (optional)
     pub retry_manager: Option<Arc<RetryManager>>,
+    /// Health checker (optional)
+    pub health_checker: Option<Arc<crate::proxy::health::HealthChecker>>,
 }
 
 impl ServerConfig {
@@ -273,6 +275,7 @@ impl ServerConfig {
             router: None,
             proxy_handler: None,
             retry_manager: None,
+            health_checker: None,
         }
     }
 
@@ -339,6 +342,7 @@ impl ServerConfig {
             router,
             proxy_handler,
             retry_manager,
+            health_checker: None,
         })
     }
 
@@ -371,6 +375,8 @@ impl ServerConfig {
 pub struct RadiusServer {
     config: Arc<ServerConfig>,
     socket: Arc<UdpSocket>,
+    /// Home servers for health checking (if proxy is enabled)
+    home_servers: Vec<Arc<crate::proxy::home_server::HomeServer>>,
 }
 
 impl RadiusServer {
@@ -380,6 +386,8 @@ impl RadiusServer {
         let socket = Arc::new(socket);
         info!("RADIUS server listening on {}", config.bind_addr);
 
+        let mut home_servers = Vec::new();
+
         // Initialize proxy components if enabled
         if let Some(ref full_config) = config.config {
             if let Some(ref proxy_config) = full_config.proxy {
@@ -387,12 +395,14 @@ impl RadiusServer {
                     info!("Initializing RADIUS proxy");
 
                     // Create proxy components
-                    let (router, proxy_handler, retry_manager) =
+                    let (router, proxy_handler, retry_manager, health_checker, servers) =
                         Self::initialize_proxy(proxy_config, Arc::clone(&socket)).await?;
 
                     config.router = Some(Arc::new(router));
                     config.proxy_handler = Some(Arc::new(proxy_handler));
                     config.retry_manager = Some(Arc::new(retry_manager));
+                    config.health_checker = health_checker.map(Arc::new);
+                    home_servers = servers;
 
                     info!("RADIUS proxy initialized");
                 }
@@ -402,6 +412,7 @@ impl RadiusServer {
         Ok(RadiusServer {
             config: Arc::new(config),
             socket,
+            home_servers,
         })
     }
 
@@ -409,8 +420,9 @@ impl RadiusServer {
     async fn initialize_proxy(
         proxy_config: &ProxyConfig,
         socket: Arc<UdpSocket>,
-    ) -> Result<(Router, ProxyHandler, RetryManager), ServerError> {
+    ) -> Result<(Router, ProxyHandler, RetryManager, Option<crate::proxy::health::HealthChecker>, Vec<Arc<crate::proxy::home_server::HomeServer>>), ServerError> {
         use crate::proxy::cache::ProxyCache;
+        use crate::proxy::health::HealthChecker;
 
         // Create home server pools
         let mut pools = std::collections::HashMap::new();
@@ -473,7 +485,46 @@ impl RadiusServer {
                 format!("Failed to create proxy handler: {}", e)
             )))?;
 
-        Ok((router, server_proxy_handler, retry_manager))
+        // Collect all home servers from all pools
+        let mut all_servers = Vec::new();
+        for pool in pools.values() {
+            for server in &pool.servers {
+                all_servers.push(Arc::clone(server));
+            }
+        }
+
+        // Create health checker if enabled
+        let health_checker = if proxy_config.health_check.enabled {
+            if !all_servers.is_empty() {
+                // Bind a separate socket for health checks on an ephemeral port
+                let health_bind_addr = match socket.local_addr()? {
+                    std::net::SocketAddr::V4(_) => "0.0.0.0:0".parse().unwrap(),
+                    std::net::SocketAddr::V6(_) => "[::]:0".parse().unwrap(),
+                };
+
+                let checker = HealthChecker::new(proxy_config.health_check.clone(), health_bind_addr)
+                    .await
+                    .map_err(|e| ServerError::Io(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!("Failed to create health checker: {}", e)
+                    )))?;
+
+                info!(
+                    server_count = all_servers.len(),
+                    interval = proxy_config.health_check.interval,
+                    "Health checker created"
+                );
+
+                Some(checker)
+            } else {
+                warn!("Health checking enabled but no servers found in pools");
+                None
+            }
+        } else {
+            None
+        };
+
+        Ok((router, server_proxy_handler, retry_manager, health_checker, all_servers))
     }
 
     /// Get the local address the server is listening on
@@ -488,6 +539,18 @@ impl RadiusServer {
         // Start retry manager if proxy is enabled
         let _retry_task = if let Some(ref retry_manager) = self.config.retry_manager {
             Some(retry_manager.start())
+        } else {
+            None
+        };
+
+        // Start health checker if proxy is enabled
+        let _health_task = if let Some(ref health_checker) = self.config.health_checker {
+            if !self.home_servers.is_empty() {
+                info!("Starting health checker for {} home servers", self.home_servers.len());
+                Some(health_checker.start(self.home_servers.clone()))
+            } else {
+                None
+            }
         } else {
             None
         };

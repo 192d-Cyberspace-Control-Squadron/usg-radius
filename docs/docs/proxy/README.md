@@ -393,18 +393,44 @@ Matches: `user@office.us.example.com`, `user@dc.eu.example.com`
 
 ### Health Checks
 
+Automatic health monitoring using RFC 5997 Status-Server packets:
+
 ```json
 {
   "health_check": {
     "enabled": true,
     "interval": 30,
-    "timeout": 5,
-    "method": "status_server"
+    "timeout": 10,
+    "failures_before_down": 3,
+    "successes_before_up": 2
   }
 }
 ```
 
-*Note: Health checks are planned for future release*
+**Parameters**:
+
+- `enabled`: Enable health checking (default: true)
+- `interval`: Health check interval in seconds (default: 30)
+- `timeout`: Health check timeout in seconds (default: 10)
+- `failures_before_down`: Consecutive failures before marking server Down (default: 3)
+- `successes_before_up`: Consecutive successes before marking server Up (default: 2)
+
+**How It Works**:
+
+1. Background task sends Status-Server (RFC 5997) packets at configured intervals
+2. Expects Access-Accept response to consider server healthy
+3. Tracks consecutive failures and successes per server
+4. Automatically transitions server states: Up ↔ Down ↔ Dead
+5. Down/Dead servers can recover automatically after enough successful checks
+6. Atomic statistics tracking (lock-free) for all health checks
+
+**State Transitions**:
+
+- **Up → Down**: After N consecutive health check failures
+- **Down → Up**: After M consecutive health check successes
+- **Dead → Up**: Dead servers can also recover if health checks succeed
+
+*Available in v0.7.1+*
 
 ## Performance
 
