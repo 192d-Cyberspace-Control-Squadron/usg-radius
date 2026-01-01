@@ -602,9 +602,17 @@ The following legacy methods will **not** be implemented due to modern alternati
   - Thread-safe attribute caching with DashMap
   - get_accept_attributes() implementation for automatic group-based attribute injection
   - Support for multiple RADIUS attributes per group
-- [ ] Connection failover
+- ✅ **Connection failover** (**Dec 31, 2025**)
+  - Support for multiple LDAP server URLs with automatic failover
+  - Health tracking per-server (consecutive failures/successes)
+  - Automatic server state transitions (Up/Down) based on connection success
+  - Prioritized server selection (healthy servers first, unhealthy for recovery)
+  - Configurable thresholds (3 failures before Down, 2 successes before Up)
+  - Backward compatible with single-URL configuration
+  - Automatic recovery when failed servers come back online
+  - Thread-safe health tracking with DashMap
 
-**Status**: ✅ Core features complete (including group membership), connection failover pending
+**Status**: ✅ **ALL FEATURES COMPLETE!**
 **Completed**: Dec 2025
 
 ### Documentation ✅ COMPLETED

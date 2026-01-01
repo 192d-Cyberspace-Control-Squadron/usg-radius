@@ -17,6 +17,7 @@ fn test_ldap_handler_creation() {
         attributes: vec!["dn".to_string(), "cn".to_string()],
         timeout: 10,
         verify_tls: true,
+        ..Default::default()
     };
 
     let _handler = LdapAuthHandler::new(config.clone());
@@ -39,6 +40,7 @@ fn test_ldap_config_serialization() {
         attributes: vec!["dn".to_string(), "memberOf".to_string()],
         timeout: 15,
         verify_tls: true,
+        ..Default::default()
     };
 
     // Test serialization
@@ -254,5 +256,137 @@ fn test_ldap_handler_implements_auth_handler() {
     let _reject_attrs = handler.get_reject_attributes("testuser");
 
     // Both should return something
+    // Test passes if we reach this point without panicking
+}
+
+#[test]
+fn test_ldap_failover_config_multiple_urls() {
+    use serde_json;
+
+    // Test configuration with multiple LDAP servers for failover
+    let json = r#"{
+        "urls": [
+            "ldap://ldap1.example.com:389",
+            "ldap://ldap2.example.com:389",
+            "ldap://ldap3.example.com:389"
+        ],
+        "base_dn": "dc=example,dc=com",
+        "bind_dn": "cn=admin,dc=example,dc=com",
+        "bind_password": "secret",
+        "search_filter": "(uid={username})"
+    }"#;
+
+    let config: LdapConfig = serde_json::from_str(json).expect("Failed to parse failover config");
+
+    // Verify all URLs are loaded
+    assert_eq!(config.urls.len(), 3);
+    assert_eq!(config.urls[0], "ldap://ldap1.example.com:389");
+    assert_eq!(config.urls[1], "ldap://ldap2.example.com:389");
+    assert_eq!(config.urls[2], "ldap://ldap3.example.com:389");
+
+    // Test get_server_urls() method
+    let server_urls = config.get_server_urls();
+    assert_eq!(server_urls.len(), 3);
+    assert_eq!(server_urls[0], "ldap://ldap1.example.com:389");
+}
+
+#[test]
+fn test_ldap_failover_config_backward_compatibility() {
+    use serde_json;
+
+    // Test that old single-URL config still works
+    let json = r#"{
+        "url": "ldap://ldap.example.com:389",
+        "base_dn": "dc=example,dc=com"
+    }"#;
+
+    let config: LdapConfig = serde_json::from_str(json).expect("Failed to parse single URL config");
+
+    // Verify single URL is used
+    assert_eq!(config.url, "ldap://ldap.example.com:389");
+    assert_eq!(config.urls.len(), 0);
+
+    // get_server_urls() should return the single URL
+    let server_urls = config.get_server_urls();
+    assert_eq!(server_urls.len(), 1);
+    assert_eq!(server_urls[0], "ldap://ldap.example.com:389");
+}
+
+#[test]
+fn test_ldap_failover_config_urls_take_precedence() {
+    use serde_json;
+
+    // Test that urls field takes precedence over url field
+    let json = r#"{
+        "url": "ldap://old.example.com:389",
+        "urls": [
+            "ldap://new1.example.com:389",
+            "ldap://new2.example.com:389"
+        ],
+        "base_dn": "dc=example,dc=com"
+    }"#;
+
+    let config: LdapConfig = serde_json::from_str(json).expect("Failed to parse config");
+
+    // get_server_urls() should return urls field, not url field
+    let server_urls = config.get_server_urls();
+    assert_eq!(server_urls.len(), 2);
+    assert_eq!(server_urls[0], "ldap://new1.example.com:389");
+    assert_eq!(server_urls[1], "ldap://new2.example.com:389");
+}
+
+#[test]
+fn test_ldap_failover_active_directory_config() {
+    use serde_json;
+
+    // Test Active Directory with multiple domain controllers
+    let json = r#"{
+        "urls": [
+            "ldaps://dc1.corp.example.com:636",
+            "ldaps://dc2.corp.example.com:636",
+            "ldaps://dc3.corp.example.com:636"
+        ],
+        "base_dn": "dc=corp,dc=example,dc=com",
+        "bind_dn": "CN=RADIUS Service,OU=Service Accounts,DC=corp,DC=example,DC=com",
+        "bind_password": "service_password",
+        "search_filter": "(sAMAccountName={username})",
+        "attributes": ["dn", "cn", "sAMAccountName", "memberOf"],
+        "timeout": 15,
+        "verify_tls": true
+    }"#;
+
+    let config: LdapConfig = serde_json::from_str(json).expect("Failed to parse AD failover config");
+
+    assert_eq!(config.urls.len(), 3);
+    assert!(config.urls[0].starts_with("ldaps://dc1"));
+    assert!(config.urls[1].starts_with("ldaps://dc2"));
+    assert!(config.urls[2].starts_with("ldaps://dc3"));
+}
+
+#[test]
+fn test_ldap_failover_handler_creation() {
+    // Test creating handler with multiple servers
+    let config = LdapConfig {
+        url: String::new(), // Empty single URL
+        urls: vec![
+            "ldap://ldap1.example.com:389".to_string(),
+            "ldap://ldap2.example.com:389".to_string(),
+        ],
+        base_dn: "dc=example,dc=com".to_string(),
+        bind_dn: Some("cn=admin,dc=example,dc=com".to_string()),
+        bind_password: Some("admin_password".to_string()),
+        search_filter: "(uid={username})".to_string(),
+        attributes: vec!["dn".to_string(), "cn".to_string()],
+        timeout: 10,
+        verify_tls: true,
+        max_connections: 10,
+        acquire_timeout: 10,
+        group_attribute: "memberOf".to_string(),
+        group_attribute_mapping: std::collections::HashMap::new(),
+    };
+
+    let _handler = LdapAuthHandler::new(config.clone());
+
+    // Handler should be created successfully with multiple servers
     // Test passes if we reach this point without panicking
 }

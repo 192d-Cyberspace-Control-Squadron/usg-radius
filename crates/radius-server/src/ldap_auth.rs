@@ -30,7 +30,15 @@ pub enum LdapError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LdapConfig {
     /// LDAP server URL (e.g., "ldap://localhost:389" or "ldaps://ldap.example.com:636")
+    /// For backward compatibility, this is still supported as primary server
+    #[serde(default)]
     pub url: String,
+
+    /// Multiple LDAP server URLs for failover support
+    /// If specified, this takes precedence over `url`
+    /// Servers are tried in order until one succeeds
+    #[serde(default)]
+    pub urls: Vec<String>,
 
     /// Base DN for user searches (e.g., "dc=example,dc=com")
     pub base_dn: String,
@@ -120,6 +128,7 @@ impl Default for LdapConfig {
     fn default() -> Self {
         LdapConfig {
             url: "ldap://localhost:389".to_string(),
+            urls: Vec::new(),
             base_dn: "dc=example,dc=com".to_string(),
             bind_dn: None,
             bind_password: None,
@@ -135,35 +144,167 @@ impl Default for LdapConfig {
     }
 }
 
+impl LdapConfig {
+    /// Get all configured LDAP server URLs
+    ///
+    /// Returns URLs from `urls` field if configured, otherwise falls back to single `url`
+    pub fn get_server_urls(&self) -> Vec<String> {
+        if !self.urls.is_empty() {
+            self.urls.clone()
+        } else if !self.url.is_empty() {
+            vec![self.url.clone()]
+        } else {
+            Vec::new()
+        }
+    }
+}
+
+/// Server health state for failover
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ServerHealth {
+    /// Server is healthy and available
+    Up,
+    /// Server is experiencing failures
+    Down,
+}
+
+/// Health information for an LDAP server
+#[derive(Debug, Clone)]
+struct ServerHealthInfo {
+    /// Current health state
+    state: ServerHealth,
+    /// Number of consecutive failures
+    consecutive_failures: u32,
+    /// Number of consecutive successes
+    consecutive_successes: u32,
+    /// Last successful connection time
+    last_success: Option<std::time::Instant>,
+    /// Last failure time
+    last_failure: Option<std::time::Instant>,
+}
+
+impl Default for ServerHealthInfo {
+    fn default() -> Self {
+        ServerHealthInfo {
+            state: ServerHealth::Up,
+            consecutive_failures: 0,
+            consecutive_successes: 0,
+            last_success: None,
+            last_failure: None,
+        }
+    }
+}
+
 /// LDAP connection pool
 ///
 /// Manages a pool of reusable LDAP connections to reduce connection overhead.
 /// Uses a semaphore to limit concurrent connections and supports connection reuse.
+/// Supports automatic failover across multiple LDAP servers.
 pub struct LdapPool {
     config: Arc<LdapConfig>,
     semaphore: Arc<Semaphore>,
+    /// Health tracking for each server URL
+    /// Key is server URL, value is health information
+    server_health: Arc<dashmap::DashMap<String, ServerHealthInfo>>,
+    /// Number of consecutive failures before marking server as Down
+    failures_before_down: u32,
+    /// Number of consecutive successes before marking server as Up
+    successes_before_up: u32,
 }
 
 impl LdapPool {
     /// Create a new LDAP connection pool
     pub fn new(config: LdapConfig) -> Self {
         let max_connections = config.max_connections as usize;
+        let server_urls = config.get_server_urls();
+
         debug!(
-            url = %config.url,
+            servers = ?server_urls,
             max_connections = max_connections,
-            "Creating LDAP connection pool"
+            "Creating LDAP connection pool with failover support"
         );
+
+        // Initialize health tracking for all servers
+        let server_health = dashmap::DashMap::new();
+        for url in &server_urls {
+            server_health.insert(url.clone(), ServerHealthInfo::default());
+        }
 
         LdapPool {
             config: Arc::new(config),
             semaphore: Arc::new(Semaphore::new(max_connections)),
+            server_health: Arc::new(server_health),
+            failures_before_down: 3,
+            successes_before_up: 2,
         }
+    }
+
+    /// Record a successful connection to a server
+    fn record_success(&self, url: &str) {
+        let mut entry = self.server_health
+            .entry(url.to_string())
+            .or_insert_with(ServerHealthInfo::default);
+
+        entry.consecutive_successes += 1;
+        entry.consecutive_failures = 0;
+        entry.last_success = Some(std::time::Instant::now());
+
+        // Transition to Up state if enough successes
+        if entry.state == ServerHealth::Down && entry.consecutive_successes >= self.successes_before_up {
+            info!(url = %url, "LDAP server recovered");
+            entry.state = ServerHealth::Up;
+        }
+    }
+
+    /// Record a failed connection to a server
+    fn record_failure(&self, url: &str) {
+        let mut entry = self.server_health
+            .entry(url.to_string())
+            .or_insert_with(ServerHealthInfo::default);
+
+        entry.consecutive_failures += 1;
+        entry.consecutive_successes = 0;
+        entry.last_failure = Some(std::time::Instant::now());
+
+        // Transition to Down state if enough failures
+        if entry.state == ServerHealth::Up && entry.consecutive_failures >= self.failures_before_down {
+            warn!(url = %url, "LDAP server marked as down after {} failures", self.failures_before_down);
+            entry.state = ServerHealth::Down;
+        }
+    }
+
+    /// Check if a server is healthy
+    fn is_server_healthy(&self, url: &str) -> bool {
+        self.server_health
+            .get(url)
+            .map(|info| info.state == ServerHealth::Up)
+            .unwrap_or(true) // Assume healthy if not tracked yet
+    }
+
+    /// Get the list of available servers (healthy servers first, then unhealthy)
+    fn get_prioritized_servers(&self) -> Vec<String> {
+        let all_urls = self.config.get_server_urls();
+        let mut healthy_servers = Vec::new();
+        let mut unhealthy_servers = Vec::new();
+
+        for url in all_urls {
+            if self.is_server_healthy(&url) {
+                healthy_servers.push(url);
+            } else {
+                unhealthy_servers.push(url);
+            }
+        }
+
+        // Try healthy servers first, then unhealthy (for recovery)
+        healthy_servers.extend(unhealthy_servers);
+        healthy_servers
     }
 
     /// Acquire a connection from the pool
     ///
     /// This will create a new connection and bind with the service account credentials.
     /// The connection is returned when the guard is dropped.
+    /// Automatically tries servers in order with failover support.
     pub async fn acquire(&self) -> Result<LdapConnection, LdapError> {
         // Acquire permit from semaphore (blocks if pool is full)
         let acquire_timeout = Duration::from_secs(self.config.acquire_timeout);
@@ -177,11 +318,44 @@ impl LdapPool {
 
         debug!("Acquired LDAP connection from pool");
 
-        // Create new connection
+        // Try servers in prioritized order (healthy first)
+        let servers = self.get_prioritized_servers();
+        let mut last_error = None;
+
+        for server_url in servers {
+            debug!(url = %server_url, "Attempting LDAP connection");
+
+            // Try to connect to this server
+            match self.try_connect_and_bind(&server_url).await {
+                Ok(ldap) => {
+                    // Connection successful
+                    self.record_success(&server_url);
+                    info!(url = %server_url, "LDAP connection established");
+
+                    return Ok(LdapConnection {
+                        ldap,
+                        _permit: permit,
+                    });
+                }
+                Err(e) => {
+                    // Connection failed, record and try next server
+                    self.record_failure(&server_url);
+                    warn!(url = %server_url, error = ?e, "LDAP connection failed, trying next server");
+                    last_error = Some(e);
+                }
+            }
+        }
+
+        // All servers failed
+        Err(last_error.unwrap_or_else(|| LdapError::Connection("No LDAP servers configured".to_string())))
+    }
+
+    /// Try to connect to a specific server and bind with service account
+    async fn try_connect_and_bind(&self, server_url: &str) -> Result<ldap3::Ldap, LdapError> {
         let settings = LdapConnSettings::new()
             .set_conn_timeout(Duration::from_secs(self.config.timeout));
 
-        let (conn, mut ldap) = LdapConnAsync::with_settings(settings, &self.config.url)
+        let (conn, mut ldap) = LdapConnAsync::with_settings(settings, server_url)
             .await
             .map_err(|e| LdapError::Connection(e.to_string()))?;
 
@@ -201,7 +375,7 @@ impl LdapPool {
                 .map_err(|e| LdapError::Bind(e.to_string()))?
                 .success()
                 .map_err(|e| LdapError::Bind(e.to_string()))?;
-            debug!("Bound LDAP connection as {}", bind_dn);
+            debug!(bind_dn = %bind_dn, "Bound LDAP connection");
         } else {
             // Anonymous bind
             ldap.simple_bind("", "")
@@ -212,41 +386,72 @@ impl LdapPool {
             debug!("Anonymous bind to LDAP connection");
         }
 
-        Ok(LdapConnection {
-            ldap,
-            _permit: permit,
-        })
+        Ok(ldap)
     }
 
     /// Create a connection for user authentication (separate from pool)
     ///
     /// User authentication requires binding with user credentials, so we create
     /// a separate connection that doesn't affect the pool.
+    /// Automatically tries servers in order with failover support.
     pub async fn connect_for_auth(&self, user_dn: &str, password: &str) -> Result<ldap3::Ldap, LdapError> {
         debug!(dn = %user_dn, "Creating LDAP connection for user authentication");
 
-        let settings = LdapConnSettings::new()
-            .set_conn_timeout(Duration::from_secs(self.config.timeout));
+        // Try servers in prioritized order (healthy first)
+        let servers = self.get_prioritized_servers();
+        let mut last_error = None;
 
-        let (conn, mut ldap) = LdapConnAsync::with_settings(settings, &self.config.url)
-            .await
-            .map_err(|e| LdapError::Connection(e.to_string()))?;
+        for server_url in servers {
+            debug!(url = %server_url, dn = %user_dn, "Attempting user authentication");
 
-        // Start connection driver
-        tokio::spawn(async move {
-            if let Err(e) = conn.drive().await {
-                error!("LDAP auth connection driver error: {}", e);
+            let settings = LdapConnSettings::new()
+                .set_conn_timeout(Duration::from_secs(self.config.timeout));
+
+            match LdapConnAsync::with_settings(settings, &server_url).await {
+                Ok((conn, mut ldap)) => {
+                    // Start connection driver
+                    tokio::spawn(async move {
+                        if let Err(e) = conn.drive().await {
+                            error!("LDAP auth connection driver error: {}", e);
+                        }
+                    });
+
+                    // Try to bind as the user
+                    match ldap.simple_bind(user_dn, password).await {
+                        Ok(bind_result) => {
+                            match bind_result.success() {
+                                Ok(_) => {
+                                    // Authentication successful
+                                    self.record_success(&server_url);
+                                    debug!(url = %server_url, "User authentication successful");
+                                    return Ok(ldap);
+                                }
+                                Err(_) => {
+                                    // Authentication failed (wrong credentials)
+                                    // Don't mark server as down for auth failures
+                                    return Err(LdapError::AuthFailed);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            // Bind request failed (connection issue)
+                            self.record_failure(&server_url);
+                            warn!(url = %server_url, error = %e, "Bind request failed, trying next server");
+                            last_error = Some(LdapError::Bind(e.to_string()));
+                        }
+                    }
+                }
+                Err(e) => {
+                    // Connection failed
+                    self.record_failure(&server_url);
+                    warn!(url = %server_url, error = %e, "Connection failed for auth, trying next server");
+                    last_error = Some(LdapError::Connection(e.to_string()));
+                }
             }
-        });
+        }
 
-        // Bind as the user
-        ldap.simple_bind(user_dn, password)
-            .await
-            .map_err(|e| LdapError::Bind(e.to_string()))?
-            .success()
-            .map_err(|_e| LdapError::AuthFailed)?;
-
-        Ok(ldap)
+        // All servers failed
+        Err(last_error.unwrap_or_else(|| LdapError::Connection("No LDAP servers configured".to_string())))
     }
 }
 

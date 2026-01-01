@@ -153,6 +153,7 @@ async fn test_ldap_anonymous_bind() {
         attributes: vec!["dn".to_string(), "cn".to_string()],
         timeout: 10,
         verify_tls: false,
+        ..Default::default()
     };
 
     let handler = LdapAuthHandler::new(config);
@@ -179,6 +180,7 @@ async fn test_ldap_search_filter_variations() {
         attributes: vec!["dn".to_string()],
         timeout: 10,
         verify_tls: false,
+        ..Default::default()
     };
     let handler1 = LdapAuthHandler::new(config1);
     assert!(handler1.authenticate("testuser", "password123"));
@@ -193,6 +195,7 @@ async fn test_ldap_search_filter_variations() {
         attributes: vec!["dn".to_string()],
         timeout: 10,
         verify_tls: false,
+        ..Default::default()
     };
     let handler2 = LdapAuthHandler::new(config2);
     // This should work with "Test User" as cn
@@ -213,6 +216,7 @@ async fn test_ldap_concurrent_authentications() {
         attributes: vec!["dn".to_string()],
         timeout: 10,
         verify_tls: false,
+        ..Default::default()
     };
 
     let handler = Arc::new(LdapAuthHandler::new(config));
