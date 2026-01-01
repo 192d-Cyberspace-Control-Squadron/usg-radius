@@ -1057,7 +1057,7 @@ let config = RevocationConfig::disabled();
   - Thread-safe OcspCache via DashMap
   - TTL-based automatic expiration from nextUpdate
   - Freshness checking (thisUpdate/nextUpdate)
-  - LRU eviction when cache is full
+  - LRU eviction when max_cache_entries is reached
   - O(1) lookups, inserts, removals
 - ✅ **RevocationCheckingVerifier Integration**
   - OcspOnly mode - OCSP exclusive checking
@@ -1072,20 +1072,23 @@ let config = RevocationConfig::disabled();
   - Cache integration tests
   - Request building and parsing tests
   - All tests passing
-- ✅ **Documentation**
+- ✅ **Documentation & Examples**
   - Comprehensive README with OCSP examples
   - OCSP vs CRL decision matrix
   - Configuration examples for all modes
   - Performance documentation in [PERFORMANCE.md](../PERFORMANCE.md)
-  - Implementation plan in [OCSP_IMPLEMENTATION.md](../../OCSP_IMPLEMENTATION.md)
+  - Standalone OCSP checker example ([examples/ocsp_check.rs](../../examples/ocsp_check.rs))
+  - Updated EAP-TLS server example with OCSP configuration ([examples/eap_server.rs](../../examples/eap_server.rs))
+  - Examples README with OCSP documentation
 
 **Implementation Statistics**:
 
 - New modules: `ocsp.rs` (~1,000 lines), `ocsp_cache.rs` (~400 lines)
-- Updated: `verifier.rs` (+200 lines), `error.rs` (+3 lines)
+- Updated: `verifier.rs` (+200 lines), `error.rs` (+3 lines), `eap_server.rs` (+70 lines)
+- New examples: `ocsp_check.rs` (~200 lines)
 - 13 tests passing (7 integration + 6 unit)
-- Documentation: README (~90 lines added), PERFORMANCE.md (~70 lines)
-- 7 detailed commits with comprehensive documentation
+- Documentation: README (~90 lines added), PERFORMANCE.md (~70 lines), examples/README.md (~90 lines)
+- 10 detailed commits with comprehensive documentation
 
 **Known Limitations** (Deferred to future releases):
 
@@ -1093,8 +1096,6 @@ let config = RevocationConfig::disabled();
 - [ ] OCSP stapling (RFC 6066) - deferred to v0.8+
 - [ ] Request signing (optional feature)
 - [ ] Batch requests (multiple certificates)
-- [ ] Example: `examples/ocsp_check.rs`
-- [ ] Update `examples/eap_tls_server.rs` with OCSP config
 
 **Performance Targets**:
 
