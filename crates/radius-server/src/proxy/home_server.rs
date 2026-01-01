@@ -1,6 +1,7 @@
 //! Home server (upstream RADIUS server) configuration and state tracking
 
 use crate::proxy::error::{ProxyError, ProxyResult};
+use crate::proxy::health::HealthCheckStats;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -68,8 +69,8 @@ pub enum HomeServerState {
     Up,
     /// Server is down (health checks failing)
     Down,
-    /// Server is being tested (health checks in progress)
-    Testing,
+    /// Server is permanently unavailable (requires manual intervention)
+    Dead,
 }
 
 impl Default for HomeServerState {
@@ -170,6 +171,8 @@ pub struct HomeServer {
     state: Arc<RwLock<HomeServerState>>,
     /// Server statistics
     stats: Arc<HomeServerStats>,
+    /// Health check statistics
+    health_stats: Arc<HealthCheckStats>,
 }
 
 impl HomeServer {
@@ -190,6 +193,7 @@ impl HomeServer {
             max_outstanding: config.max_outstanding,
             state: Arc::new(RwLock::new(HomeServerState::Up)),
             stats: Arc::new(HomeServerStats::default()),
+            health_stats: Arc::new(HealthCheckStats::new()),
         })
     }
 
@@ -221,6 +225,26 @@ impl HomeServer {
     /// Get shared secret
     pub fn secret(&self) -> &[u8] {
         &self.secret
+    }
+
+    /// Get health check statistics
+    pub fn health_stats(&self) -> &HealthCheckStats {
+        &self.health_stats
+    }
+
+    /// Mark server as down
+    pub fn mark_down(&self) {
+        *self.state.write().unwrap() = HomeServerState::Down;
+    }
+
+    /// Mark server as up
+    pub fn mark_up(&self) {
+        *self.state.write().unwrap() = HomeServerState::Up;
+    }
+
+    /// Mark server as dead (requires manual intervention)
+    pub fn mark_dead(&self) {
+        *self.state.write().unwrap() = HomeServerState::Dead;
     }
 }
 
@@ -311,8 +335,8 @@ mod tests {
         assert_eq!(server.state(), HomeServerState::Down);
         assert!(!server.is_available());
 
-        server.set_state(HomeServerState::Testing);
-        assert_eq!(server.state(), HomeServerState::Testing);
+        server.set_state(HomeServerState::Dead);
+        assert_eq!(server.state(), HomeServerState::Dead);
         assert!(!server.is_available());
 
         server.set_state(HomeServerState::Up);

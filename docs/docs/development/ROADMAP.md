@@ -886,9 +886,37 @@ let config = RevocationConfig::disabled();
 
 **Features Not Implemented** (deferred to future releases):
 
-- Health monitoring (Status-Server checks) - planned for v0.7.1
 - Dynamic routing rules - planned for v0.7.2
 - Automatic server removal/addition - planned for v0.7.2
+
+---
+
+## v0.7.1 - Health Monitoring (Complete)
+
+**Goal**: RFC 5997 Status-Server based health checking
+**Priority**: HIGH
+**Status**: ✅ COMPLETE
+
+### Health Checking Implementation
+
+- ✅ RFC 5997 Status-Server health checks
+- ✅ Background health monitoring task
+- ✅ Automatic server state transitions (Up/Down/Dead)
+- ✅ Configurable failure/success thresholds
+- ✅ Concurrent health checks for all servers
+- ✅ Health statistics tracking
+- ✅ Integration with HomeServer state management
+
+**Actual Effort**: 0.5 weeks
+
+**Implementation Details**:
+
+- Status-Server packets (RFC 5997) sent at configurable intervals
+- Servers marked Down after N consecutive failures
+- Servers marked Up after M consecutive successes
+- Dead servers can recover automatically
+- Atomic statistics tracking (lock-free)
+- Full test coverage (6 unit tests)
 
 ---
 
