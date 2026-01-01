@@ -317,9 +317,61 @@ The proxy respects the main server's client authorization:
 
 ## Monitoring
 
-### Statistics
+### Runtime Statistics API
 
-Each home server tracks statistics:
+Get real-time proxy statistics via the `get_proxy_stats()` method:
+
+```rust
+if let Some(stats) = server.get_proxy_stats() {
+    println!("Total Requests: {}", stats.total_requests);
+    println!("Total Responses: {}", stats.total_responses);
+    println!("Total Outstanding: {}", stats.total_outstanding);
+
+    // Per-pool statistics
+    for pool in &stats.pools {
+        println!("Pool {}: {} servers ({} available)",
+            pool.name, pool.total_servers, pool.available_servers);
+
+        // Per-server statistics
+        for server in &pool.servers {
+            println!("  {}: {} req, {} resp, {} outstanding ({})",
+                server.name, server.requests_sent,
+                server.responses_received, server.outstanding,
+                server.state);
+        }
+    }
+
+    // Export as JSON
+    let json = stats.to_json()?;
+}
+```
+
+**ProxyStats Structure**:
+
+- `total_requests`: Total requests across all pools
+- `total_responses`: Total responses across all pools
+- `total_outstanding`: Total outstanding requests
+- `total_timeouts`: Total timeouts across all servers
+- `pools`: Array of pool statistics
+
+**Per-Pool Statistics**:
+
+- Pool name, strategy, server counts
+- Total requests/responses/outstanding for the pool
+- Array of server statistics
+
+**Per-Server Statistics**:
+
+- Server name, address, state (Up/Down/Dead)
+- Requests sent, responses received, timeouts, outstanding
+- Time since last response
+- Health check statistics (total checks, successes, failures, consecutive counts)
+
+*Available in v0.7.3+*
+
+### Home Server Statistics
+
+Each home server tracks operational statistics:
 
 ```rust
 pub struct HomeServerStats {

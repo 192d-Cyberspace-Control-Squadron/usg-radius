@@ -56,6 +56,7 @@ pub mod pool;
 pub mod realm;
 pub mod retry;
 pub mod router;
+pub mod stats;
 
 pub use cache::{ProxyCache, ProxyCacheEntry, ProxyStateKey};
 pub use error::ProxyError;
@@ -66,6 +67,7 @@ pub use pool::{HomeServerPool, HomeServerPoolConfig, LoadBalanceStrategy};
 pub use realm::{Realm, RealmConfig, RealmMatchConfig, RealmMatcher};
 pub use retry::{RetryConfig, RetryManager};
 pub use router::{Router, RoutingDecision};
+pub use stats::{PoolStatSnapshot, ProxyStats, ServerHealthStats, ServerStatSnapshot};
 
 use serde::{Deserialize, Serialize};
 

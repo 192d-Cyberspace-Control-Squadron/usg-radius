@@ -377,6 +377,8 @@ pub struct RadiusServer {
     socket: Arc<UdpSocket>,
     /// Home servers for health checking (if proxy is enabled)
     home_servers: Vec<Arc<crate::proxy::home_server::HomeServer>>,
+    /// Home server pools (if proxy is enabled)
+    pools: Vec<Arc<crate::proxy::pool::HomeServerPool>>,
 }
 
 impl RadiusServer {
@@ -387,6 +389,7 @@ impl RadiusServer {
         info!("RADIUS server listening on {}", config.bind_addr);
 
         let mut home_servers = Vec::new();
+        let mut pools = Vec::new();
 
         // Initialize proxy components if enabled
         if let Some(ref full_config) = config.config {
@@ -395,7 +398,7 @@ impl RadiusServer {
                     info!("Initializing RADIUS proxy");
 
                     // Create proxy components
-                    let (router, proxy_handler, retry_manager, health_checker, servers) =
+                    let (router, proxy_handler, retry_manager, health_checker, servers, server_pools) =
                         Self::initialize_proxy(proxy_config, Arc::clone(&socket)).await?;
 
                     config.router = Some(Arc::new(router));
@@ -403,6 +406,7 @@ impl RadiusServer {
                     config.retry_manager = Some(Arc::new(retry_manager));
                     config.health_checker = health_checker.map(Arc::new);
                     home_servers = servers;
+                    pools = server_pools;
 
                     info!("RADIUS proxy initialized");
                 }
@@ -413,6 +417,7 @@ impl RadiusServer {
             config: Arc::new(config),
             socket,
             home_servers,
+            pools,
         })
     }
 
@@ -420,7 +425,7 @@ impl RadiusServer {
     async fn initialize_proxy(
         proxy_config: &ProxyConfig,
         socket: Arc<UdpSocket>,
-    ) -> Result<(Router, ProxyHandler, RetryManager, Option<crate::proxy::health::HealthChecker>, Vec<Arc<crate::proxy::home_server::HomeServer>>), ServerError> {
+    ) -> Result<(Router, ProxyHandler, RetryManager, Option<crate::proxy::health::HealthChecker>, Vec<Arc<crate::proxy::home_server::HomeServer>>, Vec<Arc<crate::proxy::pool::HomeServerPool>>), ServerError> {
         use crate::proxy::cache::ProxyCache;
         use crate::proxy::health::HealthChecker;
 
@@ -485,9 +490,11 @@ impl RadiusServer {
                 format!("Failed to create proxy handler: {}", e)
             )))?;
 
-        // Collect all home servers from all pools
+        // Collect all home servers and pools from all pools
         let mut all_servers = Vec::new();
+        let mut all_pools = Vec::new();
         for pool in pools.values() {
+            all_pools.push(Arc::clone(pool));
             for server in &pool.servers {
                 all_servers.push(Arc::clone(server));
             }
@@ -524,7 +531,7 @@ impl RadiusServer {
             None
         };
 
-        Ok((router, server_proxy_handler, retry_manager, health_checker, all_servers))
+        Ok((router, server_proxy_handler, retry_manager, health_checker, all_servers, all_pools))
     }
 
     /// Get the local address the server is listening on
@@ -532,6 +539,18 @@ impl RadiusServer {
     /// This is useful for testing when binding to port 0 (OS-assigned port)
     pub fn local_addr(&self) -> Result<std::net::SocketAddr, ServerError> {
         self.socket.local_addr().map_err(ServerError::from)
+    }
+
+    /// Get proxy statistics snapshot
+    ///
+    /// Returns aggregated statistics from all pools and servers if proxy is enabled.
+    /// Returns None if proxy is not enabled.
+    pub fn get_proxy_stats(&self) -> Option<crate::proxy::stats::ProxyStats> {
+        if self.pools.is_empty() {
+            None
+        } else {
+            Some(crate::proxy::stats::ProxyStats::collect(&self.pools))
+        }
     }
 
     /// Start the server and handle incoming requests

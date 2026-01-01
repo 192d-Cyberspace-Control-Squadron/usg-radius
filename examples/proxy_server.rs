@@ -105,6 +105,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  radtest local_user local_password localhost 0 testing123");
     println!("\nPress Ctrl+C to stop the server\n");
 
+    // Example: Get proxy statistics (uncomment to use)
+    // if let Some(stats) = server.get_proxy_stats() {
+    //     println!("Proxy Statistics:");
+    //     println!("  Total Requests: {}", stats.total_requests);
+    //     println!("  Total Responses: {}", stats.total_responses);
+    //     println!("  Total Outstanding: {}", stats.total_outstanding);
+    //     println!("  Pools: {}", stats.pools.len());
+    //     for pool in &stats.pools {
+    //         println!("    - {}: {} servers ({} available)",
+    //             pool.name, pool.total_servers, pool.available_servers);
+    //     }
+    //     // Export as JSON
+    //     // println!("{}", stats.to_json().unwrap());
+    // }
+
     // Run server
     server.run().await?;
 

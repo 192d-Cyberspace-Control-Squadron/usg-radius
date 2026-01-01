@@ -122,8 +122,9 @@
     "health_check": {
       "enabled": true,
       "interval": 30,
-      "timeout": 5,
-      "method": "status_server"
+      "timeout": 10,
+      "failures_before_down": 3,
+      "successes_before_up": 2
     },
 
     "retry": {
