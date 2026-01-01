@@ -43,8 +43,10 @@ use super::{
     crl::CrlInfo,
     error::RevocationError,
     fetch::{CrlFetcher, extract_crl_distribution_points},
+    ocsp::{OcspClient, OcspResponse},
+    ocsp_cache::OcspCache,
 };
-use pki_types::{CertificateDer, ServerName, UnixTime};
+use pki_types::{CertificateDer, UnixTime};
 use rustls::server::{
     WebPkiClientVerifier,
     danger::{ClientCertVerified, ClientCertVerifier},
@@ -53,21 +55,21 @@ use rustls::{DigitallySignedStruct, DistinguishedName, Error as RustlsError};
 use std::sync::Arc;
 use std::time::Duration;
 
-/// Custom certificate verifier with CRL revocation checking
+/// Custom certificate verifier with CRL and OCSP revocation checking
 ///
-/// This verifier wraps `WebPkiClientVerifier` and adds CRL checking.
+/// This verifier wraps `WebPkiClientVerifier` and adds CRL and/or OCSP checking.
 /// It implements rustls's `ClientCertVerifier` trait to integrate into
 /// the TLS handshake.
 ///
 /// # Behavior Modes
 ///
-/// - **Fail-Open**: If CRL fetch/parse fails, allow authentication (log warning)
-/// - **Fail-Closed**: If CRL fetch/parse fails, reject authentication (secure default)
+/// - **Fail-Open**: If CRL/OCSP fetch/parse fails, allow authentication (log warning)
+/// - **Fail-Closed**: If CRL/OCSP fetch/parse fails, reject authentication (secure default)
 ///
 /// # Caching
 ///
-/// CRLs are cached with configurable TTL to avoid repeated HTTP fetches.
-/// Cache is thread-safe and shared across all TLS connections.
+/// Both CRLs and OCSP responses are cached with configurable TTL to avoid repeated HTTP fetches.
+/// Caches are thread-safe and shared across all TLS connections.
 #[derive(Debug)]
 pub struct RevocationCheckingVerifier {
     /// Underlying WebPki verifier for standard validation
@@ -81,6 +83,12 @@ pub struct RevocationCheckingVerifier {
 
     /// HTTP fetcher for CRLs
     crl_fetcher: Option<CrlFetcher>,
+
+    /// OCSP response cache (thread-safe)
+    ocsp_cache: Option<Arc<OcspCache>>,
+
+    /// OCSP client for querying responders
+    ocsp_client: Option<OcspClient>,
 }
 
 impl RevocationCheckingVerifier {
@@ -127,11 +135,27 @@ impl RevocationCheckingVerifier {
             None
         };
 
+        // Create OCSP cache if OCSP is enabled
+        let ocsp_cache = if config.ocsp_config.enabled {
+            Some(OcspCache::new(config.ocsp_config.max_cache_entries))
+        } else {
+            None
+        };
+
+        // Create OCSP client if OCSP is enabled
+        let ocsp_client = if config.ocsp_config.enabled {
+            Some(OcspClient::new(config.ocsp_config.http_timeout_secs)?)
+        } else {
+            None
+        };
+
         Ok(Self {
             webpki_verifier,
             config,
             crl_cache,
             crl_fetcher,
+            ocsp_cache,
+            ocsp_client,
         })
     }
 
@@ -151,21 +175,35 @@ impl RevocationCheckingVerifier {
             None
         };
 
+        let ocsp_cache = if config.ocsp_config.enabled {
+            Some(OcspCache::new(config.ocsp_config.max_cache_entries))
+        } else {
+            None
+        };
+
+        let ocsp_client = if config.ocsp_config.enabled {
+            Some(OcspClient::new(config.ocsp_config.http_timeout_secs)?)
+        } else {
+            None
+        };
+
         Ok(Self {
             webpki_verifier,
             config,
             crl_cache,
             crl_fetcher,
+            ocsp_cache,
+            ocsp_client,
         })
     }
 
     /// Check if a certificate is revoked
     ///
-    /// This performs the full CRL checking flow:
-    /// 1. Extract CRL distribution points from cert
-    /// 2. Fetch CRL (with caching)
-    /// 3. Parse and validate CRL
-    /// 4. Check if cert serial is in revoked set
+    /// This performs revocation checking according to the configured check mode:
+    /// - OcspOnly: Check OCSP only
+    /// - CrlOnly: Check CRL only
+    /// - PreferOcsp: Try OCSP first, fallback to CRL on failure
+    /// - Both: Check both OCSP and CRL (fail if either indicates revoked)
     ///
     /// # Arguments
     ///
@@ -181,6 +219,71 @@ impl RevocationCheckingVerifier {
             return Ok(());
         }
 
+        match self.config.check_mode {
+            RevocationCheckMode::Disabled => Ok(()),
+
+            RevocationCheckMode::OcspOnly => {
+                // OCSP only - fail if OCSP check fails
+                self.check_ocsp(cert_der)
+            }
+
+            RevocationCheckMode::CrlOnly => {
+                // CRL only - existing behavior
+                self.check_crl(cert_der)
+            }
+
+            RevocationCheckMode::PreferOcsp => {
+                // Try OCSP first, fallback to CRL
+                match self.check_ocsp(cert_der) {
+                    Ok(()) => Ok(()),
+                    Err(e) => {
+                        eprintln!("OCSP check failed: {}, trying CRL fallback", e);
+                        self.check_crl(cert_der)
+                    }
+                }
+            }
+
+            RevocationCheckMode::Both => {
+                // Check both OCSP and CRL - both must succeed
+                let ocsp_result = self.check_ocsp(cert_der);
+                let crl_result = self.check_crl(cert_der);
+
+                // If either indicates revoked, fail immediately
+                match (ocsp_result, crl_result) {
+                    (Err(RevocationError::CertificateRevoked(_)), _) => {
+                        Err(RevocationError::CertificateRevoked(
+                            "Certificate revoked (OCSP)".to_string(),
+                        ))
+                    }
+                    (_, Err(RevocationError::CertificateRevoked(_))) => {
+                        Err(RevocationError::CertificateRevoked(
+                            "Certificate revoked (CRL)".to_string(),
+                        ))
+                    }
+                    // Both succeeded
+                    (Ok(()), Ok(())) => Ok(()),
+                    // At least one failed (not revoked, but error) - handle based on policy
+                    (Err(e1), Err(_e2)) => {
+                        // Both failed - use OCSP error
+                        self.handle_error(e1)
+                    }
+                    (Err(e), Ok(())) => {
+                        // OCSP failed but CRL succeeded
+                        eprintln!("OCSP check failed but CRL succeeded: {}", e);
+                        Ok(())
+                    }
+                    (Ok(()), Err(e)) => {
+                        // CRL failed but OCSP succeeded
+                        eprintln!("CRL check failed but OCSP succeeded: {}", e);
+                        Ok(())
+                    }
+                }
+            }
+        }
+    }
+
+    /// Check certificate revocation via CRL
+    fn check_crl(&self, cert_der: &[u8]) -> Result<(), RevocationError> {
         // Extract CRL distribution points from certificate
         let distribution_points = match extract_crl_distribution_points(cert_der) {
             Ok(points) => points,
@@ -214,6 +317,110 @@ impl RevocationCheckingVerifier {
         self.handle_error(last_error.unwrap_or_else(|| {
             RevocationError::DistributionPointError("No valid CRL found".to_string())
         }))
+    }
+
+    /// Check certificate revocation via OCSP
+    fn check_ocsp(&self, cert_der: &[u8]) -> Result<(), RevocationError> {
+        // Check if OCSP is enabled
+        let ocsp_client = self.ocsp_client.as_ref().ok_or_else(|| {
+            RevocationError::ConfigError("OCSP client not initialized".to_string())
+        })?;
+
+        let ocsp_cache = self.ocsp_cache.as_ref().ok_or_else(|| {
+            RevocationError::ConfigError("OCSP cache not initialized".to_string())
+        })?;
+
+        // Extract serial number for cache lookup
+        let serial = self.extract_serial_number(cert_der)?;
+
+        // Try cache first
+        if let Some(cached_response) = ocsp_cache.get(&serial) {
+            // Check certificate status from cached response
+            return self.check_ocsp_response_status(&cached_response);
+        }
+
+        // Extract OCSP URL from certificate AIA extension
+        let ocsp_url = match OcspClient::extract_ocsp_url(cert_der) {
+            Ok(url) => url,
+            Err(e) => {
+                // No OCSP URL found - handle according to fail-open/closed policy
+                return self.handle_error(e);
+            }
+        };
+
+        // We need the issuer certificate to build OCSP request
+        // For now, we'll return an error indicating issuer is needed
+        // In a full implementation, the issuer would be extracted from the cert chain
+        // passed to verify_client_cert
+        //
+        // TODO: Extract issuer from intermediates parameter in verify_client_cert
+        // and pass it through check_revocation chain
+        return Err(RevocationError::ConfigError(
+            "OCSP checking requires issuer certificate (not yet implemented)".to_string(),
+        ));
+
+        // This code will be used once issuer extraction is implemented:
+        /*
+        // Build OCSP request
+        let mut request_builder = OcspRequestBuilder::new(cert_der, issuer_der)?;
+
+        if self.config.ocsp_config.enable_nonce {
+            request_builder = request_builder.with_nonce();
+        }
+
+        let request_der = request_builder.build()?;
+
+        // Query OCSP responder
+        let response_der = ocsp_client.query(&ocsp_url, &request_der,
+            self.config.ocsp_config.max_response_size_bytes)?;
+
+        // Parse response
+        let response = OcspResponse::parse(&response_der)?;
+
+        // Verify nonce if we sent one
+        if self.config.ocsp_config.enable_nonce {
+            if let Some(ref sent_nonce) = request_builder.nonce {
+                if response.nonce.as_ref() != Some(sent_nonce) {
+                    return Err(RevocationError::OcspError(
+                        "OCSP response nonce mismatch".to_string()
+                    ));
+                }
+            }
+        }
+
+        // Cache the response
+        ocsp_cache.insert(serial.clone(), response.clone());
+
+        // Check status
+        self.check_ocsp_response_status(&response)
+        */
+    }
+
+    /// Check OCSP response status
+    fn check_ocsp_response_status(&self, response: &OcspResponse) -> Result<(), RevocationError> {
+        use super::ocsp::{CertificateStatus, OcspResponseStatus};
+
+        // Check response status
+        if response.status != OcspResponseStatus::Successful {
+            return Err(RevocationError::OcspError(format!(
+                "OCSP responder returned error status: {:?}",
+                response.status
+            )));
+        }
+
+        // Check certificate status
+        match &response.cert_status {
+            Some(CertificateStatus::Good) => Ok(()),
+            Some(CertificateStatus::Revoked { .. }) => Err(RevocationError::CertificateRevoked(
+                "Certificate revoked (OCSP)".to_string(),
+            )),
+            Some(CertificateStatus::Unknown) => Err(RevocationError::OcspError(
+                "OCSP responder returned 'unknown' status".to_string(),
+            )),
+            None => Err(RevocationError::OcspError(
+                "OCSP response missing certificate status".to_string(),
+            )),
+        }
     }
 
     /// Check CRL from a specific URL

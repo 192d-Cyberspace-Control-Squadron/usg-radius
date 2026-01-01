@@ -856,6 +856,7 @@ fn extract_nonce_from_extensions(extensions_seq: &[der_parser::der::DerObject]) 
 /// OCSP client for querying responders
 ///
 /// Handles HTTP POST requests to OCSP responders and response parsing.
+#[derive(Debug)]
 pub struct OcspClient {
     /// HTTP timeout for OCSP requests
     timeout: Duration,

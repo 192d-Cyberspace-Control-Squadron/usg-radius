@@ -64,6 +64,10 @@ pub enum RevocationError {
     /// Configuration error
     #[error("Configuration error: {0}")]
     ConfigError(String),
+
+    /// OCSP error
+    #[error("OCSP error: {0}")]
+    OcspError(String),
 }
 
 impl From<RevocationError> for crate::eap::EapError {
