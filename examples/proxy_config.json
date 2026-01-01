@@ -1,0 +1,147 @@
+{
+  "host": "0.0.0.0",
+  "port": 1812,
+  "secret": "testing123",
+  "strict_rfc_compliance": true,
+
+  "clients": [
+    {
+      "name": "Test NAS",
+      "network": "127.0.0.1/32",
+      "secret": "testing123"
+    },
+    {
+      "name": "Local Network",
+      "network": "192.168.1.0/24",
+      "secret": "network_secret"
+    }
+  ],
+
+  "proxy": {
+    "enabled": true,
+    "cache_ttl": 300,
+    "max_outstanding": 1000,
+    "proxy_timeout": 30,
+    "default_realm": "local",
+
+    "pools": [
+      {
+        "name": "corporate_pool",
+        "strategy": "round_robin",
+        "servers": [
+          {
+            "address": "10.0.1.10:1812",
+            "secret": "corporate_secret_1",
+            "timeout": 30,
+            "max_outstanding": 100,
+            "name": "corporate-radius-1"
+          },
+          {
+            "address": "10.0.1.11:1812",
+            "secret": "corporate_secret_2",
+            "timeout": 30,
+            "max_outstanding": 100,
+            "name": "corporate-radius-2"
+          }
+        ]
+      },
+      {
+        "name": "guest_pool",
+        "strategy": "least_outstanding",
+        "servers": [
+          {
+            "address": "10.0.2.10:1812",
+            "secret": "guest_secret",
+            "timeout": 30,
+            "max_outstanding": 100,
+            "name": "guest-radius"
+          }
+        ]
+      },
+      {
+        "name": "eduroam_pool",
+        "strategy": "failover",
+        "servers": [
+          {
+            "address": "radius1.eduroam.org:1812",
+            "secret": "eduroam_secret",
+            "timeout": 30,
+            "max_outstanding": 100,
+            "name": "eduroam-primary"
+          },
+          {
+            "address": "radius2.eduroam.org:1812",
+            "secret": "eduroam_secret",
+            "timeout": 30,
+            "max_outstanding": 100,
+            "name": "eduroam-backup"
+          }
+        ]
+      }
+    ],
+
+    "realms": [
+      {
+        "name": "corporate_suffix",
+        "match": {
+          "type": "suffix",
+          "pattern": "corp.example.com"
+        },
+        "pool": "corporate_pool",
+        "strip_realm": true
+      },
+      {
+        "name": "corporate_prefix",
+        "match": {
+          "type": "exact",
+          "pattern": "CORPORATE"
+        },
+        "pool": "corporate_pool",
+        "strip_realm": true
+      },
+      {
+        "name": "guest",
+        "match": {
+          "type": "exact",
+          "pattern": "GUEST"
+        },
+        "pool": "guest_pool",
+        "strip_realm": true
+      },
+      {
+        "name": "eduroam",
+        "match": {
+          "type": "regex",
+          "pattern": "^.*@.*\\.edu$"
+        },
+        "pool": "eduroam_pool",
+        "strip_realm": false
+      }
+    ],
+
+    "health_check": {
+      "enabled": true,
+      "interval": 30,
+      "timeout": 5,
+      "method": "status_server"
+    },
+
+    "retry": {
+      "max_retries": 3,
+      "retry_interval": 5,
+      "failover_on_timeout": true
+    }
+  },
+
+  "request_cache_ttl": 60,
+  "request_cache_max_entries": 10000,
+
+  "rate_limit_per_client_rps": 100,
+  "rate_limit_per_client_burst": 200,
+  "rate_limit_global_rps": 1000,
+  "rate_limit_global_burst": 2000,
+  "max_concurrent_connections": 1000,
+  "max_bandwidth_bps": 10000000,
+
+  "audit_log_path": "/var/log/radius/audit.log"
+}
