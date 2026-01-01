@@ -571,7 +571,11 @@ The following legacy methods will **not** be implemented due to modern alternati
 - ✅ Bcrypt password hashing
 - ✅ Custom SQL queries
 - ✅ PostgreSQL schema and migration examples
-- [ ] Additional password hashing algorithms (argon2, pbkdf2)
+- ✅ **Additional password hashing algorithms** (**Dec 31, 2025**)
+  - Argon2id password verification
+  - PBKDF2-SHA256 password verification
+  - Async verification using tokio::task::spawn_blocking
+  - Proper error handling and password mismatch detection
 
 **Status**: ✅ PostgreSQL complete, MySQL pending
 **Completed**: Dec 2025
@@ -591,10 +595,16 @@ The following legacy methods will **not** be implemented due to modern alternati
   - Pool timeout configuration with acquire_timeout (default: 10s)
   - Separate user authentication connections (doesn't consume pool)
   - Eliminates per-request connection overhead (~50-100ms per auth)
-- [ ] Group membership queries and RADIUS attribute mapping
+- ✅ **Group membership queries and RADIUS attribute mapping** (**Dec 31, 2025**)
+  - Group attribute retrieval via configurable LDAP attribute (default: "memberOf")
+  - HashMap-based mapping of LDAP group DNs to RADIUS attributes
+  - GroupAttributeMapping struct for flexible attribute configuration
+  - Thread-safe attribute caching with DashMap
+  - get_accept_attributes() implementation for automatic group-based attribute injection
+  - Support for multiple RADIUS attributes per group
 - [ ] Connection failover
 
-**Status**: ✅ Core features complete, advanced features pending
+**Status**: ✅ Core features complete (including group membership), connection failover pending
 **Completed**: Dec 2025
 
 ### Documentation ✅ COMPLETED
@@ -622,16 +632,22 @@ The following legacy methods will **not** be implemented due to modern alternati
 - ✅ **Docker-based LDAP integration tests** - Async runtime fixed!
   - ✅ Fixed by adding `#[tokio::test(flavor = "multi_thread")]` to all 8 tests
   - ✅ 4/8 tests passing (4 failures due to missing LDAP test data, not runtime issues)
-  - [ ] Add LDAP test data initialization script for remaining 4 tests
+  - ✅ **LDAP test data initialization script** (**Dec 31, 2025**)
+    - Created `tests/test-data/init-ldap.ldif` with test users and groups
+    - Created `tests/test-data/init-ldap.sh` for automated initialization
+    - Test data includes 3 users (testuser, alice, bob) and 3 groups
 - ✅ **Docker-based PostgreSQL integration tests** - Async runtime fixed!
   - ✅ Fixed by adding `#[tokio::test(flavor = "multi_thread")]` to all 11 tests
   - ✅ 6/11 tests passing (5 failures due to missing PostgreSQL test data, not runtime issues)
-  - [ ] Add PostgreSQL test data initialization script for remaining 5 tests
+  - ✅ **PostgreSQL test data initialization script** (**Dec 31, 2025**)
+    - Created `tests/test-data/init-postgres.sql` with comprehensive test data
+    - Created `tests/test-data/init-postgres.sh` for automated initialization
+    - Test data includes all three password hashing types (bcrypt, argon2, pbkdf2)
+    - Includes user_attributes table with RADIUS attribute mappings
 - [ ] End-to-end authentication tests
 
-**Status**: ✅ Async runtime issues resolved! Tests now run correctly.
+**Status**: ✅ Test data initialization scripts complete!
 **Completed**: Dec 2025
-**Remaining Work**: Test data initialization scripts for Docker containers
 
 ### High Availability
 
@@ -653,41 +669,41 @@ The following legacy methods will **not** be implemented due to modern alternati
 
 ### Performance Optimization ✅ COMPLETED
 
-- [x] **LDAP connection pooling** - ✅ **COMPLETED (Dec 31, 2025)**
+- ✅ **LDAP connection pooling** - **COMPLETED (Dec 31, 2025)**
   - Implemented LdapPool with semaphore-based concurrency control
   - Configurable max_connections (default: 10) and acquire_timeout (default: 10s)
   - Eliminates 2 connection creations per authentication (search + bind)
   - Expected 50-100ms latency reduction per LDAP authentication
   - Automatic connection lifecycle with `OwnedSemaphorePermit` RAII pattern
-- [x] **Password verification result caching** - ✅ **COMPLETED (Dec 31, 2025)**
+- ✅ **Password verification result caching** - **COMPLETED (Dec 31, 2025)**
   - Intelligent caching of successful bcrypt verifications
   - SHA-256 hashed cache keys (username:password) for security
   - Configurable TTL (default: 300s/5min) and max size (default: 1000 entries)
   - Automatic hash change detection and cache invalidation
   - Expected ~100ms CPU reduction per cached authentication
   - Simple FIFO eviction when cache is full
-- [x] **Database query optimization** - ✅ **COMPLETED (Dec 31, 2025)**
+- ✅ **Database query optimization** - **COMPLETED (Dec 31, 2025)**
   - Created comprehensive PostgreSQL schema with performance-optimized indexes
   - Added module-level documentation with index recommendations
   - Unique index on username for O(log n) lookups
   - Composite index on user_attributes(username, attribute_type)
   - Query performance verification with EXPLAIN ANALYZE examples
   - Complete schema in examples/postgres_schema.sql
-- [x] **Request cache expiry optimization** - ✅ **COMPLETED (Dec 31, 2025)**
+- ✅ **Request cache expiry optimization** - **COMPLETED (Dec 31, 2025)**
   - Replaced lazy cleanup with background task approach
   - Periodic cleanup every TTL/4 interval (e.g., 15s for 60s TTL)
   - Eliminates cleanup overhead from hot request path
   - Predictable memory usage and cleanup timing
   - Graceful shutdown via Drop implementation
   - Test-friendly constructor without background task
-- [x] **Rate limiter statistics and monitoring** - ✅ **COMPLETED (Dec 31, 2025)**
+- ✅ **Rate limiter statistics and monitoring** - **COMPLETED (Dec 31, 2025)**
   - Added comprehensive statistics methods (get_stats, get_tracked_clients, get_all_client_stats)
   - Non-blocking try_get_global_stats_sync() for performance-critical paths
   - Async get_global_stats() with current token count
   - New statistics types: RateLimiterStats, ClientRateLimitConfig, GlobalRateLimitConfig
   - Real-time monitoring of active connections and bandwidth usage
   - Configuration introspection support
-- [x] **Performance benchmarking framework** - ✅ Criterion-based benchmarks
+- ✅ **Performance benchmarking framework** - Criterion-based benchmarks
   - Packet encoding/decoding benchmarks (existing)
   - Server performance benchmarks (cache, rate limiter, password verification)
 - [ ] Memory profiling and optimization (Future work)
