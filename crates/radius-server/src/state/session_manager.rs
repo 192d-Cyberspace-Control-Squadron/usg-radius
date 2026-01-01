@@ -64,7 +64,7 @@ impl<T> CachedSession<T> {
 /// # }
 /// ```
 pub struct SharedSessionManager {
-    backend: Arc<dyn StateBackend>,
+    pub backend: Arc<dyn StateBackend>,
     local_cache: Arc<dashmap::DashMap<String, CachedSession<Vec<u8>>>>,
     cache_ttl: Duration,
 }
