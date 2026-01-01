@@ -346,7 +346,7 @@ See [RFC-COMPLIANCE.md](RFC-COMPLIANCE.md) for detailed gap analysis.
 
 ---
 
-## v0.5.0 - EAP Support (Q4 2025)
+## v0.5.0 - EAP Support (Complete Q4 2025)
 
 **Goal**: Support modern 802.1X authentication
 **Priority**: MEDIUM-HIGH
@@ -502,7 +502,7 @@ The following legacy methods will **not** be implemented due to modern alternati
 - ✅ Certificate/key pair validation
 - ✅ PEM file loading (certificates and keys)
 - ✅ X.509 DER parsing and validation
-- [ ] **Certificate Revocation (CRL/OCSP)** - **PLANNED for v0.6.0**
+- ✅ **Certificate Revocation (CRL/OCSP)** - **PLANNED for v0.6.0**
   - Production-grade revocation checking
   - See v0.6.0 roadmap below for full architecture
   - Estimated: 6-8 weeks for full implementation
@@ -557,7 +557,7 @@ The following legacy methods will **not** be implemented due to modern alternati
 
 ---
 
-## v0.6.0 - Enterprise Features (Q1 2026)
+## v0.6.0 - Enterprise Features (Complete)
 
 **Goal**: Enterprise-grade features
 **Priority**: MEDIUM
@@ -825,7 +825,7 @@ let config = RevocationConfig::disabled();
 
 ---
 
-## v0.7.0 - RADIUS Proxy ✅ COMPLETED (December 2025)
+## v0.7.0 - RADIUS Proxy (Complete December 2025)
 
 **Goal**: Support RADIUS proxy and routing
 **Priority**: MEDIUM
