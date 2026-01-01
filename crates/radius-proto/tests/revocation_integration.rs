@@ -60,7 +60,7 @@
 #![cfg(feature = "revocation")]
 
 use radius_proto::revocation::{
-    CrlConfig, FallbackBehavior, RevocationCheckMode, RevocationConfig,
+    CrlConfig, FallbackBehavior, OcspConfig, RevocationCheckMode, RevocationConfig,
 };
 
 /// Test configuration creation
@@ -78,6 +78,7 @@ fn test_revocation_config_integration() {
             max_cache_entries: 100,
             max_crl_size_bytes: 10 * 1024 * 1024,
         },
+        ocsp_config: OcspConfig::default(),
     };
 
     assert_eq!(config.check_mode, RevocationCheckMode::CrlOnly);
@@ -94,6 +95,7 @@ fn test_fallback_behavior_modes() {
         check_mode: RevocationCheckMode::CrlOnly,
         fallback_behavior: FallbackBehavior::FailClosed,
         crl_config: CrlConfig::default(),
+        ocsp_config: OcspConfig::default(),
     };
 
     assert_eq!(fail_closed.fallback_behavior, FallbackBehavior::FailClosed);
@@ -103,6 +105,7 @@ fn test_fallback_behavior_modes() {
         check_mode: RevocationCheckMode::CrlOnly,
         fallback_behavior: FallbackBehavior::FailOpen,
         crl_config: CrlConfig::default(),
+        ocsp_config: OcspConfig::default(),
     };
 
     assert_eq!(fail_open.fallback_behavior, FallbackBehavior::FailOpen);
@@ -115,6 +118,7 @@ fn test_disabled_mode() {
         check_mode: RevocationCheckMode::Disabled,
         fallback_behavior: FallbackBehavior::FailClosed,
         crl_config: CrlConfig::default(),
+        ocsp_config: OcspConfig::default(),
     };
 
     assert_eq!(config.check_mode, RevocationCheckMode::Disabled);
@@ -342,6 +346,7 @@ fn test_production_configuration_example() {
             max_cache_entries: 100,  // Cache up to 100 CRLs
             max_crl_size_bytes: 10 * 1024 * 1024, // 10 MB limit
         },
+        ocsp_config: OcspConfig::default(),
     };
 
     // Verify configuration
@@ -358,3 +363,268 @@ fn test_production_configuration_example() {
 
     println!("Production configuration:\n{}", json);
 }
+
+// ========================================
+// OCSP Integration Tests
+// ========================================
+
+/// Test OCSP-only configuration
+#[test]
+fn test_ocsp_only_configuration() {
+    let config = RevocationConfig::ocsp_only(
+        OcspConfig::http_fetch(5, 3600, 100),
+        FallbackBehavior::FailClosed,
+    );
+
+    assert_eq!(config.check_mode, RevocationCheckMode::OcspOnly);
+    assert!(config.ocsp_config.enabled);
+    assert_eq!(config.ocsp_config.http_timeout_secs, 5);
+    assert_eq!(config.ocsp_config.cache_ttl_secs, 3600);
+    assert_eq!(config.ocsp_config.max_cache_entries, 100);
+    assert!(config.ocsp_config.enable_nonce);
+}
+
+/// Test PreferOcsp configuration
+#[test]
+fn test_prefer_ocsp_configuration() {
+    let config = RevocationConfig {
+        check_mode: RevocationCheckMode::PreferOcsp,
+        fallback_behavior: FallbackBehavior::FailClosed,
+        crl_config: CrlConfig::default(),
+        ocsp_config: OcspConfig::http_fetch(5, 3600, 100),
+    };
+
+    assert_eq!(config.check_mode, RevocationCheckMode::PreferOcsp);
+    assert!(config.ocsp_config.enabled);
+    assert!(config.ocsp_config.prefer_ocsp);
+}
+
+/// Test Both (OCSP and CRL) configuration
+#[test]
+fn test_both_revocation_methods_configuration() {
+    let config = RevocationConfig {
+        check_mode: RevocationCheckMode::Both,
+        fallback_behavior: FallbackBehavior::FailClosed,
+        crl_config: CrlConfig::http_fetch(5, 3600, 100),
+        ocsp_config: OcspConfig::http_fetch(5, 3600, 100),
+    };
+
+    assert_eq!(config.check_mode, RevocationCheckMode::Both);
+    assert!(config.crl_config.enable_http_fetch);
+    assert!(config.ocsp_config.enabled);
+}
+
+/// Test OCSP configuration serialization
+#[test]
+fn test_ocsp_config_json_serialization() {
+    let config = RevocationConfig {
+        check_mode: RevocationCheckMode::PreferOcsp,
+        fallback_behavior: FallbackBehavior::FailClosed,
+        crl_config: CrlConfig::default(),
+        ocsp_config: OcspConfig::http_fetch(5, 3600, 100),
+    };
+
+    // Serialize to JSON
+    let json = serde_json::to_string_pretty(&config).unwrap();
+    assert!(json.contains("prefer_ocsp"));
+    assert!(json.contains("enable_nonce"));
+    assert!(json.contains("ocsp_config"));
+
+    // Deserialize from JSON
+    let deserialized: RevocationConfig = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized.check_mode, RevocationCheckMode::PreferOcsp);
+    assert_eq!(deserialized.ocsp_config.enabled, true);
+}
+
+/// Test OCSP disabled configuration
+#[test]
+fn test_ocsp_disabled_configuration() {
+    let config = RevocationConfig {
+        check_mode: RevocationCheckMode::CrlOnly,
+        fallback_behavior: FallbackBehavior::FailClosed,
+        crl_config: CrlConfig::default(),
+        ocsp_config: OcspConfig::disabled(),
+    };
+
+    assert!(!config.ocsp_config.enabled);
+}
+
+/// Documentation test showing production OCSP configuration
+#[test]
+fn test_production_ocsp_configuration_example() {
+    // Modern deployment with OCSP preferred over CRL
+    let production_config = RevocationConfig {
+        check_mode: RevocationCheckMode::PreferOcsp,
+        fallback_behavior: FallbackBehavior::FailClosed,
+        crl_config: CrlConfig {
+            static_crl_paths: vec![],
+            enable_http_fetch: true,
+            http_timeout_secs: 5,
+            cache_ttl_secs: 3600,
+            max_cache_entries: 100,
+            max_crl_size_bytes: 10 * 1024 * 1024,
+        },
+        ocsp_config: OcspConfig {
+            enabled: true,
+            http_timeout_secs: 5,      // 5 second timeout for OCSP
+            cache_ttl_secs: 3600,      // Cache responses for 1 hour
+            max_cache_entries: 100,    // Cache up to 100 responses
+            enable_nonce: true,        // Enable replay protection
+            max_response_size_bytes: 1 * 1024 * 1024, // 1 MB limit
+            prefer_ocsp: true,         // Prefer OCSP over CRL
+        },
+    };
+
+    // Verify configuration
+    assert_eq!(
+        production_config.check_mode,
+        RevocationCheckMode::PreferOcsp
+    );
+    assert!(production_config.ocsp_config.enabled);
+    assert!(production_config.ocsp_config.enable_nonce);
+    assert_eq!(production_config.ocsp_config.cache_ttl_secs, 3600);
+
+    // Serialize for storage
+    let json = serde_json::to_string_pretty(&production_config).unwrap();
+    assert!(!json.is_empty());
+    assert!(json.contains("prefer_ocsp"));
+
+    println!("Production OCSP configuration:\n{}", json);
+}
+
+/// Integration test for OCSP request building
+#[test]
+fn test_ocsp_request_building() {
+    use radius_proto::revocation::ocsp::OcspRequestBuilder;
+    use std::path::Path;
+    use std::fs;
+
+    // Use test PKI if available
+    let workspace_root = std::env::var("CARGO_MANIFEST_DIR")
+        .map(|p| Path::new(&p).parent().unwrap().parent().unwrap().to_path_buf())
+        .unwrap();
+    let cert_path = workspace_root.join("tests/pki/certs/client.crt.der");
+    let issuer_path = workspace_root.join("tests/pki/certs/intermediate-ca.crt.der");
+
+    // Skip if test PKI doesn't exist
+    if !cert_path.exists() || !issuer_path.exists() {
+        println!("Skipping OCSP request building test - test PKI not found");
+        return;
+    }
+
+    let cert_bytes = fs::read(cert_path).expect("Failed to read client cert");
+    let issuer_bytes = fs::read(issuer_path).expect("Failed to read issuer cert");
+
+    // Build OCSP request
+    let builder = OcspRequestBuilder::new(&cert_bytes, &issuer_bytes)
+        .expect("Failed to create OCSP request builder");
+
+    // Add a test nonce
+    let nonce = vec![0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
+    let builder = builder.with_nonce(nonce);
+
+    let request_der = builder.build().expect("Failed to build OCSP request");
+
+    // Verify request is non-empty DER data
+    assert!(!request_der.is_empty());
+    assert_eq!(request_der[0], 0x30); // SEQUENCE tag
+}
+
+/// Integration test for OCSP URL extraction
+#[test]
+fn test_ocsp_url_extraction() {
+    use radius_proto::revocation::ocsp::OcspClient;
+    use std::path::Path;
+    use std::fs;
+
+    // Use test PKI if available
+    let workspace_root = std::env::var("CARGO_MANIFEST_DIR")
+        .map(|p| Path::new(&p).parent().unwrap().parent().unwrap().to_path_buf())
+        .unwrap();
+    let cert_path = workspace_root.join("tests/pki/certs/client.crt.der");
+
+    // Skip if test PKI doesn't exist
+    if !cert_path.exists() {
+        println!("Skipping OCSP URL extraction test - test PKI not found");
+        return;
+    }
+
+    let cert_bytes = fs::read(cert_path).expect("Failed to read client cert");
+
+    // Try to extract OCSP URL
+    let url_result = OcspClient::extract_ocsp_url(&cert_bytes);
+
+    // If certificate has AIA with OCSP URL, verify it's a valid URL
+    if let Ok(url) = url_result {
+        assert!(url.starts_with("http://") || url.starts_with("https://"));
+        println!("Extracted OCSP URL: {}", url);
+    } else {
+        println!("Certificate does not contain OCSP URL in AIA extension");
+    }
+}
+
+/// Integration test for OCSP response parsing
+#[test]
+fn test_ocsp_response_parsing() {
+    use radius_proto::revocation::ocsp::{OcspResponse, OcspResponseStatus};
+
+    // Test non-successful OCSP response (malformed request)
+    // This is the minimal valid OCSPResponse structure
+    let error_response = vec![
+        0x30, 0x03, // SEQUENCE (3 bytes)
+        0x0a, 0x01, 0x01, // ENUMERATED (1 byte) = 1 (malformedRequest)
+    ];
+
+    let result = OcspResponse::parse(&error_response);
+
+    // This should parse successfully
+    assert!(result.is_ok(), "Failed to parse error OCSP response");
+
+    let response = result.unwrap();
+    assert_eq!(response.status, OcspResponseStatus::MalformedRequest);
+    // Error responses don't have cert_status
+    assert_eq!(response.cert_status, None);
+}
+
+/// Integration test for OCSP cache
+#[test]
+fn test_ocsp_cache_integration() {
+    use radius_proto::revocation::ocsp::{OcspResponse, OcspResponseStatus, CertificateStatus};
+    use radius_proto::revocation::ocsp_cache::OcspCache;
+    use std::time::SystemTime;
+
+    let cache = OcspCache::new(10);
+    let serial = vec![0x01, 0x02, 0x03];
+
+    // Create a test OCSP response
+    let response = OcspResponse {
+        status: OcspResponseStatus::Successful,
+        cert_status: Some(CertificateStatus::Good),
+        produced_at: SystemTime::now(),
+        this_update: SystemTime::now(),
+        next_update: Some(SystemTime::now() + std::time::Duration::from_secs(3600)),
+        nonce: None,
+        raw_bytes: vec![],
+    };
+
+    // Cache the response
+    cache.insert(serial.clone(), response.clone());
+
+    // Retrieve from cache
+    let cached = cache.get(&serial);
+    assert!(cached.is_some());
+
+    let cached_response = cached.unwrap();
+    assert_eq!(cached_response.status, OcspResponseStatus::Successful);
+    assert_eq!(cached_response.cert_status, Some(CertificateStatus::Good));
+}
+
+// Future OCSP integration tests to add:
+// - test_ocsp_http_query: Test actual HTTP query to OCSP responder (requires test responder)
+// - test_ocsp_nonce_validation: Test nonce mismatch detection
+// - test_ocsp_revoked_status: Test revoked certificate detection
+// - test_ocsp_cache_expiry: Test cache TTL expiration
+// - test_ocsp_fallback_to_crl: Test PreferOcsp mode fallback behavior
+// - test_ocsp_and_crl_both: Test Both mode with conflicting results
+// - test_ocsp_signature_verification: Test response signature validation (when implemented)
+
