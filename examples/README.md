@@ -234,6 +234,99 @@ sudo iptables -A INPUT -s 192.168.1.0/24 -p udp --dport 1812 -j ACCEPT
 sudo iptables -A INPUT -p udp --dport 1812 -j DROP
 ```
 
+## Code Examples
+
+### EAP-TLS Server (`eap_server.rs`)
+
+Example RADIUS server with EAP-TLS authentication and optional OCSP/CRL revocation checking.
+
+**Run:**
+
+```bash
+cargo run --example eap_server --features tls
+```
+
+**Features:**
+
+- EAP-TLS with mutual TLS authentication
+- Optional OCSP/CRL certificate revocation checking
+- Fallback to PAP/CHAP authentication
+- Configurable TLS certificates
+
+See [eap_server.rs](eap_server.rs) for complete documentation including certificate generation.
+
+### OCSP Certificate Checker (`ocsp_check.rs`)
+
+Standalone tool for checking certificate revocation status using OCSP.
+
+**Run:**
+
+```bash
+cargo run --example ocsp_check -- client.pem ca.pem
+```
+
+**Features:**
+
+- Builds OCSP requests with nonce for replay protection
+- Queries OCSP responders via HTTP POST
+- Parses and validates OCSP responses
+- Shows certificate status (Good/Revoked/Unknown)
+- Displays response freshness and expiration
+
+**Example output:**
+
+```
+OCSP Certificate Status Checker
+================================
+
+Loading certificate: client.pem
+Loading issuer: ca.pem
+
+Extracting OCSP URL from certificate...
+OCSP Responder URL: http://ocsp.example.com
+
+Building OCSP request...
+OCSP request size: 124 bytes
+Nonce included: yes (replay protection enabled)
+
+Querying OCSP responder...
+
+OCSP Response
+=============
+Status: Successful
+Certificate Status: Good ✅
+Produced At: 2025-12-31 12:00:00 UTC
+This Update: 2025-12-31 12:00:00 UTC
+Next Update: 2025-12-31 18:00:00 UTC
+Response fresh for: 21456 seconds
+Nonce: present ✅ (verified - replay protection active)
+Response Size: 856 bytes
+
+✅ Certificate is VALID (not revoked)
+```
+
+### EAP-TEAP Server (`eap_teap_server.rs`)
+
+Example RADIUS server with EAP-TEAP tunneled authentication.
+
+**Run:**
+
+```bash
+cargo run --example eap_teap_server --features tls
+```
+
+See the [EAP-TEAP implementation plan](../.claude/plans/stateful-splashing-pumpkin.md) for architecture details.
+
+### Performance Benchmark (`perf_bench.rs`)
+
+Benchmark tool for measuring RADIUS server performance.
+
+**Run:**
+
+```bash
+cargo run --example perf_bench --release
+```
+
 ## Testing
 
 ### Using radtest

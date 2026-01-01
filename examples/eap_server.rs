@@ -42,6 +42,36 @@
 //! cargo run --example eap_server --features tls
 //! ```
 //!
+//! # Certificate Revocation Checking (Optional)
+//!
+//! This example shows how to enable OCSP (Online Certificate Status Protocol)
+//! for real-time certificate revocation checking:
+//!
+//! ```rust
+//! use radius_proto::revocation::{
+//!     RevocationConfig, OcspConfig, CrlConfig,
+//!     RevocationCheckMode, FallbackBehavior
+//! };
+//!
+//! // Option 1: OCSP only (recommended for real-time checking)
+//! let revocation_config = RevocationConfig::ocsp_only(
+//!     OcspConfig::http_fetch(5, 3600, 100),
+//!     FallbackBehavior::FailClosed,
+//! );
+//!
+//! // Option 2: Prefer OCSP with CRL fallback (most robust)
+//! let revocation_config = RevocationConfig {
+//!     check_mode: RevocationCheckMode::PreferOcsp,
+//!     fallback_behavior: FallbackBehavior::FailClosed,
+//!     ocsp_config: OcspConfig::http_fetch(5, 3600, 100),
+//!     crl_config: CrlConfig::http_fetch(5, 3600, 100),
+//! };
+//!
+//! // Apply to TLS configuration
+//! let cert_config = TlsCertificateConfig::new(...)
+//!     .with_revocation_checking(revocation_config);
+//! ```
+//!
 //! # Testing
 //!
 //! You can test with `eapol_test` (from wpa_supplicant):
@@ -65,6 +95,10 @@
 
 #[cfg(feature = "tls")]
 use radius_proto::eap::eap_tls::TlsCertificateConfig;
+#[cfg(feature = "tls")]
+use radius_proto::revocation::{
+    CrlConfig, FallbackBehavior, OcspConfig, RevocationCheckMode, RevocationConfig,
+};
 use radius_server::{EapAuthHandler, RadiusServer, ServerConfig, SimpleAuthHandler};
 use std::sync::Arc;
 
@@ -98,12 +132,42 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Configure TLS certificates
         // In production, you would load these from secure storage
-        let cert_config = TlsCertificateConfig::new(
+        let mut cert_config = TlsCertificateConfig::new(
             "server.pem".to_string(),
             "server-key.pem".to_string(),
             Some("ca.pem".to_string()), // CA for verifying client certificates
             true,                       // Require client certificate (mutual TLS)
         );
+
+        // Optional: Enable certificate revocation checking
+        // Uncomment one of these to enable OCSP/CRL checking:
+
+        // Option 1: OCSP only (fastest, real-time checking)
+        // let revocation_config = RevocationConfig::ocsp_only(
+        //     OcspConfig::http_fetch(
+        //         5,      // 5 second HTTP timeout
+        //         3600,   // 1 hour cache TTL
+        //         100,    // Cache up to 100 responses
+        //     ),
+        //     FallbackBehavior::FailClosed, // Reject if OCSP check fails
+        // );
+        // cert_config = cert_config.with_revocation_checking(revocation_config);
+
+        // Option 2: Prefer OCSP with CRL fallback (recommended for production)
+        // let revocation_config = RevocationConfig {
+        //     check_mode: RevocationCheckMode::PreferOcsp,
+        //     fallback_behavior: FallbackBehavior::FailClosed,
+        //     ocsp_config: OcspConfig::http_fetch(5, 3600, 100),
+        //     crl_config: CrlConfig::http_fetch(5, 3600, 100),
+        // };
+        // cert_config = cert_config.with_revocation_checking(revocation_config);
+
+        // Option 3: CRL only (works offline with static CRL files)
+        // let revocation_config = RevocationConfig::static_files(
+        //     vec!["ca-crl.pem".to_string()],
+        //     FallbackBehavior::FailClosed,
+        // );
+        // cert_config = cert_config.with_revocation_checking(revocation_config);
 
         // Configure EAP-TLS for default realm
         match eap_handler.configure_tls("", cert_config) {
