@@ -46,4 +46,4 @@ tempfile.workspace = true
 [features]
 default = []
 tls = ["radius-proto/tls", "dep:rustls"]
-ha = ["dep:redis"]
+ha = ["radius-proto/serde", "dep:redis"]

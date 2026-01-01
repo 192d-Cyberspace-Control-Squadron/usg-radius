@@ -20,6 +20,7 @@ use crate::packet::Packet;
 use thiserror::Error;
 
 /// EAP packet code (first byte of EAP packet)
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum EapCode {
@@ -52,6 +53,7 @@ impl EapCode {
 }
 
 /// EAP method types (RFC 3748 and IANA registry)
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum EapType {
@@ -106,6 +108,7 @@ impl EapType {
 }
 
 /// EAP packet structure
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EapPacket {
     /// EAP code (Request, Response, Success, Failure)
@@ -1607,6 +1610,7 @@ pub mod eap_tls {
 }
 
 /// EAP authentication state
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EapState {
     /// Initial state - awaiting identity request
@@ -1678,6 +1682,7 @@ impl EapState {
 }
 
 /// EAP session state for tracking authentication progress
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone)]
 pub struct EapSession {
     /// Session identifier (typically username or session ID)

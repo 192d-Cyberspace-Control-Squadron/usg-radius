@@ -10,7 +10,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 /// Session information tracked by the accounting system
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Session {
     /// Unique session identifier (Acct-Session-Id)
     pub session_id: String,
