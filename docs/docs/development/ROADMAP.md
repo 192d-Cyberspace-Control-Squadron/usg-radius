@@ -1089,10 +1089,10 @@ let config = RevocationConfig::disabled();
 
 **Known Limitations** (Deferred to future releases):
 
-- OCSP signature verification (optional - most deployments trust HTTPS)
-- OCSP stapling (RFC 6066) - deferred to v0.8+
-- Request signing (optional feature)
-- Batch requests (multiple certificates)
+- [ ] OCSP signature verification (optional - most deployments trust HTTPS)
+- [ ] OCSP stapling (RFC 6066) - deferred to v0.8+
+- [ ] Request signing (optional feature)
+- [ ] Batch requests (multiple certificates)
 - [ ] Example: `examples/ocsp_check.rs`
 - [ ] Update `examples/eap_tls_server.rs` with OCSP config
 
