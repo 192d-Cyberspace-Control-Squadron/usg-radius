@@ -1,5 +1,6 @@
 use crate::accounting::AccountingHandler;
 use crate::audit::{AuditEntry, AuditEventType, AuditLogger};
+use crate::buffer_pool::BufferPool;
 use crate::cache::{RequestCache, RequestFingerprint};
 use crate::config::Config;
 use crate::proxy::handler::ProxyHandler;
@@ -238,6 +239,8 @@ pub struct ServerConfig {
     pub rate_limiter: Arc<RateLimiter>,
     /// Audit logger
     pub audit_logger: Arc<AuditLogger>,
+    /// Buffer pool for memory optimization
+    pub buffer_pool: Arc<BufferPool>,
     /// Proxy router (optional)
     pub router: Option<Arc<Router>>,
     /// Proxy handler (optional)
@@ -263,6 +266,9 @@ impl ServerConfig {
         // No audit logging by default
         let audit_logger = Arc::new(AuditLogger::new(None).unwrap());
 
+        // Buffer pool: 4096 byte buffers, max 1000 pooled (reuse for UDP packets)
+        let buffer_pool = BufferPool::new(4096, 1000);
+
         ServerConfig {
             bind_addr,
             secret: secret.into(),
@@ -272,6 +278,7 @@ impl ServerConfig {
             request_cache,
             rate_limiter,
             audit_logger,
+            buffer_pool,
             router: None,
             proxy_handler: None,
             retry_manager: None,
@@ -317,6 +324,9 @@ impl ServerConfig {
         // Create audit logger if configured
         let audit_logger = Arc::new(AuditLogger::new(config.audit_log_path.clone())?);
 
+        // Buffer pool: 4096 byte buffers, max 1000 pooled (reuse for UDP packets)
+        let buffer_pool = BufferPool::new(4096, 1000);
+
         // Initialize proxy components if configured
         let (router, proxy_handler, retry_manager) = if let Some(ref proxy_config) = config.proxy {
             if proxy_config.enabled {
@@ -339,6 +349,7 @@ impl ServerConfig {
             request_cache,
             rate_limiter,
             audit_logger,
+            buffer_pool,
             router,
             proxy_handler,
             retry_manager,
@@ -578,18 +589,25 @@ impl RadiusServer {
         let _response_task = if let Some(ref proxy_handler) = self.config.proxy_handler {
             let handler = Arc::clone(proxy_handler);
             let socket = Arc::clone(&self.socket);
+            let buffer_pool = Arc::clone(&self.config.buffer_pool);
             Some(tokio::spawn(async move {
-                Self::listen_for_proxy_responses(handler, socket).await;
+                Self::listen_for_proxy_responses(handler, socket, buffer_pool).await;
             }))
         } else {
             None
         };
 
-        let mut buf = vec![0u8; 4096];
-
         loop {
-            let (len, addr) = self.socket.recv_from(&mut buf).await?;
-            let data = buf[..len].to_vec();
+            // Acquire a buffer from the pool
+            let mut pooled_buf = self.config.buffer_pool.acquire().await;
+
+            // Receive packet into pooled buffer
+            let (len, addr) = self.socket.recv_from(pooled_buf.as_mut()).await?;
+
+            // Copy the received data (only the received bytes, not the full buffer)
+            let data = pooled_buf.as_ref()[..len].to_vec();
+
+            // Buffer is automatically returned to pool when pooled_buf is dropped
 
             // Spawn a task to handle this request
             let config = Arc::clone(&self.config);
@@ -607,15 +625,19 @@ impl RadiusServer {
     async fn listen_for_proxy_responses(
         proxy_handler: Arc<ProxyHandler>,
         socket: Arc<UdpSocket>,
+        buffer_pool: Arc<BufferPool>,
     ) {
-        let mut buf = vec![0u8; 4096];
-
         info!("Proxy response listener started");
 
         loop {
-            match socket.recv_from(&mut buf).await {
+            // Acquire a buffer from the pool
+            let mut pooled_buf = buffer_pool.acquire().await;
+
+            match socket.recv_from(pooled_buf.as_mut()).await {
                 Ok((len, addr)) => {
-                    let data = buf[..len].to_vec();
+                    // Copy the received data (only the received bytes)
+                    let data = pooled_buf.as_ref()[..len].to_vec();
+                    // Buffer is automatically returned to pool when pooled_buf is dropped
                     let handler = Arc::clone(&proxy_handler);
 
                     // Spawn task to handle response
