@@ -55,6 +55,7 @@ impl ProxyHandler {
         mut request: Packet,
         source: SocketAddr,
         home_server: Arc<HomeServer>,
+        client_secret: Vec<u8>,
     ) -> ProxyResult<ProxyStateKey> {
         // Check for proxy loops (RFC 2865 Section 5.33)
         let proxy_state_count = request
@@ -92,6 +93,7 @@ impl ProxyHandler {
             sent_at: Instant::now(),
             retry_count: 0,
             proxy_state,
+            client_secret,
         };
 
         // Store in cache (before sending to avoid race condition)
@@ -131,7 +133,6 @@ impl ProxyHandler {
         &self,
         mut response: Packet,
         home_server_addr: SocketAddr,
-        client_secret: &[u8],
     ) -> ProxyResult<()> {
         // Extract the last Proxy-State attribute (the one we added)
         let proxy_state_attr = response
@@ -177,7 +178,7 @@ impl ProxyHandler {
         let response_auth = calculate_response_authenticator(
             &response,
             &entry.original_request.authenticator,
-            client_secret,
+            &entry.client_secret,
         );
         response.authenticator = response_auth;
 
@@ -256,7 +257,7 @@ mod tests {
 
         // Forward request
         let proxy_state = handler
-            .forward_request(request.clone(), source, home_server)
+            .forward_request(request.clone(), source, home_server, b"test_secret".to_vec())
             .await
             .unwrap();
 
@@ -288,7 +289,7 @@ mod tests {
         let source: SocketAddr = "192.168.1.100:12345".parse().unwrap();
 
         // Should detect loop
-        let result = handler.forward_request(request, source, home_server).await;
+        let result = handler.forward_request(request, source, home_server, b"test_secret".to_vec()).await;
         assert!(result.is_err());
         match result {
             Err(ProxyError::ProxyLoop(count, limit)) => {
@@ -311,13 +312,13 @@ mod tests {
 
         // First request should succeed
         let result = handler
-            .forward_request(create_test_request(), source, home_server.clone())
+            .forward_request(create_test_request(), source, home_server.clone(), b"test_secret".to_vec())
             .await;
         assert!(result.is_ok());
 
         // Second request should fail (cache full)
         let result = handler
-            .forward_request(create_test_request(), source, home_server)
+            .forward_request(create_test_request(), source, home_server, b"test_secret".to_vec())
             .await;
         assert!(result.is_err());
         match result {

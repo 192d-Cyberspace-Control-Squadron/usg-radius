@@ -2,6 +2,12 @@ use crate::accounting::AccountingHandler;
 use crate::audit::{AuditEntry, AuditEventType, AuditLogger};
 use crate::cache::{RequestCache, RequestFingerprint};
 use crate::config::Config;
+use crate::proxy::handler::ProxyHandler;
+use crate::proxy::pool::HomeServerPool;
+use crate::proxy::realm::Realm;
+use crate::proxy::retry::RetryManager;
+use crate::proxy::router::{Router, RoutingDecision};
+use crate::proxy::ProxyConfig;
 use crate::ratelimit::{RateLimitConfig, RateLimiter};
 use radius_proto::accounting::{AccountingError, AcctStatusType};
 use radius_proto::attributes::{Attribute, AttributeType};
@@ -232,6 +238,12 @@ pub struct ServerConfig {
     pub rate_limiter: Arc<RateLimiter>,
     /// Audit logger
     pub audit_logger: Arc<AuditLogger>,
+    /// Proxy router (optional)
+    pub router: Option<Arc<Router>>,
+    /// Proxy handler (optional)
+    pub proxy_handler: Option<Arc<ProxyHandler>>,
+    /// Retry manager (optional)
+    pub retry_manager: Option<Arc<RetryManager>>,
 }
 
 impl ServerConfig {
@@ -258,6 +270,9 @@ impl ServerConfig {
             request_cache,
             rate_limiter,
             audit_logger,
+            router: None,
+            proxy_handler: None,
+            retry_manager: None,
         }
     }
 
@@ -299,6 +314,19 @@ impl ServerConfig {
         // Create audit logger if configured
         let audit_logger = Arc::new(AuditLogger::new(config.audit_log_path.clone())?);
 
+        // Initialize proxy components if configured
+        let (router, proxy_handler, retry_manager) = if let Some(ref proxy_config) = config.proxy {
+            if proxy_config.enabled {
+                // We'll need to create these components during RadiusServer::new()
+                // because they need the socket, so we pass None here
+                (None, None, None)
+            } else {
+                (None, None, None)
+            }
+        } else {
+            (None, None, None)
+        };
+
         Ok(ServerConfig {
             bind_addr,
             secret,
@@ -308,6 +336,9 @@ impl ServerConfig {
             request_cache,
             rate_limiter,
             audit_logger,
+            router,
+            proxy_handler,
+            retry_manager,
         })
     }
 
@@ -344,14 +375,105 @@ pub struct RadiusServer {
 
 impl RadiusServer {
     /// Create a new RADIUS server
-    pub async fn new(config: ServerConfig) -> Result<Self, ServerError> {
+    pub async fn new(mut config: ServerConfig) -> Result<Self, ServerError> {
         let socket = UdpSocket::bind(config.bind_addr).await?;
+        let socket = Arc::new(socket);
         info!("RADIUS server listening on {}", config.bind_addr);
+
+        // Initialize proxy components if enabled
+        if let Some(ref full_config) = config.config {
+            if let Some(ref proxy_config) = full_config.proxy {
+                if proxy_config.enabled {
+                    info!("Initializing RADIUS proxy");
+
+                    // Create proxy components
+                    let (router, proxy_handler, retry_manager) =
+                        Self::initialize_proxy(proxy_config, Arc::clone(&socket)).await?;
+
+                    config.router = Some(Arc::new(router));
+                    config.proxy_handler = Some(Arc::new(proxy_handler));
+                    config.retry_manager = Some(Arc::new(retry_manager));
+
+                    info!("RADIUS proxy initialized");
+                }
+            }
+        }
 
         Ok(RadiusServer {
             config: Arc::new(config),
-            socket: Arc::new(socket),
+            socket,
         })
+    }
+
+    /// Initialize proxy components from configuration
+    async fn initialize_proxy(
+        proxy_config: &ProxyConfig,
+        socket: Arc<UdpSocket>,
+    ) -> Result<(Router, ProxyHandler, RetryManager), ServerError> {
+        use crate::proxy::cache::ProxyCache;
+
+        // Create home server pools
+        let mut pools = std::collections::HashMap::new();
+        for pool_config in &proxy_config.pools {
+            let pool = HomeServerPool::new(pool_config.clone())
+                .map_err(|e| ServerError::Io(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    format!("Failed to create pool '{}': {}", pool_config.name, e)
+                )))?;
+            pools.insert(pool_config.name.clone(), Arc::new(pool));
+        }
+
+        // Create realms
+        let mut realms = Vec::new();
+        for realm_config in &proxy_config.realms {
+            let pool = pools.get(&realm_config.pool)
+                .ok_or_else(|| ServerError::Io(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    format!("Realm '{}' references unknown pool '{}'", realm_config.name, realm_config.pool)
+                )))?
+                .clone();
+
+            let realm = Realm::new(realm_config.clone(), pool)
+                .map_err(|e| ServerError::Io(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    format!("Failed to create realm '{}': {}", realm_config.name, e)
+                )))?;
+            realms.push(realm);
+        }
+
+        // Create router
+        let router = Router::new(realms, proxy_config.default_realm.clone());
+
+        // Create proxy cache
+        let cache_ttl = Duration::from_secs(proxy_config.cache_ttl);
+        let proxy_cache = Arc::new(ProxyCache::new(cache_ttl, proxy_config.max_outstanding));
+
+        // Create proxy handler
+        let proxy_handler = ProxyHandler::new(Arc::clone(&proxy_cache), socket.local_addr()?)
+            .await
+            .map_err(|e| ServerError::Io(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("Failed to create proxy handler: {}", e)
+            )))?;
+
+        // Create retry manager
+        let retry_timeout = Duration::from_secs(proxy_config.proxy_timeout);
+        let retry_manager = RetryManager::new(
+            Arc::clone(&proxy_cache),
+            Arc::new(proxy_handler),
+            proxy_config.retry.clone(),
+            retry_timeout,
+        );
+
+        // Create a second proxy handler for the server (both share the same cache)
+        let server_proxy_handler = ProxyHandler::new(proxy_cache, socket.local_addr()?)
+            .await
+            .map_err(|e| ServerError::Io(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("Failed to create proxy handler: {}", e)
+            )))?;
+
+        Ok((router, server_proxy_handler, retry_manager))
     }
 
     /// Get the local address the server is listening on
@@ -363,6 +485,24 @@ impl RadiusServer {
 
     /// Start the server and handle incoming requests
     pub async fn run(&self) -> Result<(), ServerError> {
+        // Start retry manager if proxy is enabled
+        let _retry_task = if let Some(ref retry_manager) = self.config.retry_manager {
+            Some(retry_manager.start())
+        } else {
+            None
+        };
+
+        // Start response listener task if proxy is enabled
+        let _response_task = if let Some(ref proxy_handler) = self.config.proxy_handler {
+            let handler = Arc::clone(proxy_handler);
+            let socket = Arc::clone(&self.socket);
+            Some(tokio::spawn(async move {
+                Self::listen_for_proxy_responses(handler, socket).await;
+            }))
+        } else {
+            None
+        };
+
         let mut buf = vec![0u8; 4096];
 
         loop {
@@ -378,6 +518,44 @@ impl RadiusServer {
                     debug!("Error handling request from {}: {}", addr, e);
                 }
             });
+        }
+    }
+
+    /// Listen for responses from home servers
+    async fn listen_for_proxy_responses(
+        proxy_handler: Arc<ProxyHandler>,
+        socket: Arc<UdpSocket>,
+    ) {
+        let mut buf = vec![0u8; 4096];
+
+        info!("Proxy response listener started");
+
+        loop {
+            match socket.recv_from(&mut buf).await {
+                Ok((len, addr)) => {
+                    let data = buf[..len].to_vec();
+                    let handler = Arc::clone(&proxy_handler);
+
+                    // Spawn task to handle response
+                    tokio::spawn(async move {
+                        // Decode the packet first
+                        match Packet::decode(&data) {
+                            Ok(response) => {
+                                if let Err(e) = handler.handle_response(response, addr).await {
+                                    debug!("Error handling proxy response from {}: {}", addr, e);
+                                }
+                            }
+                            Err(e) => {
+                                warn!("Failed to decode proxy response from {}: {}", addr, e);
+                            }
+                        }
+                    });
+                }
+                Err(e) => {
+                    warn!("Error receiving proxy response: {}", e);
+                    // Continue listening even after errors
+                }
+            }
         }
     }
 
@@ -525,6 +703,70 @@ impl RadiusServer {
         config: &ServerConfig,
         source_ip: std::net::IpAddr,
     ) -> Result<Packet, ServerError> {
+        // Check if proxy routing is enabled
+        if let (Some(router), Some(proxy_handler)) = (&config.router, &config.proxy_handler) {
+            // Route the request
+            let routing_decision = router.route_request(request);
+
+            match routing_decision {
+                RoutingDecision::Proxy { home_server, stripped_username } => {
+                    // Proxy the request
+                    debug!(
+                        home_server = %home_server.name,
+                        "Proxying request to home server"
+                    );
+
+                    // Modify request if realm should be stripped
+                    let mut forwarded_request = request.clone();
+                    if let Some(stripped) = stripped_username {
+                        // Replace User-Name attribute with stripped version
+                        forwarded_request.attributes.retain(|attr| {
+                            attr.attr_type != AttributeType::UserName as u8
+                        });
+                        forwarded_request.add_attribute(
+                            Attribute::string(AttributeType::UserName as u8, &stripped)
+                                .map_err(|_| ServerError::AuthFailed)?
+                        );
+                    }
+
+                    // Get client secret
+                    let secret = config.get_secret_for_client(source_ip).to_vec();
+
+                    // Forward the request
+                    let source_addr = SocketAddr::new(source_ip, 0); // NAS address
+                    proxy_handler
+                        .forward_request(forwarded_request, source_addr, home_server, secret)
+                        .await
+                        .map_err(|e| {
+                            warn!("Proxy forwarding failed: {}", e);
+                            ServerError::Io(std::io::Error::new(
+                                std::io::ErrorKind::Other,
+                                format!("Proxy forwarding failed: {}", e)
+                            ))
+                        })?;
+
+                    // Return empty response - actual response will come from proxy handler
+                    // We'll handle this differently - for now, return a reject as placeholder
+                    // In a real implementation, we'd need a different approach
+                    // For now, we'll just continue to local auth which will handle the response
+                    // This needs architectural refinement - the proxy response is async
+                    return Err(ServerError::Io(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        "Request forwarded to proxy - response will be sent asynchronously"
+                    )));
+                }
+                RoutingDecision::Reject => {
+                    // Reject immediately
+                    warn!("Routing decision: Reject");
+                    return Err(ServerError::AuthFailed);
+                }
+                RoutingDecision::Local => {
+                    // Continue with local authentication
+                    debug!("Routing decision: Local authentication");
+                }
+            }
+        }
+
         // Get the appropriate shared secret for this client
         let secret = config.get_secret_for_client(source_ip);
 

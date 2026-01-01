@@ -50,6 +50,8 @@ pub struct ProxyCacheEntry {
     pub retry_count: u8,
     /// Proxy-State key for correlation
     pub proxy_state: ProxyStateKey,
+    /// Client secret for response authentication
+    pub client_secret: Vec<u8>,
 }
 
 /// Proxy cache for tracking in-flight requests
@@ -251,6 +253,7 @@ mod tests {
             sent_at: Instant::now(),
             retry_count: 0,
             proxy_state: generate_proxy_state_key(),
+            client_secret: b"test_secret".to_vec(),
         }
     }
 
