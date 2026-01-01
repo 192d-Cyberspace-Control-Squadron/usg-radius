@@ -23,6 +23,7 @@ async fn test_postgres_connection() {
             .to_string(),
         password_hash: "bcrypt".to_string(),
         attributes_query: None,
+        ..Default::default()
     };
 
     let _handler = PostgresAuthHandler::new(config)
@@ -44,6 +45,7 @@ async fn test_postgres_authentication_success() {
             .to_string(),
         password_hash: "bcrypt".to_string(),
         attributes_query: None,
+        ..Default::default()
     };
 
     let handler = PostgresAuthHandler::new(config)
@@ -70,6 +72,7 @@ async fn test_postgres_authentication_failure_wrong_password() {
             .to_string(),
         password_hash: "bcrypt".to_string(),
         attributes_query: None,
+        ..Default::default()
     };
 
     let handler = PostgresAuthHandler::new(config)
@@ -92,6 +95,7 @@ async fn test_postgres_authentication_user_not_found() {
             .to_string(),
         password_hash: "bcrypt".to_string(),
         attributes_query: None,
+        ..Default::default()
     };
 
     let handler = PostgresAuthHandler::new(config)
@@ -114,6 +118,7 @@ async fn test_postgres_disabled_user() {
             .to_string(),
         password_hash: "bcrypt".to_string(),
         attributes_query: None,
+        ..Default::default()
     };
 
     let handler = PostgresAuthHandler::new(config)
@@ -137,6 +142,7 @@ async fn test_postgres_multiple_users() {
             .to_string(),
         password_hash: "bcrypt".to_string(),
         attributes_query: None,
+        ..Default::default()
     };
 
     let handler = PostgresAuthHandler::new(config)
@@ -177,6 +183,7 @@ async fn test_postgres_user_attributes() {
             "SELECT attribute_type, attribute_value FROM user_attributes WHERE username = $1"
                 .to_string(),
         ),
+        ..Default::default()
     };
 
     let handler = PostgresAuthHandler::new(config)
@@ -206,6 +213,7 @@ async fn test_postgres_connection_pool() {
             .to_string(),
         password_hash: "bcrypt".to_string(),
         attributes_query: None,
+        ..Default::default()
     };
 
     let handler = PostgresAuthHandler::new(config)
@@ -253,6 +261,7 @@ async fn test_postgres_custom_query() {
         query: "SELECT u.username, u.password_hash FROM users u WHERE u.username = $1 AND u.enabled = true".to_string(),
         password_hash: "bcrypt".to_string(),
         attributes_query: None,
+        ..Default::default()
     };
 
     let handler = PostgresAuthHandler::new(config)
@@ -273,6 +282,7 @@ async fn test_postgres_bcrypt_verification() {
         query: "SELECT username, password_hash FROM users WHERE username = $1".to_string(),
         password_hash: "bcrypt".to_string(),
         attributes_query: None,
+        ..Default::default()
     };
 
     let handler = PostgresAuthHandler::new(config)
@@ -302,6 +312,7 @@ async fn test_postgres_connection_timeout() {
         query: "SELECT username, password_hash FROM users WHERE username = $1".to_string(),
         password_hash: "bcrypt".to_string(),
         attributes_query: None,
+        ..Default::default()
     };
 
     // This should still succeed if database is responsive

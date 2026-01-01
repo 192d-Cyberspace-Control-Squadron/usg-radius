@@ -1,0 +1,85 @@
+# LDAP Test Data Initialization
+# This file contains test data for LDAP integration tests
+#
+# To load this data into the OpenLDAP test container:
+# ldapadd -x -H ldap://localhost:389 -D "cn=admin,dc=example,dc=com" -w admin -f init-ldap.ldif
+
+# Create organizational units
+dn: ou=users,dc=example,dc=com
+objectClass: organizationalUnit
+ou: users
+
+dn: ou=groups,dc=example,dc=com
+objectClass: organizationalUnit
+ou: groups
+
+# Create test users
+dn: uid=testuser,ou=users,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: testuser
+sn: User
+givenName: Test
+cn: Test User
+displayName: Test User
+uidNumber: 10000
+gidNumber: 10000
+userPassword: {SSHA}password123
+homeDirectory: /home/testuser
+loginShell: /bin/bash
+mail: testuser@example.com
+
+dn: uid=adminuser,ou=users,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: adminuser
+sn: Admin
+givenName: Admin
+cn: Admin User
+displayName: Admin User
+uidNumber: 10001
+gidNumber: 10001
+userPassword: {SSHA}admin123
+homeDirectory: /home/adminuser
+loginShell: /bin/bash
+mail: adminuser@example.com
+
+dn: uid=guestuser,ou=users,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: guestuser
+sn: Guest
+givenName: Guest
+cn: Guest User
+displayName: Guest User
+uidNumber: 10002
+gidNumber: 10002
+userPassword: {SSHA}guest123
+homeDirectory: /home/guestuser
+loginShell: /bin/bash
+mail: guestuser@example.com
+
+# Create test groups
+dn: cn=radius_users,ou=groups,dc=example,dc=com
+objectClass: groupOfNames
+cn: radius_users
+description: RADIUS Users Group
+member: uid=testuser,ou=users,dc=example,dc=com
+member: uid=adminuser,ou=users,dc=example,dc=com
+member: uid=guestuser,ou=users,dc=example,dc=com
+
+dn: cn=radius_admins,ou=groups,dc=example,dc=com
+objectClass: groupOfNames
+cn: radius_admins
+description: RADIUS Administrators Group
+member: uid=adminuser,ou=users,dc=example,dc=com
+
+dn: cn=vpn_users,ou=groups,dc=example,dc=com
+objectClass: groupOfNames
+cn: vpn_users
+description: VPN Users Group
+member: uid=testuser,ou=users,dc=example,dc=com
+member: uid=adminuser,ou=users,dc=example,dc=com

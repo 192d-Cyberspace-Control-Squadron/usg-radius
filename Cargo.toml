@@ -67,6 +67,8 @@ sqlx = { version = "0.8", features = [
     "chrono",
 ] }
 bcrypt = "0.17"
+argon2 = "0.5"
+pbkdf2 = { version = "0.12", features = ["simple"] }
 
 # Development
 hex = "0.4"

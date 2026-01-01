@@ -28,6 +28,8 @@ clap.workspace = true
 ldap3.workspace = true
 sqlx.workspace = true
 bcrypt.workspace = true
+argon2.workspace = true
+pbkdf2.workspace = true
 sha2.workspace = true
 rustls = { workspace = true, optional = true }
 

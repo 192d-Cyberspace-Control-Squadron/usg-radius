@@ -68,6 +68,24 @@ pub struct LdapConfig {
     /// Connection acquire timeout in seconds
     #[serde(default = "default_acquire_timeout")]
     pub acquire_timeout: u64,
+
+    /// Group attribute name (default: "memberOf")
+    #[serde(default = "default_group_attribute")]
+    pub group_attribute: String,
+
+    /// Map LDAP groups to RADIUS attributes
+    /// Format: { "CN=GroupName,OU=Groups,DC=example,DC=com": [{"type": 25, "value": "Framed-User"}] }
+    #[serde(default)]
+    pub group_attribute_mapping: std::collections::HashMap<String, Vec<GroupAttributeMapping>>,
+}
+
+/// Mapping from LDAP group to RADIUS attribute
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroupAttributeMapping {
+    /// RADIUS attribute type number
+    pub attr_type: u8,
+    /// RADIUS attribute value
+    pub attr_value: String,
 }
 
 fn default_search_filter() -> String {
@@ -94,6 +112,10 @@ fn default_acquire_timeout() -> u64 {
     10
 }
 
+fn default_group_attribute() -> String {
+    "memberOf".to_string()
+}
+
 impl Default for LdapConfig {
     fn default() -> Self {
         LdapConfig {
@@ -107,6 +129,8 @@ impl Default for LdapConfig {
             verify_tls: true,
             max_connections: default_max_connections(),
             acquire_timeout: default_acquire_timeout(),
+            group_attribute: default_group_attribute(),
+            group_attribute_mapping: std::collections::HashMap::new(),
         }
     }
 }
@@ -246,6 +270,9 @@ impl LdapConnection {
 pub struct LdapAuthHandler {
     config: LdapConfig,
     pool: Arc<LdapPool>,
+    /// Cache of user attributes from last successful search
+    /// Key is username, value is the LDAP entry attributes
+    user_attrs_cache: Arc<dashmap::DashMap<String, std::collections::HashMap<String, Vec<String>>>>,
 }
 
 impl LdapAuthHandler {
@@ -260,6 +287,7 @@ impl LdapAuthHandler {
         LdapAuthHandler {
             config,
             pool: Arc::new(pool),
+            user_attrs_cache: Arc::new(dashmap::DashMap::new()),
         }
     }
 
@@ -305,14 +333,17 @@ impl LdapAuthHandler {
             );
         }
 
-        // Get user DN
+        // Get user DN and attributes
         let entry = SearchEntry::construct(rs[0].clone());
-        let user_dn = entry.dn;
+        let user_dn = entry.dn.clone();
+
+        // Cache user attributes for later retrieval
+        self.user_attrs_cache.insert(username.to_string(), entry.attrs.clone());
 
         debug!(
             username = %username,
             dn = %user_dn,
-            "Found user in LDAP"
+            "Found user in LDAP and cached attributes"
         );
 
         Ok(user_dn)
@@ -366,10 +397,52 @@ impl AuthHandler for LdapAuthHandler {
     // LDAP uses bind authentication which doesn't provide access to plaintext passwords
     // The default implementation in AuthHandler will return false
 
-    fn get_accept_attributes(&self, _username: &str) -> Vec<Attribute> {
-        // Could retrieve group memberships or other attributes from LDAP
-        // and convert them to RADIUS attributes
-        vec![]
+    fn get_accept_attributes(&self, username: &str) -> Vec<Attribute> {
+        let mut attributes = Vec::new();
+
+        // Retrieve cached user attributes
+        if let Some(user_attrs) = self.user_attrs_cache.get(username) {
+            // Get group memberships from the configured group attribute (default: memberOf)
+            if let Some(groups) = user_attrs.get(&self.config.group_attribute) {
+                debug!(
+                    username = %username,
+                    groups = ?groups,
+                    "Retrieved group memberships from LDAP"
+                );
+
+                // Map each group to RADIUS attributes based on configuration
+                for group in groups {
+                    if let Some(mappings) = self.config.group_attribute_mapping.get(group) {
+                        for mapping in mappings {
+                            // Create RADIUS attribute from mapping
+                            match Attribute::string(mapping.attr_type, &mapping.attr_value) {
+                                Ok(attr) => {
+                                    debug!(
+                                        username = %username,
+                                        group = %group,
+                                        attr_type = mapping.attr_type,
+                                        attr_value = %mapping.attr_value,
+                                        "Mapped LDAP group to RADIUS attribute"
+                                    );
+                                    attributes.push(attr);
+                                }
+                                Err(e) => {
+                                    warn!(
+                                        username = %username,
+                                        group = %group,
+                                        attr_type = mapping.attr_type,
+                                        error = ?e,
+                                        "Failed to create RADIUS attribute from group mapping"
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        attributes
     }
 
     fn get_reject_attributes(&self, _username: &str) -> Vec<Attribute> {

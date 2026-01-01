@@ -281,6 +281,58 @@ impl PostgresAuthHandler {
                 .map_err(|e| PostgresError::PasswordVerification(e.to_string()))?
                 .map_err(|e| PostgresError::PasswordVerification(e.to_string()))
             }
+            "argon2" => {
+                // Use Argon2 to verify password
+                use argon2::{Argon2, PasswordHash, PasswordVerifier};
+
+                tokio::task::spawn_blocking({
+                    let password = password.to_string();
+                    let hash = hash.to_string();
+                    move || {
+                        let parsed_hash = PasswordHash::new(&hash)
+                            .map_err(|e| format!("Invalid Argon2 hash format: {}", e))?;
+                        Argon2::default()
+                            .verify_password(password.as_bytes(), &parsed_hash)
+                            .map(|_| true)
+                            .or_else(|e| {
+                                if matches!(e, argon2::password_hash::Error::Password) {
+                                    Ok(false)
+                                } else {
+                                    Err(format!("Argon2 verification error: {}", e))
+                                }
+                            })
+                    }
+                })
+                .await
+                .map_err(|e| PostgresError::PasswordVerification(e.to_string()))?
+                .map_err(|e| PostgresError::PasswordVerification(e.to_string()))
+            }
+            "pbkdf2" => {
+                // Use PBKDF2 to verify password
+                use pbkdf2::password_hash::{PasswordHash, PasswordVerifier};
+
+                tokio::task::spawn_blocking({
+                    let password = password.to_string();
+                    let hash = hash.to_string();
+                    move || {
+                        let parsed_hash = PasswordHash::new(&hash)
+                            .map_err(|e| format!("Invalid PBKDF2 hash format: {}", e))?;
+                        pbkdf2::Pbkdf2
+                            .verify_password(password.as_bytes(), &parsed_hash)
+                            .map(|_| true)
+                            .or_else(|e| {
+                                if matches!(e, pbkdf2::password_hash::Error::Password) {
+                                    Ok(false)
+                                } else {
+                                    Err(format!("PBKDF2 verification error: {}", e))
+                                }
+                            })
+                    }
+                })
+                .await
+                .map_err(|e| PostgresError::PasswordVerification(e.to_string()))?
+                .map_err(|e| PostgresError::PasswordVerification(e.to_string()))
+            }
             "plain" => {
                 // Plain text comparison (NOT recommended for production)
                 warn!("Using plain text password comparison - NOT recommended for production");

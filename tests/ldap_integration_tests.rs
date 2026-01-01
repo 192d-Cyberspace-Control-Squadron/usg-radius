@@ -24,6 +24,7 @@ async fn test_ldap_connection() {
         attributes: vec!["dn".to_string(), "cn".to_string()],
         timeout: 10,
         verify_tls: false,
+        ..Default::default()
     };
 
     let _handler = LdapAuthHandler::new(config);
@@ -45,6 +46,7 @@ async fn test_ldap_authentication_success() {
         attributes: vec!["dn".to_string(), "cn".to_string()],
         timeout: 10,
         verify_tls: false,
+        ..Default::default()
     };
 
     let handler = LdapAuthHandler::new(config);
@@ -70,6 +72,7 @@ async fn test_ldap_authentication_failure_wrong_password() {
         attributes: vec!["dn".to_string(), "cn".to_string()],
         timeout: 10,
         verify_tls: false,
+        ..Default::default()
     };
 
     let handler = LdapAuthHandler::new(config);
@@ -91,6 +94,7 @@ async fn test_ldap_authentication_user_not_found() {
         attributes: vec!["dn".to_string(), "cn".to_string()],
         timeout: 10,
         verify_tls: false,
+        ..Default::default()
     };
 
     let handler = LdapAuthHandler::new(config);
@@ -112,6 +116,7 @@ async fn test_ldap_multiple_users() {
         attributes: vec!["dn".to_string(), "cn".to_string()],
         timeout: 10,
         verify_tls: false,
+        ..Default::default()
     };
 
     let handler = LdapAuthHandler::new(config);
