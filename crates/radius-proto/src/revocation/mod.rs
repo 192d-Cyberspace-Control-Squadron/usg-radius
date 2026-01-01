@@ -292,6 +292,8 @@ pub(crate) mod fetch;
 #[cfg(feature = "revocation")]
 pub mod ocsp;
 #[cfg(feature = "revocation")]
+pub mod ocsp_cache;
+#[cfg(feature = "revocation")]
 pub mod verifier;
 
 // Re-export public types

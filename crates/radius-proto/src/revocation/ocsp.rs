@@ -477,6 +477,7 @@ fn encode_base128(mut value: u64) -> Vec<u8> {
 /// Parsed OCSP response
 ///
 /// Contains the decoded and validated OCSP response data.
+#[derive(Debug, Clone)]
 pub struct OcspResponse {
     /// Response status
     pub status: OcspResponseStatus,
@@ -511,7 +512,7 @@ impl OcspResponse {
         //     responseBytes   [0] EXPLICIT ResponseBytes OPTIONAL
         // }
 
-        let (rem, ocsp_resp_seq) = der_parser::parse_der(der_bytes)
+        let (_rem, ocsp_resp_seq) = der_parser::parse_der(der_bytes)
             .map_err(|e| RevocationError::ParseError(format!("Failed to parse OCSP response: {:?}", e)))?;
 
         let ocsp_resp_seq = ocsp_resp_seq.as_sequence()
