@@ -39,6 +39,11 @@ async-trait.workspace = true
 # High Availability dependencies
 redis = { workspace = true, optional = true, features = ["tokio-comp", "connection-manager"] }
 
+# HTTP server for health checks and metrics
+axum = { workspace = true, optional = true }
+tower = { workspace = true, optional = true }
+tower-http = { workspace = true, optional = true }
+
 [dev-dependencies]
 hex.workspace = true
 tempfile.workspace = true
@@ -46,4 +51,4 @@ tempfile.workspace = true
 [features]
 default = []
 tls = ["radius-proto/tls", "dep:rustls"]
-ha = ["radius-proto/serde", "dep:redis"]
+ha = ["radius-proto/serde", "dep:redis", "dep:axum", "dep:tower", "dep:tower-http"]

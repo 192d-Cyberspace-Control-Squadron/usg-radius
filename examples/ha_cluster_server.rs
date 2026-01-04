@@ -36,18 +36,28 @@
 //! radtest alice password 127.0.0.1:1813 0 testing123  # Same session visible
 //! ```
 
+// This example requires the 'ha' feature to be enabled
+
+#[cfg(feature = "ha")]
 use radius_server::{
     RadiusServer, ServerConfig, SimpleAuthHandler,
     cache_ha::SharedRequestCache,
     ratelimit_ha::{SharedRateLimitConfig, SharedRateLimiter},
     state::{MemoryStateBackend, SharedSessionManager, ValkeyConfig, ValkeyStateBackend},
 };
+
+#[cfg(feature = "ha")]
 use std::env;
+#[cfg(feature = "ha")]
 use std::net::SocketAddr;
+#[cfg(feature = "ha")]
 use std::sync::Arc;
+#[cfg(feature = "ha")]
 use std::time::Duration;
+#[cfg(feature = "ha")]
 use tracing::{info, warn};
 
+#[cfg(feature = "ha")]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize logging
@@ -157,20 +167,68 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         info!("Session storage: Valkey (distributed)");
     }
 
+    // Start health check server if HA is enabled
+    let health_port = port + 1000; // Health on port 2812 if RADIUS on 1812
+    let metrics_port = port + 2000; // Metrics on port 3812 if RADIUS on 1812
+
+    if let Some(ref session_manager) = session_manager {
+        // Start health check server
+        let health_addr: SocketAddr = format!("0.0.0.0:{}", health_port).parse()?;
+        let health_session_manager = Arc::clone(session_manager);
+        tokio::spawn(async move {
+            if let Err(e) =
+                radius_server::start_health_server(health_session_manager, health_addr).await
+            {
+                warn!("Health server error: {}", e);
+            }
+        });
+
+        // Start metrics server
+        let metrics_addr: SocketAddr = format!("0.0.0.0:{}", metrics_port).parse()?;
+        let metrics_session_manager = Arc::clone(session_manager);
+        tokio::spawn(async move {
+            if let Err(e) =
+                radius_server::start_metrics_server(metrics_session_manager, metrics_addr).await
+            {
+                warn!("Metrics server error: {}", e);
+            }
+        });
+
+        info!("Health check server: http://0.0.0.0:{}/health", health_port);
+        info!("Metrics server: http://0.0.0.0:{}/metrics", metrics_port);
+    }
+
     // Print server info
     info!("========================================");
     info!("RADIUS Server Ready");
     info!("Listening on: {}", addr);
     info!("Shared secret: testing123");
     info!("HA Mode: {}", if use_ha { "enabled" } else { "disabled" });
+    if use_ha {
+        info!("Health checks: http://0.0.0.0:{}", health_port);
+        info!("Metrics: http://0.0.0.0:{}", metrics_port);
+    }
     info!("========================================");
     info!("");
     info!("Test with:");
     info!("  radtest alice password 127.0.0.1:{} 0 testing123", port);
+    if use_ha {
+        info!("");
+        info!("Monitor with:");
+        info!("  curl http://127.0.0.1:{}/health", health_port);
+        info!("  curl http://127.0.0.1:{}/metrics", metrics_port);
+    }
     info!("");
 
     // Run server
     server.run().await?;
 
     Ok(())
+}
+
+#[cfg(not(feature = "ha"))]
+fn main() {
+    eprintln!("This example requires the 'ha' feature to be enabled.");
+    eprintln!("Run with: cargo run --example ha_cluster_server --features ha");
+    std::process::exit(1);
 }

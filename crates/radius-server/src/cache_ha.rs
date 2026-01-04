@@ -125,13 +125,45 @@ impl SharedRequestCache {
                 false
             }
             Ok(false) => {
-                // SET NX failed - request already exists (duplicate)
-                debug!(
-                    source_ip = %fingerprint.source_ip,
-                    identifier = fingerprint.identifier,
-                    "Duplicate request detected (cluster-wide)"
-                );
-                true
+                // SET NX failed - key exists, but we need to verify authenticator
+                // RFC 2865: same IP + identifier + different authenticator = new request
+                match self.session_manager.backend.get(&key).await {
+                    Ok(Some(stored_value)) if stored_value.len() >= 24 => {
+                        // Extract stored authenticator (skip 8-byte timestamp)
+                        let stored_auth = &stored_value[8..24];
+
+                        if stored_auth == authenticator {
+                            // Same authenticator - this is a duplicate
+                            debug!(
+                                source_ip = %fingerprint.source_ip,
+                                identifier = fingerprint.identifier,
+                                "Duplicate request detected (cluster-wide)"
+                            );
+                            true
+                        } else {
+                            // Different authenticator - this is a new request (e.g., retry)
+                            // Update the stored value with new authenticator
+                            debug!(
+                                source_ip = %fingerprint.source_ip,
+                                identifier = fingerprint.identifier,
+                                "New request with different authenticator (retry)"
+                            );
+
+                            // Update the value (not atomic, but acceptable for this use case)
+                            let _ = self.session_manager.backend.set(&key, &value, Some(self.ttl)).await;
+                            false
+                        }
+                    }
+                    _ => {
+                        // Can't retrieve or malformed - treat as non-duplicate (fail safe)
+                        debug!(
+                            source_ip = %fingerprint.source_ip,
+                            identifier = fingerprint.identifier,
+                            "Failed to retrieve stored request, treating as non-duplicate"
+                        );
+                        false
+                    }
+                }
             }
             Err(e) => {
                 // Backend error - fail safe by treating as non-duplicate

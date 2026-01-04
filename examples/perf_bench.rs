@@ -106,7 +106,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Create auth handler with test users
     let mut auth_handler = SimpleAuthHandler::new();
     for i in 0..100 {
-        auth_handler.add_user(&format!("user{}", i), "testpass");
+        auth_handler.add_user(format!("user{}", i), "testpass");
     }
 
     // Create minimal config

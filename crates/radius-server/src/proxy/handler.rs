@@ -3,9 +3,9 @@
 use crate::proxy::cache::{ProxyCache, ProxyCacheEntry, ProxyStateKey, generate_proxy_state_key};
 use crate::proxy::error::{ProxyError, ProxyResult};
 use crate::proxy::home_server::HomeServer;
+use radius_proto::Packet;
 use radius_proto::attributes::{Attribute, AttributeType};
 use radius_proto::auth::calculate_response_authenticator;
-use radius_proto::Packet;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Instant;

@@ -50,7 +50,9 @@ pub mod cache;
 pub mod cache_ha;
 pub mod config;
 pub mod eap_auth;
+pub mod health;
 pub mod ldap_auth;
+pub mod metrics;
 pub mod postgres_auth;
 pub mod proxy;
 pub mod ratelimit;
@@ -71,3 +73,9 @@ pub use ratelimit_ha::{SharedRateLimitConfig, SharedRateLimiter};
 pub use server::{
     AuthHandler, AuthResult, RadiusServer, ServerConfig, ServerError, SimpleAuthHandler,
 };
+
+// HA-specific exports
+#[cfg(feature = "ha")]
+pub use health::{HealthCheckState, HealthStatus, create_health_server, start_health_server};
+#[cfg(feature = "ha")]
+pub use metrics::{MetricsState, PrometheusMetrics, create_metrics_server, start_metrics_server};

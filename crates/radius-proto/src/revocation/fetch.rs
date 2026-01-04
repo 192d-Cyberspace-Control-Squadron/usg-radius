@@ -1,4 +1,5 @@
 //! CRL HTTP fetching
+#![allow(dead_code)] // HTTP fetcher is wired later in revocation pipeline
 //!
 //! This module provides HTTP client functionality for fetching CRLs from
 //! distribution points specified in X.509 certificates.
@@ -169,13 +170,13 @@ impl CrlFetcher {
         }
 
         // Check Content-Length header if present
-        if let Some(content_length) = response.content_length() {
-            if content_length as usize > self.max_size {
-                return Err(RevocationError::CrlTooLarge(
-                    content_length as usize,
-                    self.max_size,
-                ));
-            }
+        if let Some(content_length) = response.content_length()
+            && content_length as usize > self.max_size
+        {
+            return Err(RevocationError::CrlTooLarge(
+                content_length as usize,
+                self.max_size,
+            ));
         }
 
         // Read response body with size limit

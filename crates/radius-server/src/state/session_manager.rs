@@ -49,17 +49,36 @@ impl<T> CachedSession<T> {
 ///
 /// ```no_run
 /// use radius_server::state::{SharedSessionManager, MemoryStateBackend};
+/// use radius_server::accounting::Session;
 /// use std::sync::Arc;
+/// use std::time::{Duration, SystemTime};
+/// use std::net::IpAddr;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let backend = Arc::new(MemoryStateBackend::new());
 /// let manager = SharedSessionManager::new(backend);
 ///
+/// // Create a session
+/// let session = Session {
+///     session_id: "session-123".to_string(),
+///     username: "testuser".to_string(),
+///     nas_ip: "192.168.1.1".parse::<IpAddr>().unwrap(),
+///     framed_ip: Some("10.0.0.1".parse::<IpAddr>().unwrap()),
+///     start_time: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs(),
+///     last_update: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs(),
+///     input_octets: 1000,
+///     output_octets: 2000,
+///     input_packets: 10,
+///     output_packets: 20,
+///     session_time: 300,
+///     terminate_cause: None,
+/// };
+///
 /// // Store session
-/// manager.store_accounting("session-123", session, Some(Duration::from_secs(300))).await?;
+/// manager.store_accounting("session-123", &session, Some(Duration::from_secs(300))).await?;
 ///
 /// // Retrieve session
-/// let session = manager.get_accounting("session-123").await?;
+/// let retrieved = manager.get_accounting("session-123").await?;
 /// # Ok(())
 /// # }
 /// ```

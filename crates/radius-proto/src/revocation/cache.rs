@@ -40,6 +40,8 @@
 //! # }
 //! ```
 
+#![allow(dead_code)] // Cache helpers are staged for future integration
+
 use super::crl::CrlInfo;
 use dashmap::DashMap;
 use std::sync::Arc;

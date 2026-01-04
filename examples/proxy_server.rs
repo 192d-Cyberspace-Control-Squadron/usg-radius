@@ -50,7 +50,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         config.proxy.as_ref().map(|p| p.enabled)
     );
 
-    if let Some(ref proxy) = config.proxy && proxy.enabled {
+    if let Some(ref proxy) = config.proxy
+        && proxy.enabled
+    {
         println!("  Pools configured: {}", proxy.pools.len());
         for pool in &proxy.pools {
             println!(

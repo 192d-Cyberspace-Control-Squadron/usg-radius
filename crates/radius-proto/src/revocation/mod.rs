@@ -303,14 +303,6 @@ pub use error::RevocationError;
 #[cfg(feature = "revocation")]
 pub use verifier::RevocationCheckingVerifier;
 
-// Internal types (will be made public as implementation progresses)
-#[cfg(feature = "revocation")]
-pub(crate) use cache::CrlCache;
-#[cfg(feature = "revocation")]
-pub(crate) use crl::CrlInfo;
-#[cfg(feature = "revocation")]
-pub(crate) use fetch::CrlFetcher;
-
 /// Module version for tracking implementation progress
 pub const VERSION: &str = "0.6.0 (Phase 1: CRL Support Complete)";
 

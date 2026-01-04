@@ -1,4 +1,5 @@
 //! CRL parsing and validation
+#![allow(dead_code)] // CRL support in-progress; some helpers unused today
 //!
 //! This module handles parsing of Certificate Revocation Lists (RFC 5280)
 //! and checking if certificates are revoked.
@@ -196,10 +197,10 @@ impl CrlInfo {
         }
 
         // Check nextUpdate > now (if present)
-        if let Some(next_update) = self.next_update {
-            if next_update <= now {
-                return Err(RevocationError::CrlExpired(next_update.to_rfc3339()));
-            }
+        if let Some(next_update) = self.next_update
+            && next_update <= now
+        {
+            return Err(RevocationError::CrlExpired(next_update.to_rfc3339()));
         }
 
         Ok(())

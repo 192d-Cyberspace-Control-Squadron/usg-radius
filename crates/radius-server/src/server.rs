@@ -410,14 +410,8 @@ impl RadiusServer {
             info!("Initializing RADIUS proxy");
 
             // Create proxy components
-            let (
-                router,
-                proxy_handler,
-                retry_manager,
-                health_checker,
-                servers,
-                server_pools,
-            ) = Self::initialize_proxy(proxy_config, Arc::clone(&socket)).await?;
+            let (router, proxy_handler, retry_manager, health_checker, servers, server_pools) =
+                Self::initialize_proxy(proxy_config, Arc::clone(&socket)).await?;
 
             config.router = Some(Arc::new(router));
             config.proxy_handler = Some(Arc::new(proxy_handler));

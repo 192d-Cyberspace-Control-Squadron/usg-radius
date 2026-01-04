@@ -4,18 +4,23 @@
 //! certificate revocation status in real-time.
 //!
 //! Usage:
-//!   cargo run --example ocsp_check -- <cert_path> <issuer_path>
+//!   cargo run --example ocsp_check --features revocation -- <cert_path> <issuer_path>
 //!
 //! Example:
-//!   cargo run --example ocsp_check -- client.pem ca.pem
+//!   cargo run --example ocsp_check --features revocation -- client.pem ca.pem
 
-use radius_proto::revocation::{
+#[cfg(feature = "revocation")]
+use radius_proto::revocation::ocsp::{
     CertificateStatus, OcspClient, OcspRequestBuilder, OcspResponse, OcspResponseStatus,
-    RevocationError,
 };
-use std::fs;
-use std::time::Duration;
 
+#[cfg(feature = "revocation")]
+use radius_proto::revocation::RevocationError;
+
+#[cfg(feature = "revocation")]
+use std::fs;
+
+#[cfg(feature = "revocation")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
 
@@ -61,13 +66,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create OCSP client with 10 second timeout
     println!("\nCreating OCSP client...");
-    let client = OcspClient::new(Duration::from_secs(10));
+    let client = OcspClient::new(10)?;
 
     // Send OCSP request
     println!("Querying OCSP responder: {}", ocsp_url);
     println!("(This may take a few seconds...)");
 
-    let response = client.query(&ocsp_url, &request)?;
+    let response_bytes = client.query(&ocsp_url, &request, 10 * 1024 * 1024)?; // 10 MB max
+    let response = OcspResponse::parse(&response_bytes)?;
 
     // Display response
     println!("\nOCSP Response");
@@ -104,6 +110,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
+#[cfg(feature = "revocation")]
 fn display_response(response: &OcspResponse, expected_nonce: &[u8]) -> Result<(), RevocationError> {
     // Response status
     println!("Status: {:?}", response.status);
@@ -147,7 +154,7 @@ fn display_response(response: &OcspResponse, expected_nonce: &[u8]) -> Result<()
             if now > next {
                 println!("⚠️  Response has expired!");
             } else {
-                let remaining = next.duration_since(now).unwrap_or_default();
+                let remaining: std::time::Duration = next.duration_since(now).unwrap_or_default();
                 println!("Response fresh for: {} seconds", remaining.as_secs());
             }
         }
@@ -171,6 +178,7 @@ fn display_response(response: &OcspResponse, expected_nonce: &[u8]) -> Result<()
     Ok(())
 }
 
+#[cfg(feature = "revocation")]
 fn pem_to_der(pem: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     // Simple PEM parser - extract base64 between BEGIN/END markers
     let lines: Vec<&str> = pem.lines().collect();
@@ -199,6 +207,7 @@ fn pem_to_der(pem: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     Ok(der)
 }
 
+#[cfg(feature = "revocation")]
 fn generate_nonce() -> Vec<u8> {
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -213,6 +222,7 @@ fn generate_nonce() -> Vec<u8> {
     nonce.as_bytes().to_vec()
 }
 
+#[cfg(feature = "revocation")]
 fn revocation_reason_name(code: u8) -> &'static str {
     match code {
         0 => "unspecified",
@@ -227,4 +237,11 @@ fn revocation_reason_name(code: u8) -> &'static str {
         10 => "aACompromise",
         _ => "unknown",
     }
+}
+
+#[cfg(not(feature = "revocation"))]
+fn main() {
+    eprintln!("This example requires the 'revocation' feature to be enabled.");
+    eprintln!("Run with: cargo run --example ocsp_check --features revocation");
+    std::process::exit(1);
 }

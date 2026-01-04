@@ -1,9 +1,10 @@
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use radius_server::cache::{RequestCache, RequestFingerprint};
-use radius_server::ratelimit::RateLimiter;
+use radius_server::ratelimit::{RateLimitConfig, RateLimiter};
 use std::hint::black_box;
 use std::net::IpAddr;
 use std::time::Duration;
+use std::sync::Arc;
 
 // Cache benchmarks
 fn bench_cache_duplicate_check(c: &mut Criterion) {
@@ -34,11 +35,11 @@ fn bench_cache_concurrent(c: &mut Criterion) {
             BenchmarkId::from_parameter(num_threads),
             num_threads,
             |b, &num_threads| {
-                let cache = RequestCache::new(Duration::from_secs(60), 10000);
+                let cache = Arc::new(RequestCache::new(Duration::from_secs(60), 10000));
                 b.iter(|| {
                     let handles: Vec<_> = (0..num_threads)
                         .map(|i| {
-                            let cache_ref = &cache;
+                            let cache_ref = Arc::clone(&cache);
                             std::thread::spawn(move || {
                                 for j in 0..100 {
                                     let auth = [i as u8; 16];
@@ -69,7 +70,7 @@ fn bench_ratelimit_check(c: &mut Criterion) {
     let mut group = c.benchmark_group("ratelimit_check");
 
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let limiter = RateLimiter::new();
+    let limiter = RateLimiter::new(RateLimitConfig::default());
 
     group.bench_function("single_client", |b| {
         let test_ip: IpAddr = "192.168.1.100".parse().unwrap();
@@ -90,7 +91,7 @@ fn bench_ratelimit_concurrent(c: &mut Criterion) {
             BenchmarkId::from_parameter(num_clients),
             num_clients,
             |b, &num_clients| {
-                let limiter = RateLimiter::new();
+                let limiter = RateLimiter::new(RateLimitConfig::default());
                 let clients: Vec<IpAddr> = (0..num_clients)
                     .map(|i| format!("192.168.{}.{}", i / 256, i % 256).parse().unwrap())
                     .collect();
@@ -113,7 +114,7 @@ fn bench_ratelimit_burst(c: &mut Criterion) {
     let mut group = c.benchmark_group("ratelimit_burst");
     let rt = tokio::runtime::Runtime::new().unwrap();
 
-    let limiter = RateLimiter::new();
+    let limiter = RateLimiter::new(RateLimitConfig::default());
 
     group.bench_function("burst_100", |b| {
         let test_ip: IpAddr = "192.168.1.100".parse().unwrap();

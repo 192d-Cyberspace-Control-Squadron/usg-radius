@@ -305,7 +305,7 @@ impl Default for OcspConfig {
 }
 
 fn default_max_ocsp_response_size() -> usize {
-    1 * 1024 * 1024 // 1 MB
+    1024 * 1024 // 1 MB
 }
 
 #[cfg(test)]

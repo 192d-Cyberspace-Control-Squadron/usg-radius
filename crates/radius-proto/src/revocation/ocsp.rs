@@ -385,10 +385,10 @@ fn der_octet_string(contents: &[u8]) -> Vec<u8> {
 fn der_integer(value: &[u8]) -> Vec<u8> {
     // Handle negative numbers by adding padding if high bit is set
     let mut int_value = value.to_vec();
-    if let Some(&first_byte) = int_value.first() {
-        if first_byte & 0x80 != 0 {
-            int_value.insert(0, 0x00);
-        }
+    if let Some(&first_byte) = int_value.first()
+        && first_byte & 0x80 != 0
+    {
+        int_value.insert(0, 0x00);
     }
     der_tlv(0x02, &int_value)
 }
@@ -522,7 +522,7 @@ impl OcspResponse {
             RevocationError::ParseError("OCSP response is not a SEQUENCE".to_string())
         })?;
 
-        if ocsp_resp_seq.len() < 1 {
+        if ocsp_resp_seq.is_empty() {
             return Err(RevocationError::ParseError(
                 "OCSP response SEQUENCE is empty".to_string(),
             ));
@@ -670,28 +670,21 @@ impl OcspResponse {
 
         // nextUpdate [0] EXPLICIT GeneralizedTime OPTIONAL
         let mut next_update = None;
-        if single_resp.len() > 3 {
-            if single_resp[3].header.tag().0 == 0xA0 {
-                // Extract the GeneralizedTime from inside the [0] tag
-                if let Ok(seq) = single_resp[3].as_sequence() {
-                    if !seq.is_empty() {
-                        if let Ok(next_update_str) = seq[0].as_str() {
-                            next_update = Some(parse_generalized_time(next_update_str)?);
-                        }
-                    }
-                }
-            }
+        if single_resp.len() > 3
+            && single_resp[3].header.tag().0 == 0xA0
+            && let Ok(seq) = single_resp[3].as_sequence()
+            && let Some(next_update_str) = seq.first().and_then(|item| item.as_str().ok())
+        {
+            next_update = Some(parse_generalized_time(next_update_str)?);
         }
 
         // Extract nonce from responseExtensions if present
         let mut nonce = None;
-        if tbs_response_data.len() > idx + 1 {
-            if tbs_response_data[idx + 1].header.tag().0 == 0xA1 {
-                // Parse extensions
-                if let Ok(exts_seq) = tbs_response_data[idx + 1].as_sequence() {
-                    nonce = extract_nonce_from_extensions(exts_seq)?;
-                }
-            }
+        if tbs_response_data.len() > idx + 1
+            && tbs_response_data[idx + 1].header.tag().0 == 0xA1
+            && let Ok(exts_seq) = tbs_response_data[idx + 1].as_sequence()
+        {
+            nonce = extract_nonce_from_extensions(exts_seq)?;
         }
 
         Ok(Self {
@@ -728,10 +721,10 @@ impl OcspResponse {
         }
 
         // If nextUpdate is present, must be before it
-        if let Some(next_update) = self.next_update {
-            if now >= next_update {
-                return false;
-            }
+        if let Some(next_update) = self.next_update
+            && now >= next_update
+        {
+            return false;
         }
 
         true
@@ -741,10 +734,10 @@ impl OcspResponse {
     ///
     /// Returns the time until nextUpdate, or a default TTL if nextUpdate is missing
     pub fn cache_ttl(&self) -> Duration {
-        if let Some(next_update) = self.next_update {
-            if let Ok(duration) = next_update.duration_since(SystemTime::now()) {
-                return duration;
-            }
+        if let Some(next_update) = self.next_update
+            && let Ok(duration) = next_update.duration_since(SystemTime::now())
+        {
+            return duration;
         }
 
         // Default: cache for 1 hour if no nextUpdate
@@ -902,8 +895,6 @@ fn extract_nonce_from_extensions(
 /// Handles HTTP POST requests to OCSP responders and response parsing.
 #[derive(Debug)]
 pub struct OcspClient {
-    /// HTTP timeout for OCSP requests
-    timeout: Duration,
     /// HTTP client (reused for connection pooling)
     http_client: reqwest::blocking::Client,
 }
@@ -921,10 +912,7 @@ impl OcspClient {
                 RevocationError::HttpError(format!("Failed to create HTTP client: {}", e))
             })?;
 
-        Ok(Self {
-            timeout: Duration::from_secs(timeout),
-            http_client,
-        })
+        Ok(Self { http_client })
     }
 
     /// Query an OCSP responder
@@ -961,15 +949,14 @@ impl OcspClient {
         }
 
         // Check Content-Type header
-        if let Some(content_type) = response.headers().get("Content-Type") {
-            if let Ok(ct_str) = content_type.to_str() {
-                if !ct_str.contains("application/ocsp-response") {
-                    return Err(RevocationError::HttpError(format!(
-                        "Unexpected Content-Type: {}",
-                        ct_str
-                    )));
-                }
-            }
+        if let Some(content_type) = response.headers().get("Content-Type")
+            && let Ok(ct_str) = content_type.to_str()
+            && !ct_str.contains("application/ocsp-response")
+        {
+            return Err(RevocationError::HttpError(format!(
+                "Unexpected Content-Type: {}",
+                ct_str
+            )));
         }
 
         // Read response body with size limit
@@ -1017,7 +1004,7 @@ impl OcspClient {
                 // OCSP access method OID is 1.3.6.1.5.5.7.48.1
 
                 // Use x509-parser's parsing
-                use x509_parser::extensions::{AuthorityInfoAccess, GeneralName, ParsedExtension};
+                use x509_parser::extensions::{GeneralName, ParsedExtension};
 
                 if let ParsedExtension::AuthorityInfoAccess(aia) = ext.parsed_extension() {
                     let ocsp_oid = oid!(1.3.6.1.5.5.7.48.1);

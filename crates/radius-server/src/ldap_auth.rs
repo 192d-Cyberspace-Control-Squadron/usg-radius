@@ -241,10 +241,7 @@ impl LdapPool {
 
     /// Record a successful connection to a server
     fn record_success(&self, url: &str) {
-        let mut entry = self
-            .server_health
-            .entry(url.to_string())
-            .or_default();
+        let mut entry = self.server_health.entry(url.to_string()).or_default();
 
         entry.consecutive_successes += 1;
         entry.consecutive_failures = 0;
@@ -261,10 +258,7 @@ impl LdapPool {
 
     /// Record a failed connection to a server
     fn record_failure(&self, url: &str) {
-        let mut entry = self
-            .server_health
-            .entry(url.to_string())
-            .or_default();
+        let mut entry = self.server_health.entry(url.to_string()).or_default();
 
         entry.consecutive_failures += 1;
         entry.consecutive_successes = 0;

@@ -322,7 +322,7 @@ impl RevocationCheckingVerifier {
     /// Check certificate revocation via OCSP
     fn check_ocsp(&self, cert_der: &[u8]) -> Result<(), RevocationError> {
         // Check if OCSP is enabled
-        let ocsp_client = self.ocsp_client.as_ref().ok_or_else(|| {
+        let _ocsp_client = self.ocsp_client.as_ref().ok_or_else(|| {
             RevocationError::ConfigError("OCSP client not initialized".to_string())
         })?;
 
@@ -340,7 +340,7 @@ impl RevocationCheckingVerifier {
         }
 
         // Extract OCSP URL from certificate AIA extension
-        let ocsp_url = match OcspClient::extract_ocsp_url(cert_der) {
+        let _ocsp_url = match OcspClient::extract_ocsp_url(cert_der) {
             Ok(url) => url,
             Err(e) => {
                 // No OCSP URL found - handle according to fail-open/closed policy
@@ -355,9 +355,9 @@ impl RevocationCheckingVerifier {
         //
         // TODO: Extract issuer from intermediates parameter in verify_client_cert
         // and pass it through check_revocation chain
-        return Err(RevocationError::ConfigError(
+        Err(RevocationError::ConfigError(
             "OCSP checking requires issuer certificate (not yet implemented)".to_string(),
-        ));
+        ))
 
         // This code will be used once issuer extraction is implemented:
         /*

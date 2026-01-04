@@ -13,16 +13,6 @@ pub struct PooledBuffer {
 }
 
 impl PooledBuffer {
-    /// Get a mutable reference to the buffer
-    pub fn as_mut(&mut self) -> &mut Vec<u8> {
-        &mut self.buffer
-    }
-
-    /// Get an immutable reference to the buffer
-    pub fn as_ref(&self) -> &[u8] {
-        &self.buffer
-    }
-
     /// Get the buffer length
     pub fn len(&self) -> usize {
         self.buffer.len()
